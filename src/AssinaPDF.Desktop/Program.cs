@@ -50,25 +50,33 @@ internal sealed class MainForm : Form
         var header = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 74,
-            Padding = new Padding(22, 12, 22, 10),
+            Height = 82,
+            Padding = new Padding(12, 6, 12, 6),
             BackColor = Color.FromArgb(232, 234, 237)
         };
-        header.Controls.Add(new Label
+        var logo = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Transparent };
+        try
         {
-            Text = "Future Soluções  •  Leitura e assinatura digital de PDFs",
-            Dock = DockStyle.Bottom,
-            Height = 24,
-            ForeColor = Color.FromArgb(210, 200, 225)
-        });
-        header.Controls.Add(new Label
+            var logoPath = Path.Combine(AppContext.BaseDirectory, "logo-future.png");
+            if (File.Exists(logoPath))
+            {
+                using var image = Image.FromFile(logoPath);
+                logo.Image = new Bitmap(image);
+            }
+        }
+        catch (IOException) { }
+        catch (ArgumentException) { }
+        header.Controls.Add(logo);
+
+        var promoBanners = new TableLayoutPanel
         {
-            Text = "AssinaPDF",
-            Dock = DockStyle.Top,
-            Height = 32,
-            Font = new Font("Segoe UI Semibold", 18F, FontStyle.Bold),
-            ForeColor = Color.White
-        });
+            Dock = DockStyle.Top, Height = 42, ColumnCount = 3, RowCount = 1,
+            Padding = new Padding(8, 4, 8, 4), BackColor = Color.FromArgb(242, 243, 245)
+        };
+        for (var i = 0; i < 3; i++) promoBanners.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333F));
+        promoBanners.Controls.Add(CreatePromoLink("Certificado Digital", "Emissão e renovação"), 0, 0);
+        promoBanners.Controls.Add(CreatePromoLink("SPC Brasil", "Consultas para empresas"), 1, 0);
+        promoBanners.Controls.Add(CreatePromoLink("Sistema de Notas", "Emissão fiscal em nuvem"), 2, 0);
 
         var toolbar = new FlowLayoutPanel
         {
@@ -156,6 +164,7 @@ internal sealed class MainForm : Form
         Controls.Add(_certificateStatus);
         Controls.Add(_fileStatus);
         Controls.Add(toolbar);
+        Controls.Add(promoBanners);
         Controls.Add(header);
 
         Shown += async (_, _) => await InitializeViewerAsync();
@@ -182,6 +191,23 @@ internal sealed class MainForm : Form
         };
         button.FlatAppearance.BorderSize = 0;
         return button;
+    }
+
+    private static LinkLabel CreatePromoLink(string title, string description)
+    {
+        var link = new LinkLabel
+        {
+            Dock = DockStyle.Fill, Text = "  " + title + " · " + description,
+            TextAlign = ContentAlignment.MiddleCenter, LinkColor = Color.FromArgb(55, 61, 70),
+            VisitedLinkColor = Color.FromArgb(55, 61, 70), ActiveLinkColor = Color.FromArgb(25, 30, 38),
+            BackColor = Color.FromArgb(232, 234, 237), Margin = new Padding(3), AutoEllipsis = true
+        };
+        link.LinkClicked += (_, _) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://futuresolucoes.com.br/") { UseShellExecute = true }); }
+            catch (System.ComponentModel.Win32Exception) { MessageBox.Show("Não foi possível abrir o site.", "Future Soluções"); }
+        };
+        return link;
     }
 
     private async Task InitializeViewerAsync()
