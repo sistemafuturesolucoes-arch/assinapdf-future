@@ -1,6 +1,6 @@
 # Instalador Windows x64
 
-O pacote WiX gera um MSI por usuário, instala os arquivos em LocalAppData e cria um atalho no Menu Iniciar. Ele não exige instalação global do aplicativo.
+O pacote WiX gera um MSI x64 por máquina, instala os arquivos em Program Files e cria um atalho no Menu Iniciar. A instalação exige permissão de administrador; a desinstalação é feita por Aplicativos instalados do Windows.
 
 ## Build no CI
 
