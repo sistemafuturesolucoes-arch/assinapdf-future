@@ -33,7 +33,7 @@
 - [x] Salvar em novo arquivo por padrão e preservar o original.
 - [ ] Permitir selecionar a área da assinatura clicando diretamente no preview do PDF.
 - [ ] Executar testes independentes de integridade e interoperabilidade.
-- [ ] Diferenciar integridade, confiança da cadeia, revogação e carimbo do tempo na tela de validação.
+- [x] Adicionar verificação local de integridade/assinatura criptográfica com aviso de que cadeia, revogação e carimbo do tempo não são validados nesta etapa.\n- [ ] Diferenciar resultados de integridade, cadeia de confiança, revogação e carimbo do tempo na validação completa.
 - [ ] Implementar carimbo do tempo e perfis de validação de longo prazo somente após definir provedores e política.
 - [ ] Validar com ferramentas apropriadas, incluindo ITI quando aplicável.
 
