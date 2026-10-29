@@ -131,7 +131,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Top,
             Height = 34,
             Padding = new Padding(18, 7, 18, 4),
-            ForeColor = Color.FromArgb(215, 215, 225),
+            ForeColor = Color.FromArgb(55, 59, 65),
             AutoEllipsis = true
         };
 
@@ -196,7 +196,7 @@ internal sealed class MainForm : Form
             Text = text,
             AutoSize = true,
             Padding = new Padding(12, 6, 12, 6),
-            BackColor = Color.FromArgb(124, 58, 237),
+            BackColor = Color.FromArgb(92, 98, 108),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Margin = new Padding(0, 0, 8, 0),
