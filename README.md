@@ -8,11 +8,12 @@ Aplicativo desktop da Future Soluções para leitura local e assinatura digital 
 - Visualizador integrado baseado no Microsoft Edge WebView2.
 - Abrir PDF por seletor de arquivo ou arrastar o arquivo para a janela.
 - Consulta local ao repositório Pessoal de certificados do usuário atual do Windows.
-- Fluxo inicial de assinatura PAdES básico (Baseline-B-B) usando o certificado selecionado, sem exportar a chave privada.
-- O PDF assinado é salvo em um arquivo separado; o arquivo original não deve ser sobrescrito.
+- Fluxo de assinatura PAdES básico (Baseline-B-B) usando o certificado selecionado, sem exportar a chave privada.
+- Configuração de aparência visível por página e coordenadas PDF; a seleção clicando diretamente sobre o preview ainda está pendente.
+- O PDF assinado é salvo em um arquivo separado; o arquivo original é preservado.
 - Workflow independente de build/publicação, sem deploy do CRM.
 
-**Ainda é uma versão de desenvolvimento, não um instalador final para distribuição.** A implementação de assinatura precisa de testes de interoperabilidade e de certificados reais em Windows antes de ser usada em produção. A assinatura básica não inclui, por si só, carimbo do tempo ou evidência de revogação de longo prazo. O êxito da operação não garante que toda cadeia seja confiável nem confirma automaticamente conformidade ICP-Brasil.
+**Ainda é uma versão de desenvolvimento, não um instalador final para distribuição.** A assinatura precisa ser testada com certificados reais, validadores independentes e documentos variados antes de uso em produção. O perfil básico não inclui, por si só, carimbo do tempo ou evidência de revogação de longo prazo. O êxito da operação não garante que toda cadeia seja confiável nem confirma automaticamente conformidade ICP-Brasil.
 
 ## Requisitos
 
