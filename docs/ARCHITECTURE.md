@@ -15,7 +15,7 @@
 - **Desktop UI:** Windows Forms.
 - **PDF viewer:** Microsoft WebView2 hospedando o visualizador PDF do Microsoft Edge.
 - **Certificate discovery:** repositório Pessoal do usuário atual do Windows (`CurrentUser/My`); a interface mostra metadados e disponibilidade local da chave privada.
-- **PAdES signing:** `SimpleSign.PAdES` 0.9.2, perfil básico Baseline-B-B, usando o certificado escolhido sem exportar a chave privada.
+- **PAdES signing:** `SimpleSign.PAdES` 0.9.2, perfil básico Baseline-B-B, usando o certificado escolhido sem exportar a chave privada.\n- **Visible appearance:** diálogo para informar página e coordenadas em pontos PDF; seleção visual com clique no preview ainda não está implementada.
 - **CI:** workflow dedicado que compila e publica um artefato de teste, sem implantar o CRM.
 
 ## Limites e próximas etapas
