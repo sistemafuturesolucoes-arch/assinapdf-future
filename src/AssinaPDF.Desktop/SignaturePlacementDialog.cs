@@ -8,8 +8,8 @@ internal sealed class SignaturePlacementDialog : Form
     private readonly TextBox _reason;
 
     public int PageNumber => (int)_pageNumber.Value;
-    public double XCoordinate => (double)_xCoordinate.Value;
-    public double YCoordinate => (double)_yCoordinate.Value;
+    public float XCoordinate => (float)_xCoordinate.Value;
+    public float YCoordinate => (float)_yCoordinate.Value;
     public string SigningReason => _reason.Text.Trim();
 
     public SignaturePlacementDialog()
