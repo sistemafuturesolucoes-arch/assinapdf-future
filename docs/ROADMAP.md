@@ -43,7 +43,7 @@
 - [ ] Expandir testes para validação criptográfica independente, PDFs existentes, certificados A1 e token/cartão.
 - [ ] Auditar a dependência PAdES recente e fixar a versão aprovada.
 - [ ] Fazer revisão de segurança e análise de dependências/licenças.
-- [ ] Criar instalador x64 reproduzível e desinstalador.
+- [x] Criar projeto WiX para MSI x64 com instalação e desinstalação via Windows Installer.\n- [ ] Validar instalação, atualização e remoção do MSI em máquinas Windows limpas.
 - [ ] Detectar ou instalar WebView2 Runtime conforme estratégia aprovada.
 - [ ] Definir licença e identidade comercial do produto.
 - [ ] Assinar executável/instalador quando houver certificado de assinatura de código adequado.
