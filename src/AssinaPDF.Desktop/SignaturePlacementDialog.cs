@@ -23,19 +23,20 @@ internal sealed class SignaturePlacementDialog : Form
     {
         _pdfPath = Path.GetFullPath(pdfPath);
         Text = "Selecione os locais da assinatura";
-        StartPosition = FormStartPosition.CenterParent;
-        MinimumSize = new Size(900, 680);
-        Size = new Size(1120, 820);
-        BackColor = Color.FromArgb(18, 18, 27);
+        StartPosition = FormStartPosition.CenterScreen;
+        MinimumSize = new Size(800, 560);
+        Size = new Size(1000, 690);
+        MaximizeBox = false;
+        BackColor = Color.FromArgb(242, 243, 245);
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 10F);
 
-        var header = new Panel { Dock = DockStyle.Top, Height = 94, Padding = new Padding(20, 12, 20, 10), BackColor = Color.FromArgb(39, 25, 62) };
+        var header = new Panel { Dock = DockStyle.Top, Height = 94, Padding = new Padding(20, 12, 20, 10), BackColor = Color.FromArgb(224, 227, 231) };
         header.Controls.Add(new Label { Text = "Selecione o local para assinar", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI Semibold", 17F, FontStyle.Bold), ForeColor = Color.White });
         header.Controls.Add(new Label { Text = "Clique no PDF para adicionar uma marca de assinatura. Você pode selecionar mais de um local, inclusive em páginas diferentes.", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(222, 213, 236) });
 
-        _viewer = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(30, 30, 38) };
-        var bottom = new Panel { Dock = DockStyle.Bottom, Height = 100, Padding = new Padding(18, 8, 18, 8), BackColor = Color.FromArgb(24, 24, 34) };
+        _viewer = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(245, 246, 248) };
+        var bottom = new Panel { Dock = DockStyle.Bottom, Height = 118, Padding = new Padding(18, 8, 18, 8), BackColor = Color.FromArgb(224, 227, 231) };
         _selectionStatus = new Label { Dock = DockStyle.Top, Height = 25, Text = "Carregando documento...", ForeColor = Color.FromArgb(225, 218, 239) };
         var controls = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, BackColor = bottom.BackColor };
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -71,7 +72,10 @@ internal sealed class SignaturePlacementDialog : Form
     {
         try
         {
-            await _viewer.EnsureCoreWebView2Async();
+            var webViewData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FutureSolucoes", "AssinaPDF", "WebView2");
+            Directory.CreateDirectory(webViewData);
+            var environment = await CoreWebView2Environment.CreateAsync(null, webViewData);
+            await _viewer.EnsureCoreWebView2Async(environment);
             _viewerTempFolder = Path.Combine(Path.GetTempPath(), "AssinaPDF-Placement-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_viewerTempFolder);
             File.Copy(Path.Combine(AppContext.BaseDirectory, "placement-viewer.html"), Path.Combine(_viewerTempFolder, "placement-viewer.html"));
@@ -131,7 +135,7 @@ internal sealed class SignaturePlacementDialog : Form
 
     private static Button CreateButton(string text)
     {
-        var button = new Button { Text = text, AutoSize = true, Padding = new Padding(12, 6, 12, 6), BackColor = Color.FromArgb(124, 58, 237), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Margin = new Padding(5, 3, 0, 3), Cursor = Cursors.Hand };
+        var button = new Button { Text = text, AutoSize = true, Padding = new Padding(12, 6, 12, 6), BackColor = Color.FromArgb(92, 98, 108), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Margin = new Padding(5, 3, 0, 3), Cursor = Cursors.Hand };
         button.FlatAppearance.BorderSize = 0;
         return button;
     }
