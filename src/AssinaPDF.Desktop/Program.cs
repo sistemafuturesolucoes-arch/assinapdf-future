@@ -1,6 +1,8 @@
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using SimpleSign.Core.Signing;
+using SimpleSign.PAdES;
 
 namespace FutureSolucoes.AssinaPDF;
 
@@ -23,6 +25,7 @@ internal sealed class MainForm : Form
     private readonly Button _signButton;
     private string? _currentPdfPath;
     private bool _viewerReady;
+    private bool _signingInProgress;
 
     public MainForm()
     {
@@ -76,7 +79,7 @@ internal sealed class MainForm : Form
 
         _signButton = CreateButton("Assinar PDF");
         _signButton.Enabled = false;
-        _signButton.Click += (_, _) => ShowSigningNotReady();
+        _signButton.Click += async (_, _) => await SignPdfAsync();
         toolbar.Controls.Add(_signButton);
 
         toolbar.Controls.Add(new Label
@@ -99,6 +102,7 @@ internal sealed class MainForm : Form
         {
             var item = _certificatePicker.SelectedItem as CertificateItem;
             _certificateStatus.Text = item?.Details ?? "Selecione um certificado.";
+            UpdateSigningAvailability();
         };
         toolbar.Controls.Add(_certificatePicker);
 
@@ -224,7 +228,7 @@ internal sealed class MainForm : Form
 
             _currentPdfPath = fullPath;
             _fileStatus.Text = $"{info.Name}  •  {FormatFileSize(info.Length)}  •  {fullPath}";
-            _signButton.Enabled = false;
+            UpdateSigningAvailability();
             if (_viewerReady)
                 NavigateToPdf(fullPath);
         }
@@ -243,7 +247,7 @@ internal sealed class MainForm : Form
                 return;
 
             _pdfViewer.CoreWebView2.Navigate(new Uri(Path.GetFullPath(path)).AbsoluteUri);
-            _signButton.Enabled = true;
+            UpdateSigningAvailability();
         }
         catch (Exception ex)
         {
@@ -258,6 +262,7 @@ internal sealed class MainForm : Form
         _certificatePicker.BeginUpdate();
         _certificatePicker.Items.Clear();
         var found = 0;
+        var eligible = 0;
 
         try
         {
@@ -271,22 +276,26 @@ internal sealed class MainForm : Form
                     var hasPrivateKey = certificate.HasPrivateKey;
                     var now = DateTime.Now;
                     var currentlyValid = now >= certificate.NotBefore && now <= certificate.NotAfter;
+                    var name = certificate.GetNameInfo(X509NameType.SimpleName, false);
+                    var canAttemptSigning = hasPrivateKey && currentlyValid;
                     var item = new CertificateItem(
                         certificate,
-                        $"{certificate.GetNameInfo(X509NameType.SimpleName, false)} — válido até {certificate.NotAfter:dd/MM/yyyy}",
-                        $"Titular: {certificate.GetNameInfo(X509NameType.SimpleName, false)} | Emissor: {certificate.GetNameInfo(X509NameType.SimpleName, true)} | Validade: {certificate.NotBefore:dd/MM/yyyy} a {certificate.NotAfter:dd/MM/yyyy} | Chave privada disponível: {(hasPrivateKey ? "sim" : "não")} | Vigência local: {(currentlyValid ? "dentro do prazo" : "fora do prazo")}");
+                        $"{name} — válido até {certificate.NotAfter:dd/MM/yyyy}{(canAttemptSigning ? "" : " — não pronto para assinar")}",
+                        $"Titular: {name} | Emissor: {certificate.GetNameInfo(X509NameType.SimpleName, true)} | Validade: {certificate.NotBefore:dd/MM/yyyy} a {certificate.NotAfter:dd/MM/yyyy} | Chave privada disponível: {(hasPrivateKey ? "sim" : "não")} | Vigência local: {(currentlyValid ? "dentro do prazo" : "fora do prazo")}");
                     _certificatePicker.Items.Add(item);
                     found++;
+                    if (canAttemptSigning)
+                        eligible++;
                 }
-                finally
+                catch (CryptographicException)
                 {
-                    // The store owns its certificate collection; no private key material is exported.
+                    // Um certificado malformado não deve impedir a listagem dos demais.
                 }
             }
 
             _certificateStatus.Text = found == 0
                 ? "Nenhum certificado encontrado no repositório Pessoal do usuário atual."
-                : $"{found} certificado(s) encontrado(s). A listagem não confirma cadeia de confiança, revogação ou compatibilidade para assinatura.";
+                : $"{found} certificado(s) encontrado(s), {eligible} com chave privada e dentro da validade local. A confiança, revogação e compatibilidade serão avaliadas separadamente.";
         }
         catch (Exception ex)
         {
@@ -297,15 +306,136 @@ internal sealed class MainForm : Form
         finally
         {
             _certificatePicker.EndUpdate();
+            UpdateSigningAvailability();
         }
     }
 
-    private void ShowSigningNotReady()
+    private async Task SignPdfAsync()
     {
-        MessageBox.Show(this,
-            "A seleção do certificado e o visualizador são etapas preparatórias. A assinatura criptográfica PAdES ainda não está habilitada. Nenhum documento foi alterado.",
-            "AssinaPDF — assinatura em desenvolvimento",
-            MessageBoxButtons.OK, MessageBoxIcon.Information);
+        if (_signingInProgress || string.IsNullOrWhiteSpace(_currentPdfPath))
+            return;
+
+        if (_certificatePicker.SelectedItem is not CertificateItem item)
+        {
+            MessageBox.Show(this, "Selecione um certificado do Windows antes de assinar.", "Certificado necessário",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var certificate = item.Certificate;
+        var now = DateTime.Now;
+        if (!certificate.HasPrivateKey || now < certificate.NotBefore || now > certificate.NotAfter)
+        {
+            MessageBox.Show(this, "O certificado selecionado não tem chave privada acessível ou está fora da validade local. Escolha outro certificado.",
+                "Certificado indisponível", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UpdateSigningAvailability();
+            return;
+        }
+
+        var inputPath = Path.GetFullPath(_currentPdfPath);
+        var inputInfo = new FileInfo(inputPath);
+        if (!inputInfo.Exists || inputInfo.Length == 0)
+        {
+            MessageBox.Show(this, "O PDF original não está mais disponível ou está vazio. Abra o documento novamente.",
+                "Documento indisponível", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        using var dialog = new SaveFileDialog
+        {
+            Title = "Salvar PDF assinado",
+            Filter = "Documento PDF (*.pdf)|*.pdf",
+            DefaultExt = "pdf",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = $"{Path.GetFileNameWithoutExtension(inputPath)}-assinado.pdf",
+            InitialDirectory = Path.GetDirectoryName(inputPath),
+            RestoreDirectory = true
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+            return;
+
+        var outputPath = Path.GetFullPath(dialog.FileName);
+        if (string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(this, "Para proteger o original, salve a assinatura em um novo arquivo com outro nome.",
+                "Escolha outro nome", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        string? temporaryPath = null;
+        _signingInProgress = true;
+        _signButton.Text = "Assinando...";
+        _signButton.Enabled = false;
+        _certificateStatus.Text = "Assinando localmente com o certificado selecionado. Não feche o aplicativo enquanto o processo estiver em andamento.";
+
+        try
+        {
+            var pdfBytes = await File.ReadAllBytesAsync(inputPath);
+            var signedBytes = await PadesSigner
+                .Document(pdfBytes)
+                .WithCertificate(certificate)
+                .WithLevel(AdesBaselineProfile.Basic())
+                .SignAsync();
+
+            if (signedBytes.Length == 0)
+                throw new InvalidDataException("O mecanismo de assinatura retornou um documento vazio.");
+
+            var outputDirectory = Path.GetDirectoryName(outputPath)
+                ?? throw new InvalidOperationException("Não foi possível determinar a pasta de destino.");
+            temporaryPath = Path.Combine(outputDirectory, $".assinapdf-{Guid.NewGuid():N}.tmp");
+            await File.WriteAllBytesAsync(temporaryPath, signedBytes);
+            File.Move(temporaryPath, outputPath, overwrite: true);
+            temporaryPath = null;
+
+            _certificateStatus.Text = $"Assinatura PAdES básica concluída. Arquivo salvo em: {outputPath}";
+            MessageBox.Show(this,
+                $"O PDF assinado foi salvo em um arquivo separado.\r\n\r\nArquivo: {outputPath}\r\nCertificado: {certificate.GetNameInfo(X509NameType.SimpleName, false)}\r\n\r\nA assinatura foi gerada no perfil PAdES básico. A confiança da cadeia, a revogação e o carimbo do tempo não são certificados por esta mensagem.",
+                "Assinatura concluída", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            _certificateStatus.Text = "A assinatura não foi concluída. O arquivo original foi mantido sem alterações.";
+            MessageBox.Show(this,
+                $"Não foi possível assinar o PDF. O arquivo original não foi alterado.\r\n\r\nVerifique se o certificado permite uso da chave privada, se o token/cartão está conectado e se o documento é compatível.\r\n\r\nDetalhes: {ex.Message}",
+                "Falha na assinatura", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            if (temporaryPath is not null)
+            {
+                try
+                {
+                    if (File.Exists(temporaryPath))
+                        File.Delete(temporaryPath);
+                }
+                catch (IOException)
+                {
+                    // Falha na limpeza temporária não deve ocultar o erro original.
+                }
+            }
+
+            _signingInProgress = false;
+            _signButton.Text = "Assinar PDF";
+            UpdateSigningAvailability();
+        }
+    }
+
+    private void UpdateSigningAvailability()
+    {
+        if (_signButton is null || _signingInProgress)
+            return;
+
+        var hasPdf = !string.IsNullOrWhiteSpace(_currentPdfPath) && File.Exists(_currentPdfPath);
+        var item = _certificatePicker.SelectedItem as CertificateItem;
+        var now = DateTime.Now;
+        var certificateReady = item is not null
+            && item.Certificate.HasPrivateKey
+            && now >= item.Certificate.NotBefore
+            && now <= item.Certificate.NotAfter;
+
+        _signButton.Enabled = hasPdf && certificateReady;
     }
 
     private void HandleDragEnter(object? sender, DragEventArgs e)
