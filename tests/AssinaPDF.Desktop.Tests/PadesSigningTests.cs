@@ -4,8 +4,10 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using SimpleSign.Core.Extensions;
 using SimpleSign.Core.Signing;
+using SimpleSign.Core.Validation;
 using SimpleSign.PAdES;
 using SimpleSign.PAdES.Signing;
+using SimpleSign.PAdES.Validation;
 using Xunit;
 
 namespace FutureSolucoes.AssinaPDF.Tests;
@@ -32,6 +34,11 @@ public sealed class PadesSigningTests
         var signedText = Encoding.Latin1.GetString(signed);
         Assert.Contains("/ByteRange", signedText, StringComparison.Ordinal);
         Assert.Contains("/ETSI.CAdES.detached", signedText, StringComparison.Ordinal);
+
+        var validation = await ValidateSignatureAsync(signed);
+        Assert.Single(validation);
+        Assert.True(validation[0].IsIntegrityValid, string.Join("; ", validation[0].Errors));
+        Assert.True(validation[0].IsSignatureValid, string.Join("; ", validation[0].Errors));
     }
 
     [Fact]
@@ -63,6 +70,22 @@ public sealed class PadesSigningTests
         var signedText = Encoding.Latin1.GetString(signed);
         Assert.Contains("/ByteRange", signedText, StringComparison.Ordinal);
         Assert.Contains("/Reason", signedText, StringComparison.Ordinal);
+
+        var validation = await ValidateSignatureAsync(signed);
+        Assert.Single(validation);
+        Assert.True(validation[0].IsIntegrityValid, string.Join("; ", validation[0].Errors));
+        Assert.True(validation[0].IsSignatureValid, string.Join("; ", validation[0].Errors));
+    }
+
+    private static async Task<IReadOnlyList<SimpleSign.Core.Validation.SignatureValidationResult>> ValidateSignatureAsync(byte[] signed)
+    {
+        var validator = new PdfSignatureValidator(new ValidationOptions
+        {
+            CheckRevocation = false,
+            TrustSystemRoots = false
+        });
+        using var stream = new MemoryStream(signed);
+        return await validator.ValidateAsync(stream);
     }
 
     private static X509Certificate2 CreateSigningCertificate()
