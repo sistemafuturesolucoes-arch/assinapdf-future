@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -98,12 +99,6 @@ internal sealed class MainForm : Form
             BackColor = Color.FromArgb(38, 38, 48),
             ForeColor = Color.White
         };
-        _certificatePicker.SelectedIndexChanged += (_, _) =>
-        {
-            var item = _certificatePicker.SelectedItem as CertificateItem;
-            _certificateStatus.Text = item?.Details ?? "Selecione um certificado.";
-            UpdateSigningAvailability();
-        };
         toolbar.Controls.Add(_certificatePicker);
 
         var refreshButton = CreateButton("Atualizar certificados");
@@ -137,6 +132,13 @@ internal sealed class MainForm : Form
             BackColor = Color.FromArgb(24, 24, 32),
             ForeColor = Color.FromArgb(185, 185, 200),
             AutoEllipsis = true
+        };
+
+        _certificatePicker.SelectedIndexChanged += (_, _) =>
+        {
+            var item = _certificatePicker.SelectedItem as CertificateItem;
+            _certificateStatus.Text = item?.Details ?? "Selecione um certificado.";
+            UpdateSigningAvailability();
         };
 
         Controls.Add(_pdfViewer);
