@@ -5,7 +5,7 @@
     Manufacturer="Future Soluções"
     Version="0.3.0"
     UpgradeCode="9F6C6C20-3BA4-4F69-9B6C-60C8DAE3D114"
-    Scope="perUser"
+    Scope="perMachine"
     Language="1046">
     <SummaryInformation Description="AssinaPDF — leitor e assinatura digital de PDFs" />
     <MajorUpgrade DowngradeErrorMessage="Já existe uma versão mais recente do AssinaPDF instalada." />
@@ -18,7 +18,7 @@
   </Package>
 
   <Fragment>
-    <StandardDirectory Id="LocalAppDataFolder">
+    <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="FutureAppDirectory" Name="Programs">
         <Directory Id="INSTALLFOLDER" Name="Future Soluções\AssinaPDF" />
       </Directory>
@@ -37,7 +37,7 @@
                 Target="[INSTALLFOLDER]AssinaPDF.exe"
                 WorkingDirectory="INSTALLFOLDER" />
       <RemoveFolder Id="RemoveAssinaPDFStartMenuFolder" On="uninstall" />
-      <RegistryValue Root="HKCU"
+      <RegistryValue Root="HKLM"
                      Key="Software\Future Soluções\AssinaPDF"
                      Name="installed"
                      Type="integer"
