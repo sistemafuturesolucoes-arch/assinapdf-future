@@ -25,7 +25,7 @@
     </StandardDirectory>
 
     <ComponentGroup Id="PublishedAppFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(PublishDir)**" Exclude="$(PublishDir)**\\*.pdb;$(PublishDir)**\\*.xml" />
+      <Files Include="$(PublishDir)**" Exclude="$(PublishDir)**\*.pdb;$(PublishDir)**\*.xml" />
     </ComponentGroup>
   </Fragment>
 
