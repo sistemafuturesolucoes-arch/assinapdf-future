@@ -1,45 +1,50 @@
 # Roadmap por etapas
 
-## Etapa 1 — Fundação (atual)
+## Etapa 1 — Fundação
 
 - [x] Pasta independente no repositório do CRM.
 - [x] Projeto Windows x64 inicial.
-- [x] Janela inicial e seleção de arquivo PDF.
-- [x] Documentação de arquitetura e segurança.
-- [ ] Confirmar build verde no GitHub Actions.
+- [x] Workflow de build separado.
+- [x] Build/publicação inicial confirmado no GitHub Actions.
 
-## Etapa 2 — Leitura real de PDF
+## Etapa 2 — Leitura de PDF e descoberta de certificados (em implementação)
 
-- [ ] Avaliar motores de visualização e suas licenças.
-- [ ] Abrir e renderizar documentos localmente.
-- [ ] Zoom, navegação por páginas, rotação, pesquisa e impressão.
-- [ ] Testes para arquivos inválidos, grandes, criptografados e corrompidos.
+- [x] Abrir PDF local por seletor de arquivo.
+- [x] Aceitar arrastar e soltar PDF.
+- [x] Integrar visualizador PDF via Microsoft WebView2.
+- [x] Consultar certificados do repositório Pessoal do usuário atual.
+- [ ] Validar zoom, pesquisa, páginas, rotação e impressão em máquinas Windows limpas.
+- [ ] Testar PDFs grandes, protegidos, inválidos e corrompidos.
+- [ ] Criar testes automatizados e tratamento de erros adicional.
 
-## Etapa 3 — Certificados Windows
+## Etapa 3 — Elegibilidade e seleção de certificados
 
-- [ ] Listar certificados utilizáveis no repositório do usuário atual.
-- [ ] Exibir emissor, titular, validade e finalidade sem expor segredos.
+- [ ] Filtrar certificados adequados para assinatura conforme política definida.
+- [ ] Exibir titular, emissor, validade, uso de chave e chave privada disponível.
 - [ ] Lidar com certificados expirados, sem chave privada ou com token/cartão indisponível.
-- [ ] Confirmar que a chave privada nunca é exportada nem transmitida.
+- [ ] Confirmar suporte a chaves não exportáveis via Windows CryptoAPI/CNG e CSP/KSP.
 
-## Etapa 4 — Assinatura digital
+## Etapa 4 — Assinatura digital PAdES
 
-- [ ] Selecionar e aprovar biblioteca de assinatura com licença compatível.
-- [ ] Implementar assinatura PAdES e preservação do documento.
+- [ ] Selecionar biblioteca com licença compatível com o produto comercial.
+- [ ] Implementar assinatura PAdES sem exportar chaves privadas.
+- [ ] Salvar em novo arquivo por padrão e preservar o original.
 - [ ] Verificar integridade criptográfica após assinar.
 - [ ] Diferenciar integridade, confiança da cadeia, revogação e carimbo do tempo.
-- [ ] Testar documentos no validador apropriado, incluindo o ITI quando aplicável.
+- [ ] Testar com certificados de software e tokens/cartões relevantes.
+- [ ] Validar em ferramentas apropriadas, incluindo ITI quando aplicável.
 
-## Etapa 5 — Instalador e distribuição
+## Etapa 5 — Distribuição Windows
 
+- [ ] Criar instalador x64 reproduzível e desinstalador.
+- [ ] Detectar ou instalar WebView2 Runtime conforme estratégia aprovada.
 - [ ] Definir licença e identidade comercial do produto.
-- [ ] Gerar instalador x64 reproduzível e desinstalador.
-- [ ] Assinatura de código do instalador quando houver certificado adequado.
+- [ ] Assinar executável/instalador quando houver certificado de assinatura de código adequado.
 - [ ] Testar instalação, atualização, remoção e execução em Windows limpo.
-- [ ] Publicar apenas builds que passem nos testes.
+- [ ] Publicar somente builds aprovados.
 
 ## Etapa 6 — macOS
 
-- [ ] Avaliar suporte nativo, Keychain e bibliotecas compatíveis.
+- [ ] Avaliar UI nativa, Keychain e motores PDF compatíveis.
 - [ ] Implementar assinatura e empacotamento específicos do macOS.
-- [ ] Validar assinatura/notarização e distribuição antes de anunciar compatibilidade.
+- [ ] Validar assinatura/notarização antes de anunciar compatibilidade.
