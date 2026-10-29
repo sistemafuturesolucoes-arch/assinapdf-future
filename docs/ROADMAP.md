@@ -5,7 +5,7 @@
 - [x] Pasta independente no repositório do CRM.
 - [x] Projeto Windows x64 inicial.
 - [x] Workflow de build separado.
-- [x] Build/publicação inicial confirmado no GitHub Actions.
+- [x] Build/publicação self-contained inicial confirmado no GitHub Actions.
 
 ## Etapa 2 — Leitura de PDF e descoberta de certificados
 
@@ -15,7 +15,7 @@
 - [x] Consultar certificados do repositório Pessoal do usuário atual.
 - [ ] Validar zoom, pesquisa, páginas, rotação e impressão em máquinas Windows limpas.
 - [ ] Testar PDFs grandes, protegidos, inválidos e corrompidos.
-- [ ] Criar testes automatizados e tratamento de erros adicional.
+- [ ] Ampliar tratamento de erros e testes de documentos.
 
 ## Etapa 3 — Elegibilidade e seleção de certificados (parcial)
 
@@ -29,7 +29,9 @@
 
 - [x] Selecionar uma biblioteca com licença MIT para a prova de conceito.
 - [x] Implementar assinatura PAdES básica com o certificado selecionado.
+- [x] Configurar aparência visível por página e coordenadas PDF.
 - [x] Salvar em novo arquivo por padrão e preservar o original.
+- [ ] Permitir selecionar a área da assinatura clicando diretamente no preview do PDF.
 - [ ] Executar testes independentes de integridade e interoperabilidade.
 - [ ] Diferenciar integridade, confiança da cadeia, revogação e carimbo do tempo na tela de validação.
 - [ ] Implementar carimbo do tempo e perfis de validação de longo prazo somente após definir provedores e política.
@@ -37,7 +39,8 @@
 
 ## Etapa 5 — Qualidade, segurança e distribuição Windows
 
-- [x] Adicionar teste automatizado inicial que gera um PDF mínimo e certificado de laboratório, assina em PAdES básico e verifica preservação dos bytes de entrada.\n- [ ] Expandir testes para validação criptográfica independente, PDFs existentes, certificados A1 e token/cartão.
+- [x] Adicionar teste automatizado inicial que gera um PDF mínimo e certificado de laboratório, assina em PAdES básico e verifica preservação dos bytes de entrada.
+- [ ] Expandir testes para validação criptográfica independente, PDFs existentes, certificados A1 e token/cartão.
 - [ ] Auditar a dependência PAdES recente e fixar a versão aprovada.
 - [ ] Fazer revisão de segurança e análise de dependências/licenças.
 - [ ] Criar instalador x64 reproduzível e desinstalador.
