@@ -32,6 +32,37 @@ public sealed class PadesSigningTests
         Assert.Contains("/ETSI.CAdES.detached", signedText, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task SignAsync_WithVisibleAppearance_AddsSignatureMetadata()
+    {
+        var pdf = MinimalPdf.Create();
+        using var certificate = CreateSigningCertificate();
+
+        var signed = await PadesSigner
+            .Document(pdf)
+            .WithCertificate(certificate)
+            .WithMetadata(new SignatureMetadata
+            {
+                SignerName = "AssinaPDF Automated Test",
+                Reason = "Teste de aparência",
+                Location = "Future Soluções"
+            })
+            .WithAppearance(new SignatureAppearance
+            {
+                Page = 1,
+                X = 50,
+                Y = 50,
+                ShowDate = true,
+                ShowReason = true
+            })
+            .WithLevel(AdesBaselineProfile.Basic())
+            .SignAsync();
+
+        var signedText = Encoding.Latin1.GetString(signed);
+        Assert.Contains("/ByteRange", signedText, StringComparison.Ordinal);
+        Assert.Contains("/Reason", signedText, StringComparison.Ordinal);
+    }
+
     private static X509Certificate2 CreateSigningCertificate()
     {
         using var rsa = RSA.Create(2048);
