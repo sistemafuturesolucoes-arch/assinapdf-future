@@ -1,135 +1,123 @@
+using System.Text.Json;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
+
 namespace FutureSolucoes.AssinaPDF;
+
+internal sealed record SignaturePlacementPoint(int Page, float X, float Y);
 
 internal sealed class SignaturePlacementDialog : Form
 {
-    private readonly NumericUpDown _pageNumber;
-    private readonly NumericUpDown _xCoordinate;
-    private readonly NumericUpDown _yCoordinate;
+    private readonly string _pdfPath;
+    private readonly WebView2 _viewer;
+    private readonly Label _selectionStatus;
+    private readonly Button _continueButton;
     private readonly TextBox _reason;
+    private readonly List<SignaturePlacementPoint> _placements = new();
 
-    public int PageNumber => (int)_pageNumber.Value;
-    public float XCoordinate => (float)_xCoordinate.Value;
-    public float YCoordinate => (float)_yCoordinate.Value;
+    public IReadOnlyList<SignaturePlacementPoint> Placements => _placements.AsReadOnly();
     public string SigningReason => _reason.Text.Trim();
 
-    public SignaturePlacementDialog()
+    public SignaturePlacementDialog(string pdfPath)
     {
-        Text = "Posição da assinatura visível";
+        _pdfPath = Path.GetFullPath(pdfPath);
+        Text = "Selecione os locais da assinatura";
         StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MinimizeBox = false;
-        MaximizeBox = false;
-        ShowInTaskbar = false;
-        ClientSize = new Size(520, 300);
-        BackColor = Color.FromArgb(24, 24, 32);
+        MinimumSize = new Size(900, 680);
+        Size = new Size(1120, 820);
+        BackColor = Color.FromArgb(18, 18, 27);
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 10F);
 
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(18),
-            ColumnCount = 2,
-            RowCount = 6,
-            BackColor = BackColor
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        var header = new Panel { Dock = DockStyle.Top, Height = 94, Padding = new Padding(20, 12, 20, 10), BackColor = Color.FromArgb(39, 25, 62) };
+        header.Controls.Add(new Label { Text = "Selecione o local para assinar", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI Semibold", 17F, FontStyle.Bold), ForeColor = Color.White });
+        header.Controls.Add(new Label { Text = "Clique no PDF para adicionar uma marca de assinatura. Você pode selecionar mais de um local, inclusive em páginas diferentes.", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(222, 213, 236) });
 
-        _pageNumber = CreateNumeric(1, 10000, 1);
-        _xCoordinate = CreateNumeric(0, 10000, 50);
-        _yCoordinate = CreateNumeric(0, 10000, 50);
-        _reason = new TextBox
-        {
-            Dock = DockStyle.Fill,
-            MaxLength = 200,
-            Text = "Assinatura digital",
-            BackColor = Color.FromArgb(38, 38, 48),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            Margin = new Padding(3, 5, 3, 5)
-        };
+        _viewer = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(30, 30, 38) };
+        var bottom = new Panel { Dock = DockStyle.Bottom, Height = 100, Padding = new Padding(18, 8, 18, 8), BackColor = Color.FromArgb(24, 24, 34) };
+        _selectionStatus = new Label { Dock = DockStyle.Top, Height = 25, Text = "Carregando documento...", ForeColor = Color.FromArgb(225, 218, 239) };
+        var controls = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, BackColor = bottom.BackColor };
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
+        _reason = new TextBox { Dock = DockStyle.Fill, Text = "Assinatura digital", MaxLength = 200, BackColor = Color.FromArgb(38, 38, 48), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 7, 10, 4) };
+        var clear = CreateButton("Limpar locais");
+        clear.Click += async (_, _) => { _placements.Clear(); UpdateSelectionStatus(); if (_viewer.CoreWebView2 is not null) await _viewer.CoreWebView2.ExecuteScriptAsync("clearSelections()"); };
+        _continueButton = CreateButton("Continuar");
+        _continueButton.Enabled = false;
+        _continueButton.DialogResult = DialogResult.OK;
+        var cancel = CreateButton("Cancelar");
+        cancel.DialogResult = DialogResult.Cancel;
+        var buttonPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+        buttonPanel.Controls.Add(_continueButton);
+        buttonPanel.Controls.Add(cancel);
+        controls.Controls.Add(_reason, 0, 0);
+        controls.Controls.Add(clear, 1, 0);
+        controls.Controls.Add(buttonPanel, 2, 0);
+        bottom.Controls.Add(controls);
+        bottom.Controls.Add(_selectionStatus);
 
-        AddRow(layout, 0, "Página do PDF:", _pageNumber);
-        AddRow(layout, 1, "Posição X (pontos):", _xCoordinate);
-        AddRow(layout, 2, "Posição Y (pontos):", _yCoordinate);
-        AddRow(layout, 3, "Motivo:", _reason);
-
-        var help = new Label
-        {
-            Dock = DockStyle.Fill,
-            Text = "As coordenadas são medidas em pontos PDF a partir do canto inferior esquerdo da página. A posição padrão é 50 × 50. Confira o arquivo assinado antes de utilizá-lo.",
-            ForeColor = Color.FromArgb(195, 195, 210),
-            AutoSize = false,
-            Padding = new Padding(2, 4, 2, 4)
-        };
-        layout.Controls.Add(help, 0, 4);
-        layout.SetColumnSpan(help, 2);
-
-        var buttons = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false
-        };
-        var okButton = CreateButton("Continuar");
-        okButton.DialogResult = DialogResult.OK;
-        var cancelButton = CreateButton("Cancelar");
-        cancelButton.DialogResult = DialogResult.Cancel;
-        buttons.Controls.Add(okButton);
-        buttons.Controls.Add(cancelButton);
-        layout.Controls.Add(buttons, 0, 5);
-        layout.SetColumnSpan(buttons, 2);
-
-        Controls.Add(layout);
-        AcceptButton = okButton;
-        CancelButton = cancelButton;
+        Controls.Add(_viewer);
+        Controls.Add(bottom);
+        Controls.Add(header);
+        CancelButton = cancel;
+        AcceptButton = _continueButton;
+        Shown += async (_, _) => await InitializeViewerAsync();
     }
 
-    private static NumericUpDown CreateNumeric(decimal minimum, decimal maximum, decimal value) => new()
+    private async Task InitializeViewerAsync()
     {
-        Minimum = minimum,
-        Maximum = maximum,
-        Value = value,
-        DecimalPlaces = 0,
-        ThousandsSeparator = false,
-        Dock = DockStyle.Fill,
-        BackColor = Color.FromArgb(38, 38, 48),
-        ForeColor = Color.White,
-        Margin = new Padding(3, 5, 3, 5)
-    };
-
-    private static void AddRow(TableLayoutPanel layout, int row, string labelText, Control input)
-    {
-        layout.Controls.Add(new Label
+        try
         {
-            Text = labelText,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Color.Gainsboro,
-            Margin = new Padding(3)
-        }, 0, row);
-        layout.Controls.Add(input, 1, row);
+            await _viewer.EnsureCoreWebView2Async();
+            _viewer.CoreWebView2.SetVirtualHostNameToFolderMapping("assinapdf-viewer.local", AppContext.BaseDirectory, CoreWebView2HostResourceAccessKind.Allow);
+            var pdfDirectory = Path.GetDirectoryName(_pdfPath) ?? throw new InvalidOperationException("Pasta do PDF indisponível.");
+            _viewer.CoreWebView2.SetVirtualHostNameToFolderMapping("assinapdf-pdf.local", pdfDirectory, CoreWebView2HostResourceAccessKind.Allow);
+            _viewer.CoreWebView2.WebMessageReceived += (_, args) =>
+            {
+                try
+                {
+                    using var json = JsonDocument.Parse(args.WebMessageAsJson);
+                    if (!json.RootElement.TryGetProperty("placements", out var list) || list.ValueKind != JsonValueKind.Array) return;
+                    _placements.Clear();
+                    foreach (var item in list.EnumerateArray())
+                    {
+                        var page = item.GetProperty("page").GetInt32();
+                        var x = item.GetProperty("x").GetSingle();
+                        var y = item.GetProperty("y").GetSingle();
+                        if (page > 0 && float.IsFinite(x) && float.IsFinite(y) && x >= 0 && y >= 0)
+                            _placements.Add(new SignaturePlacementPoint(page, x, y));
+                    }
+                    UpdateSelectionStatus();
+                }
+                catch (JsonException) { }
+                catch (InvalidOperationException) { }
+            };
+            var pdfUrl = "https://assinapdf-pdf.local/" + Uri.EscapeDataString(Path.GetFileName(_pdfPath));
+            var viewerUrl = "https://assinapdf-viewer.local/placement-viewer.html?file=" + Uri.EscapeDataString(pdfUrl);
+            _viewer.CoreWebView2.Navigate(viewerUrl);
+        }
+        catch (Exception ex)
+        {
+            _selectionStatus.Text = "Não foi possível abrir a visualização para selecionar os locais.";
+            MessageBox.Show(this, $"A visualização de seleção não pôde ser iniciada.\r\n\r\n{ex.Message}", "AssinaPDF", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void UpdateSelectionStatus()
+    {
+        _selectionStatus.Text = _placements.Count switch
+        {
+            0 => "Nenhum local selecionado — clique em uma ou mais páginas do PDF.",
+            1 => "1 local selecionado. Você pode adicionar outros locais antes de continuar.",
+            _ => $"{_placements.Count} locais selecionados. Cada local receberá uma assinatura digital."
+        };
+        _continueButton.Enabled = _placements.Count > 0;
     }
 
     private static Button CreateButton(string text)
     {
-        var button = new Button
-        {
-            Text = text,
-            AutoSize = true,
-            Padding = new Padding(12, 5, 12, 5),
-            BackColor = Color.FromArgb(124, 58, 237),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Margin = new Padding(6, 4, 0, 4)
-        };
+        var button = new Button { Text = text, AutoSize = true, Padding = new Padding(12, 6, 12, 6), BackColor = Color.FromArgb(124, 58, 237), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Margin = new Padding(5, 3, 0, 3), Cursor = Cursors.Hand };
         button.FlatAppearance.BorderSize = 0;
         return button;
     }
