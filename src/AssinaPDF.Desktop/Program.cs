@@ -4,8 +4,10 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using SimpleSign.Core.Extensions;
 using SimpleSign.Core.Signing;
+using SimpleSign.Core.Validation;
 using SimpleSign.PAdES;
 using SimpleSign.PAdES.Signing;
+using SimpleSign.PAdES.Validation;
 
 namespace FutureSolucoes.AssinaPDF;
 
@@ -26,6 +28,8 @@ internal sealed class MainForm : Form
     private readonly WebView2 _pdfViewer;
     private readonly ComboBox _certificatePicker;
     private readonly Button _signButton;
+    private readonly Button _validateButton;
+    private bool _validationInProgress;
     private string? _currentPdfPath;
     private bool _viewerReady;
     private bool _signingInProgress;
@@ -84,6 +88,11 @@ internal sealed class MainForm : Form
         _signButton.Enabled = false;
         _signButton.Click += async (_, _) => await SignPdfAsync();
         toolbar.Controls.Add(_signButton);
+
+        _validateButton = CreateButton("Validar assinatura");
+        _validateButton.Enabled = false;
+        _validateButton.Click += async (_, _) => await ValidatePdfAsync();
+        toolbar.Controls.Add(_validateButton);
 
         toolbar.Controls.Add(new Label
         {
@@ -322,6 +331,84 @@ internal sealed class MainForm : Form
         }
     }
 
+    private async Task ValidatePdfAsync()
+    {
+        if (_validationInProgress || string.IsNullOrWhiteSpace(_currentPdfPath) || !File.Exists(_currentPdfPath))
+            return;
+
+        _validationInProgress = true;
+        _validateButton.Enabled = false;
+        _validateButton.Text = "Validando...";
+        _certificateStatus.Text = "Verificando a integridade criptográfica das assinaturas no documento local...";
+
+        try
+        {
+            var options = new ValidationOptions
+            {
+                CheckRevocation = false,
+                TrustSystemRoots = false
+            };
+            var validator = new PdfSignatureValidator(options);
+            await using var stream = new FileStream(
+                _currentPdfPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize: 81920,
+                useAsync: true);
+            var results = await validator.ValidateAsync(stream);
+
+            if (results.Count == 0)
+            {
+                _certificateStatus.Text = "Nenhuma assinatura digital reconhecida neste PDF.";
+                MessageBox.Show(this,
+                    "Não foi encontrada uma assinatura digital compatível neste documento. Isso não significa necessariamente que o PDF seja inválido; ele pode simplesmente não estar assinado.",
+                    "Validação de assinatura",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            var report = string.Join(
+                Environment.NewLine + Environment.NewLine,
+                results.Select((result, index) =>
+                {
+                    var errors = result.Errors.Count == 0
+                        ? "Nenhum erro criptográfico reportado."
+                        : string.Join(Environment.NewLine, result.Errors.Select(error => "• " + error));
+                    return $"Assinatura {index + 1}{Environment.NewLine}" +
+                           $"Integridade do documento: {(result.IsIntegrityValid ? "válida" : "inválida/não confirmada")}{Environment.NewLine}" +
+                           $"Assinatura criptográfica: {(result.IsSignatureValid ? "válida" : "inválida/não confirmada")}{Environment.NewLine}" +
+                           errors;
+                }));
+
+            var disclaimer = Environment.NewLine + Environment.NewLine +
+                "Limites desta verificação: cadeia de confiança, revogação e carimbo do tempo não foram verificados nesta etapa. Este resultado não é uma declaração de conformidade ICP-Brasil nem substitui um validador oficial.";
+
+            _certificateStatus.Text = $"Validação criptográfica concluída: {results.Count} assinatura(s) encontrada(s).";
+            MessageBox.Show(this, report + disclaimer, "Resultado da validação PAdES",
+                MessageBoxButtons.OK,
+                results.All(result => result.IsIntegrityValid && result.IsSignatureValid)
+                    ? MessageBoxIcon.Information
+                    : MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            _certificateStatus.Text = "Não foi possível validar as assinaturas deste PDF.";
+            MessageBox.Show(this,
+                $"A validação não pôde ser concluída.\r\n\r\nDetalhes: {ex.Message}",
+                "Falha na validação",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _validationInProgress = false;
+            _validateButton.Text = "Validar assinatura";
+            _validateButton.Enabled = !string.IsNullOrWhiteSpace(_currentPdfPath) && File.Exists(_currentPdfPath);
+        }
+    }
+
     private async Task SignPdfAsync()
     {
         if (_signingInProgress || string.IsNullOrWhiteSpace(_currentPdfPath))
@@ -474,6 +561,7 @@ internal sealed class MainForm : Form
             return;
 
         var hasPdf = !string.IsNullOrWhiteSpace(_currentPdfPath) && File.Exists(_currentPdfPath);
+        _validateButton.Enabled = hasPdf && !_validationInProgress;
         var item = _certificatePicker.SelectedItem as CertificateItem;
         var now = DateTime.Now;
         var certificateReady = item is not null
