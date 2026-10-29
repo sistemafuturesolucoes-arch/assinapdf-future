@@ -40,6 +40,7 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(980, 680);
         Size = new Size(1280, 850);
+        WindowState = FormWindowState.Maximized;
         BackColor = Color.FromArgb(242, 243, 245);
         ForeColor = Color.FromArgb(40, 43, 48);
         Font = new Font("Segoe UI", 10F);
@@ -153,14 +154,26 @@ internal sealed class MainForm : Form
             AutoEllipsis = true
         };
 
-        _certificatePicker.SelectedIndexChanged += (_, _) =>
-        {
-            var item = _certificatePicker.SelectedItem as CertificateItem;
-            _certificateStatus.Text = item?.Details ?? "Selecione um certificado.";
-            UpdateSigningAvailability();
-        };
+        _certificatePicker.SelectedIndexChanged += (_, _) => HandleCertificateSelectionChanged();
 
         Controls.Add(_pdfViewer);
+        var whatsappButton = new Button
+        {
+            Name = "whatsappSupportButton",
+            Text = "💬 WhatsApp",
+            Size = new Size(148, 38),
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom,
+            Location = new Point(ClientSize.Width - 166, ClientSize.Height - 88),
+            BackColor = Color.FromArgb(37, 161, 91),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+        whatsappButton.FlatAppearance.BorderSize = 0;
+        whatsappButton.Click += (_, _) => OpenRenewalWhatsApp();
+        Controls.Add(whatsappButton);
+        whatsappButton.BringToFront();
         Controls.Add(_certificateStatus);
         Controls.Add(_fileStatus);
         Controls.Add(toolbar);
@@ -224,7 +237,7 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            _fileStatus.Text = "Não foi possível iniciar o visualizador PDF. Verifique se o Microsoft Edge WebView2 Runtime está instalado.";
+            _fileStatus.Text = "Não foi possível iniciar o visualizador PDF. O instalador deve incluir o Microsoft Edge WebView2 Runtime.";
             MessageBox.Show(this,
                 $"O visualizador não pôde ser inicializado.\r\n\r\nDetalhes: {ex.Message}",
                 "AssinaPDF — visualizador indisponível",
@@ -367,6 +380,71 @@ internal sealed class MainForm : Form
         }
     }
 
+    private void HandleCertificateSelectionChanged()
+    {
+        var item = _certificatePicker.SelectedItem as CertificateItem;
+        _certificateStatus.Text = item?.Details ?? "Selecione um certificado.";
+        if (item is not null && DateTime.Now > item.Certificate.NotAfter)
+            ShowExpiredCertificateDialog(item.Certificate);
+        UpdateSigningAvailability();
+    }
+
+    private void ShowExpiredCertificateDialog(X509Certificate2 certificate)
+    {
+        using var dialog = new Form
+        {
+            Text = "Certificado digital vencido",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(470, 220),
+            BackColor = Color.FromArgb(246, 247, 249),
+            Font = new Font("Segoe UI", 10F)
+        };
+        var message = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 112,
+            Padding = new Padding(22, 18, 22, 8),
+            Text = $"O certificado de {certificate.GetNameInfo(X509NameType.SimpleName, false)} venceu em {certificate.NotAfter:dd/MM/yyyy}.\r\n\r\nRenove seu certificado para continuar assinando documentos.",
+            ForeColor = Color.FromArgb(45, 49, 56)
+        };
+        var renew = new Button
+        {
+            Text = "Clique aqui e agende a renovação",
+            Size = new Size(300, 42),
+            Location = new Point(85, 135),
+            BackColor = Color.FromArgb(37, 161, 91),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+        renew.FlatAppearance.BorderSize = 0;
+        renew.Click += (_, _) => { OpenRenewalWhatsApp(); dialog.Close(); };
+        dialog.Controls.Add(renew);
+        dialog.Controls.Add(message);
+        dialog.ShowDialog(this);
+    }
+
+    private static void OpenRenewalWhatsApp()
+    {
+        const string phone = "5554999307507";
+        const string message = "Vim do assinador PDF e gostaria de mais informações";
+        var url = "https://wa.me/" + phone + "?text=" + Uri.EscapeDataString(message);
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            MessageBox.Show("Não foi possível abrir o WhatsApp. Acesse https://wa.me/5554999307507 para falar com a Future Soluções.",
+                "Future Soluções", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
     private async Task ValidatePdfAsync()
     {
         if (_validationInProgress || string.IsNullOrWhiteSpace(_currentPdfPath) || !File.Exists(_currentPdfPath))
@@ -459,9 +537,16 @@ internal sealed class MainForm : Form
 
         var certificate = item.Certificate;
         var now = DateTime.Now;
-        if (!certificate.HasPrivateKey || now < certificate.NotBefore || now > certificate.NotAfter || !AllowsDigitalSignature(certificate))
+        if (now > certificate.NotAfter)
         {
-            MessageBox.Show(this, "O certificado selecionado não tem chave privada acessível ou está fora da validade local. Escolha outro certificado.",
+            ShowExpiredCertificateDialog(certificate);
+            UpdateSigningAvailability();
+            return;
+        }
+
+        if (!certificate.HasPrivateKey || now < certificate.NotBefore || !AllowsDigitalSignature(certificate))
+        {
+            MessageBox.Show(this, "O certificado selecionado não tem chave privada acessível ou ainda não está dentro da validade. Escolha outro certificado.",
                 "Certificado indisponível", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             UpdateSigningAvailability();
             return;
