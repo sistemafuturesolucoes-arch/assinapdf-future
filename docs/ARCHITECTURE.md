@@ -1,22 +1,28 @@
-# Arquitetura inicial
+# Arquitetura do AssinaPDF
 
 ## Princípios
 
-1. O AssinaPDF é um aplicativo desktop independente, hospedado neste repositório apenas por conveniência.
-2. O código-fonte, dependências, build e artefatos ficam sob `apps/assinapdf-desktop` (artefatos gerados não devem ser commitados).
-3. O CRM web não deve importar assemblies, scripts de build ou dependências do aplicativo desktop.
-4. A assinatura deve ocorrer localmente no computador do usuário; chaves privadas não devem ser enviadas ao CRM ou a serviços remotos.
-5. A interface nunca deve confundir imagem de assinatura com assinatura digital criptográfica.
+1. O AssinaPDF é um aplicativo desktop independente, hospedado neste repositório por conveniência.
+2. Código, dependências, build e artefatos ficam sob `apps/assinapdf-desktop`; artefatos gerados não devem ser commitados.
+3. O CRM web não deve importar assemblies ou dependências do aplicativo desktop.
+4. Documentos são abertos localmente. Não enviar PDFs a servidores sem ação explícita e informada do usuário.
+5. Chaves privadas não devem ser exportadas nem transmitidas.
+6. A interface nunca deve confundir imagem de assinatura com assinatura digital criptográfica.
 
-## Componentes planejados
+## Componentes atuais
 
-- **Desktop UI:** Windows Forms para a primeira base Windows.
-- **PDF viewer:** decisão pendente até avaliar renderização, acessibilidade, licenças e distribuição offline.
-- **Certificate provider:** enumerar certificados elegíveis do repositório de certificados do usuário Windows, sem exportar chaves privadas.
-- **Signing engine:** módulo isolado para assinatura PAdES, com validação de integridade após assinar.
-- **Installer:** instalador Windows separado, com identidade de produto e desinstalação limpa.
-- **CI:** workflow dedicado; não publicar nem implantar o CRM a partir deste workflow.
+- **Desktop UI:** Windows Forms.
+- **PDF viewer:** Microsoft WebView2 hospedando o visualizador PDF do Microsoft Edge.
+- **Certificate discovery:** repositório Pessoal do usuário atual do Windows (`CurrentUser/My`); apenas metadados são mostrados.
+- **CI:** workflow dedicado que compila e publica um artefato de teste, sem implantar o CRM.
 
-## Decisões ainda não fechadas
+## Componentes pendentes
 
-Antes de adicionar bibliotecas, documentar a licença, versão, manutenção, vulnerabilidades conhecidas e condições de redistribuição. Não afirmar conformidade ICP-Brasil apenas por gerar um PDF assinado: a implementação precisa passar por testes técnicos e validação aplicável.
+- **Signing engine:** biblioteca PAdES com licença e condições de redistribuição aprovadas.
+- **Certificate eligibility:** validação adequada de usos de chave, cadeia, revogação, timestamp e dispositivos criptográficos.
+- **Installer:** instalador x64 com verificação do WebView2 Runtime, identidade de produto e desinstalação limpa.
+- **Tests:** testes automatizados e matriz de documentos/certificados.
+
+## Decisões técnicas e limites
+
+O WebView2 depende do runtime Microsoft Edge e de sua implementação do visualizador PDF; a versão final deve verificar o comportamento em máquinas limpas e em PDFs protegidos, grandes ou corrompidos. A listagem de certificados é informativa, não uma declaração de confiança. Não afirmar conformidade ICP-Brasil apenas por produzir um PDF assinado: são necessários testes técnicos e validação aplicável.
