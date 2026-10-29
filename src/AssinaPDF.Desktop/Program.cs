@@ -313,6 +313,7 @@ internal sealed class MainForm : Form
         _certificatePicker.Items.Clear();
         var found = 0;
         var eligible = 0;
+        var expiringSoon = new List<string>();
 
         try
         {
@@ -335,7 +336,11 @@ internal sealed class MainForm : Form
                     _certificatePicker.Items.Add(item);
                     found++;
                     if (canAttemptSigning)
+                    {
                         eligible++;
+                        if (certificate.NotAfter.Date >= now.Date && certificate.NotAfter.Date <= now.Date.AddDays(30))
+                            expiringSoon.Add(name + " — vence em " + certificate.NotAfter.ToString("dd/MM/yyyy"));
+                    }
                 }
                 catch (CryptographicException)
                 {
@@ -346,6 +351,8 @@ internal sealed class MainForm : Form
             _certificateStatus.Text = found == 0
                 ? "Nenhum certificado encontrado no repositório Pessoal do usuário atual."
                 : $"{found} certificado(s) encontrado(s), {eligible} com chave privada e dentro da validade local. A confiança, revogação e compatibilidade serão avaliadas separadamente.";
+            if (expiringSoon.Count > 0)
+                MessageBox.Show(this, "Atenção: há certificado(s) vencendo nos próximos 30 dias.\r\n\r\n" + string.Join("\r\n", expiringSoon.Distinct()) + "\r\n\r\nEntre em contato com a Future Soluções para renovar antes do vencimento.", "Seu certificado está vencendo — renove agora", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
