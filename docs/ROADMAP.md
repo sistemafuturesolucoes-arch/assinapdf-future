@@ -37,7 +37,7 @@
 
 ## Etapa 5 — Qualidade, segurança e distribuição Windows
 
-- [ ] Criar testes automatizados com PDFs de teste e certificados de laboratório.
+- [x] Adicionar teste automatizado inicial que gera um PDF mínimo e certificado de laboratório, assina em PAdES básico e verifica preservação dos bytes de entrada.\n- [ ] Expandir testes para validação criptográfica independente, PDFs existentes, certificados A1 e token/cartão.
 - [ ] Auditar a dependência PAdES recente e fixar a versão aprovada.
 - [ ] Fazer revisão de segurança e análise de dependências/licenças.
 - [ ] Criar instalador x64 reproduzível e desinstalador.
