@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Drawing.Drawing2D;
 using System.IO.Compression;
 using System.Reflection;
 
@@ -38,66 +37,158 @@ internal sealed class LauncherForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = true;
-        ClientSize = new Size(680, 400);
+        ClientSize = new Size(620, 390);
         BackColor = Color.FromArgb(242, 243, 245);
-        ForeColor = Color.White;
+        ForeColor = Color.FromArgb(45, 49, 56);
         Font = new Font("Segoe UI", 10F);
-        try { using var ms = new MemoryStream(Program.ReadResource("logo-future.png")); using var loaded = Image.FromStream(ms); _logo = new Bitmap(loaded); }
+
+        try
+        {
+            using var ms = new MemoryStream(Program.ReadResource("logo-future.png"));
+            using var loaded = Image.FromStream(ms);
+            _logo = new Bitmap(loaded);
+        }
         catch { _logo = null; }
 
-        var header = new Panel { Dock = DockStyle.Top, Height = 150, BackColor = Color.FromArgb(224, 227, 231), Padding = new Padding(28, 18, 28, 18) };
-        var logo = new PictureBox { Dock = DockStyle.Left, Width = 150, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Transparent, Image = _logo };
+        var header = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 190,
+            BackColor = Color.FromArgb(232, 234, 237),
+            Padding = new Padding(20, 14, 20, 14)
+        };
+        var logo = new PictureBox
+        {
+            Dock = DockStyle.Fill,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.Transparent,
+            Image = _logo
+        };
         header.Controls.Add(logo);
-        var titleArea = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-        titleArea.Controls.Add(new Label { Text = "AssinaPDF", Dock = DockStyle.Top, Height = 58, Font = new Font("Segoe UI", 27F, FontStyle.Bold), ForeColor = Color.White, TextAlign = ContentAlignment.BottomLeft });
-        titleArea.Controls.Add(new Label { Text = "Assinatura digital de PDFs • Future Soluções", Dock = DockStyle.Top, Height = 32, Font = new Font("Segoe UI", 10F), ForeColor = Color.FromArgb(221, 210, 239), TextAlign = ContentAlignment.MiddleLeft });
-        header.Controls.Add(titleArea);
 
-        var intro = new Label { Text = "Como deseja usar o AssinaPDF?", Dock = DockStyle.Top, Height = 62, Padding = new Padding(28, 22, 28, 8), Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(238, 235, 246) };
-        var options = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(28, 2, 28, 12), ColumnCount = 2, RowCount = 1, BackColor = BackColor };
+        var prompt = new Label
+        {
+            Text = "Como deseja usar o AssinaPDF?",
+            Dock = DockStyle.Top,
+            Height = 52,
+            Padding = new Padding(16, 14, 16, 4),
+            Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(45, 49, 56),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+        var options = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(22, 4, 22, 10),
+            ColumnCount = 2,
+            RowCount = 1,
+            BackColor = BackColor
+        };
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        _installButton = CreateOption("Instalar no computador", "Instala o AssinaPDF e cria atalhos para abrir depois.");
-        _portableButton = CreateOption("Assinar sem instalar", "Abre o aplicativo diretamente, sem instalar no Windows.");
+        _installButton = CreateOption("Instalar no computador", "Instala e cria atalhos no Windows.");
+        _portableButton = CreateOption("Assinar sem instalar", "Executa sem instalar no Windows.");
         _installButton.Click += async (_, _) => await InstallAsync();
         _portableButton.Click += async (_, _) => await RunPortableAsync();
         options.Controls.Add(_installButton, 0, 0);
         options.Controls.Add(_portableButton, 1, 0);
 
-        _status = new Label { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(28, 10, 28, 8), ForeColor = Color.FromArgb(183, 178, 198), Text = "Seus certificados permanecem no Windows. A chave privada não é exportada." };
+        _status = new Label
+        {
+            Dock = DockStyle.Bottom,
+            Height = 34,
+            Padding = new Padding(14, 7, 14, 6),
+            ForeColor = Color.FromArgb(75, 80, 88),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Text = "Future Soluções"
+        };
+
         Controls.Add(options);
         Controls.Add(_status);
-        Controls.Add(intro);
+        Controls.Add(prompt);
         Controls.Add(header);
-        if (_logo is not null) Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
     }
 
     private static Button CreateOption(string title, string description)
     {
-        var button = new Button { Dock = DockStyle.Fill, Text = title + Environment.NewLine + Environment.NewLine + description, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Semibold", 12F, FontStyle.Bold), BackColor = Color.FromArgb(92, 98, 108), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Margin = new Padding(8), Cursor = Cursors.Hand, Padding = new Padding(12) };
-        button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(112, 118, 128);
+        var button = new Button
+        {
+            Dock = DockStyle.Fill,
+            Text = title + Environment.NewLine + Environment.NewLine + description,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Segoe UI Semibold", 11F, FontStyle.Bold),
+            BackColor = Color.FromArgb(210, 214, 219),
+            ForeColor = Color.FromArgb(42, 46, 52),
+            FlatStyle = FlatStyle.Flat,
+            Margin = new Padding(8),
+            Cursor = Cursors.Hand,
+            Padding = new Padding(12)
+        };
+        button.FlatAppearance.BorderSize = 1;
+        button.FlatAppearance.BorderColor = Color.FromArgb(190, 195, 202);
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(222, 225, 229);
         return button;
     }
 
     private async Task InstallAsync()
     {
-        SetBusy(true, "Preparando o instalador...");
+        SetBusy(true, "Verificando o visualizador PDF...");
         string? msiPath = null;
+        string? webViewInstallerPath = null;
         try
         {
+            // O bootstrapper oficial instala/atualiza o Evergreen WebView2 Runtime.
+            webViewInstallerPath = Path.Combine(Path.GetTempPath(), $"MicrosoftEdgeWebView2Setup-{Guid.NewGuid():N}.exe");
+            await File.WriteAllBytesAsync(webViewInstallerPath, Program.ReadResource("MicrosoftEdgeWebView2Setup.exe"));
+            using (var webView = Process.Start(new ProcessStartInfo(webViewInstallerPath)
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                ArgumentList = { "/silent", "/install" }
+            }) ?? throw new InvalidOperationException("O Windows não iniciou a instalação do WebView2 Runtime."))
+            {
+                await Task.Run(() => webView.WaitForExit());
+                if (webView.ExitCode != 0 && webView.ExitCode != 3010)
+                    throw new InvalidOperationException($"A instalação do WebView2 Runtime terminou com o código {webView.ExitCode}.");
+            }
+
+            SetBusy(true, "Instalando o AssinaPDF...");
             msiPath = Path.Combine(Path.GetTempPath(), $"AssinaPDF-Setup-{Guid.NewGuid():N}.msi");
             await File.WriteAllBytesAsync(msiPath, Program.ReadResource("AssinaPDF-Setup-x64.msi"));
-            var start = new ProcessStartInfo("msiexec.exe") { UseShellExecute = true, Verb = "runas", ArgumentList = { "/i", msiPath } };
-            using var process = Process.Start(start) ?? throw new InvalidOperationException("O Windows não iniciou o instalador.");
-            _status.Text = "O assistente de instalação do Windows foi aberto.";
+            using var process = Process.Start(new ProcessStartInfo("msiexec.exe")
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                ArgumentList = { "/i", msiPath }
+            }) ?? throw new InvalidOperationException("O Windows não iniciou o instalador do AssinaPDF.");
+
             await Task.Run(() => process.WaitForExit());
-            if (process.ExitCode == 0) _status.Text = "Instalação concluída. Você já pode abrir o AssinaPDF pelo atalho.";
-            else if (process.ExitCode == 1602) _status.Text = "Instalação cancelada pelo usuário.";
-            else _status.Text = $"O instalador encerrou com código {process.ExitCode}.";
+            if (process.ExitCode == 0 || process.ExitCode == 3010)
+            {
+                MessageBox.Show(this,
+                    "O AssinaPDF Future foi instalado com sucesso!\r\n\r\nVocê já pode abrir o aplicativo pelo atalho criado na área de trabalho ou no menu Iniciar.",
+                    "Instalação bem-sucedida", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Close();
+                return;
+            }
+            if (process.ExitCode == 1602)
+                _status.Text = "Instalação cancelada pelo usuário.";
+            else
+                throw new InvalidOperationException($"O instalador encerrou com o código {process.ExitCode}.");
         }
-        catch (Exception ex) { MessageBox.Show(this, $"Não foi possível iniciar a instalação.\r\n\r\n{ex.Message}", "Instalação do AssinaPDF", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-        finally { if (msiPath is not null) { try { File.Delete(msiPath); } catch { } } SetBusy(false, _status.Text); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Não foi possível concluir a instalação.\r\n\r\n{ex.Message}",
+                "Instalação do AssinaPDF", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _status.Text = "A instalação não foi concluída.";
+        }
+        finally
+        {
+            TryDelete(msiPath);
+            TryDelete(webViewInstallerPath);
+            if (!IsDisposed) SetBusy(false, _status.Text);
+        }
     }
 
     private async Task RunPortableAsync()
@@ -113,14 +204,21 @@ internal sealed class LauncherForm : Form
                 await File.WriteAllBytesAsync(zipPath, Program.ReadResource("AssinaPDF-portable.zip"));
                 await Task.Run(() => ZipFile.ExtractToDirectory(zipPath, folder, overwriteFiles: true));
             }
-            finally { try { File.Delete(zipPath); } catch { } }
+            finally { TryDelete(zipPath); }
+
             var exe = Path.Combine(folder, "AssinaPDF.exe");
-            if (!File.Exists(exe)) throw new FileNotFoundException("O aplicativo não foi encontrado no pacote portátil.", exe);
+            if (!File.Exists(exe))
+                throw new FileNotFoundException("O aplicativo não foi encontrado no pacote portátil.", exe);
+
             Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
-            _status.Text = "AssinaPDF aberto. Nenhuma instalação foi realizada.";
+            _status.Text = "AssinaPDF aberto sem instalação.";
         }
-        catch (Exception ex) { MessageBox.Show(this, $"Não foi possível abrir a versão portátil.\r\n\r\n{ex.Message}", "AssinaPDF", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-        finally { SetBusy(false, _status.Text); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Não foi possível abrir a versão portátil.\r\n\r\n{ex.Message}",
+                "AssinaPDF", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally { if (!IsDisposed) SetBusy(false, _status.Text); }
     }
 
     private void SetBusy(bool busy, string message)
@@ -129,5 +227,11 @@ internal sealed class LauncherForm : Form
         _portableButton.Enabled = !busy;
         _status.Text = message;
         UseWaitCursor = busy;
+    }
+
+    private static void TryDelete(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try { File.Delete(path); } catch { }
     }
 }
