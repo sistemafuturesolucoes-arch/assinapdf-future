@@ -7,7 +7,7 @@
 - [x] Workflow de build separado.
 - [x] Build/publicação inicial confirmado no GitHub Actions.
 
-## Etapa 2 — Leitura de PDF e descoberta de certificados (em implementação)
+## Etapa 2 — Leitura de PDF e descoberta de certificados
 
 - [x] Abrir PDF local por seletor de arquivo.
 - [x] Aceitar arrastar e soltar PDF.
@@ -17,25 +17,29 @@
 - [ ] Testar PDFs grandes, protegidos, inválidos e corrompidos.
 - [ ] Criar testes automatizados e tratamento de erros adicional.
 
-## Etapa 3 — Elegibilidade e seleção de certificados
+## Etapa 3 — Elegibilidade e seleção de certificados (parcial)
 
-- [ ] Filtrar certificados adequados para assinatura conforme política definida.
-- [ ] Exibir titular, emissor, validade, uso de chave e chave privada disponível.
-- [ ] Lidar com certificados expirados, sem chave privada ou com token/cartão indisponível.
+- [x] Exibir titular, emissor, validade e presença de chave privada.
+- [x] Impedir tentativa de assinatura quando o certificado está fora da validade temporal local ou não indica chave privada.
+- [ ] Aplicar política completa de usos de chave e certificados apropriados para assinatura.
 - [ ] Confirmar suporte a chaves não exportáveis via Windows CryptoAPI/CNG e CSP/KSP.
+- [ ] Testar certificados A1, token/cartão, PIN e provedores diferentes.
 
-## Etapa 4 — Assinatura digital PAdES
+## Etapa 4 — Assinatura digital PAdES (implementação inicial)
 
-- [ ] Selecionar biblioteca com licença compatível com o produto comercial.
-- [ ] Implementar assinatura PAdES sem exportar chaves privadas.
-- [ ] Salvar em novo arquivo por padrão e preservar o original.
-- [ ] Verificar integridade criptográfica após assinar.
-- [ ] Diferenciar integridade, confiança da cadeia, revogação e carimbo do tempo.
-- [ ] Testar com certificados de software e tokens/cartões relevantes.
-- [ ] Validar em ferramentas apropriadas, incluindo ITI quando aplicável.
+- [x] Selecionar uma biblioteca com licença MIT para a prova de conceito.
+- [x] Implementar assinatura PAdES básica com o certificado selecionado.
+- [x] Salvar em novo arquivo por padrão e preservar o original.
+- [ ] Executar testes independentes de integridade e interoperabilidade.
+- [ ] Diferenciar integridade, confiança da cadeia, revogação e carimbo do tempo na tela de validação.
+- [ ] Implementar carimbo do tempo e perfis de validação de longo prazo somente após definir provedores e política.
+- [ ] Validar com ferramentas apropriadas, incluindo ITI quando aplicável.
 
-## Etapa 5 — Distribuição Windows
+## Etapa 5 — Qualidade, segurança e distribuição Windows
 
+- [ ] Criar testes automatizados com PDFs de teste e certificados de laboratório.
+- [ ] Auditar a dependência PAdES recente e fixar a versão aprovada.
+- [ ] Fazer revisão de segurança e análise de dependências/licenças.
 - [ ] Criar instalador x64 reproduzível e desinstalador.
 - [ ] Detectar ou instalar WebView2 Runtime conforme estratégia aprovada.
 - [ ] Definir licença e identidade comercial do produto.
