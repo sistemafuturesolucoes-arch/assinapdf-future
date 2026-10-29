@@ -431,19 +431,9 @@ internal sealed class MainForm : Form
             return;
         }
 
-        using var placementDialog = new SignaturePlacementDialog();
+        using var placementDialog = new SignaturePlacementDialog(_currentPdfPath);
         if (placementDialog.ShowDialog(this) != DialogResult.OK)
             return;
-
-        var appearance = new SignatureAppearance
-        {
-            Page = placementDialog.PageNumber,
-            X = placementDialog.XCoordinate,
-            Y = placementDialog.YCoordinate,
-            ShowDate = true,
-            ShowReason = true,
-            ShowLocation = true
-        };
 
         var inputPath = Path.GetFullPath(_currentPdfPath);
         var inputInfo = new FileInfo(inputPath);
@@ -486,21 +476,32 @@ internal sealed class MainForm : Form
         try
         {
             var pdfBytes = await File.ReadAllBytesAsync(inputPath);
-            var signedBytes = await PadesSigner
-                .Document(pdfBytes)
-                .WithCertificate(certificate)
-                .WithMetadata(new SignatureMetadata
-                {
-                    SignerName = certificate.GetNameInfo(X509NameType.SimpleName, false),
-                    Reason = placementDialog.SigningReason,
-                    Location = "Future Soluções"
-                })
-                .WithAppearance(appearance)
-                .WithLevel(AdesBaselineProfile.Basic())
-                .SignAsync();
-
-            if (signedBytes.Length == 0)
-                throw new InvalidDataException("O mecanismo de assinatura retornou um documento vazio.");
+            byte[] signedBytes = pdfBytes;
+            foreach (var placement in placementDialog.Placements)
+            {
+                signedBytes = await PadesSigner
+                    .Document(signedBytes)
+                    .WithCertificate(certificate)
+                    .WithMetadata(new SignatureMetadata
+                    {
+                        SignerName = certificate.GetNameInfo(X509NameType.SimpleName, false),
+                        Reason = placementDialog.SigningReason,
+                        Location = "Future Soluções"
+                    })
+                    .WithAppearance(new SignatureAppearance
+                    {
+                        Page = placement.Page,
+                        X = placement.X,
+                        Y = placement.Y,
+                        ShowDate = true,
+                        ShowReason = true,
+                        ShowLocation = true
+                    })
+                    .WithLevel(AdesBaselineProfile.Basic())
+                    .SignAsync();
+                if (signedBytes.Length == 0)
+                    throw new InvalidDataException("O mecanismo de assinatura retornou um documento vazio.");
+            }
 
             var outputDirectory = Path.GetDirectoryName(outputPath)
                 ?? throw new InvalidOperationException("Não foi possível determinar a pasta de destino.");
