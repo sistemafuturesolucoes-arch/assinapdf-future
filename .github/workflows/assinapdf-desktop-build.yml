@@ -1,4 +1,4 @@
-﻿name: AssinaPDF - Windows Build
+name: AssinaPDF - Windows Build
 
 on:
   workflow_dispatch:
@@ -109,15 +109,13 @@ jobs:
 
           if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar o MSI." }
 
-          $msi = Get-ChildItem $root -Filter "AssinaPDF-Setup-x64.msi" -Recurse -File |
-            Select-Object -First 1
-          if (!$msi) {
-            $msi = Get-ChildItem (Join-Path $root "installer") -Filter "AssinaPDF-Setup-x64.msi" -Recurse -File |
-              Select-Object -First 1
+          $msi = Join-Path $installerOut "AssinaPDF-Setup-x64.msi"
+          if (!(Test-Path $msi)) {
+            throw "O MSI não foi encontrado no diretório de saída esperado: $msi"
           }
-          if (!$msi) { throw "O MSI não foi encontrado após a compilação." }
-
-          Copy-Item $msi.FullName (Join-Path $installerOut "AssinaPDF-Setup-x64.msi") -Force
+          if ((Get-Item $msi).Length -eq 0) {
+            throw "O MSI foi gerado, mas está vazio: $msi"
+          }
 
       - name: Prepare launcher resources
         shell: pwsh
