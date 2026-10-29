@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <Content Include="placement-viewer.html;placement-viewer.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../../public/logo-future.png" Link="logo-future.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="viewer\\**\\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
