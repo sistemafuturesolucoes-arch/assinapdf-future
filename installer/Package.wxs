@@ -31,7 +31,7 @@
 
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="AssinaPDFShortcuts" Guid="D4B44A87-4E10-44E9-9E8F-55D6D68B5E21">
-        <File Id="AssinaPDFExecutable" Source="$(PublishDir)AssinaPDF.exe" KeyPath="yes">
+        <File Id="AssinaPDFExecutable" Source="$(AppExePath)" KeyPath="yes">
           <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="AssinaPDF" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" Advertise="no" />
           <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="AssinaPDF" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" Advertise="no" />
         </File>
@@ -41,7 +41,7 @@
     </DirectoryRef>
 
     <ComponentGroup Id="PublishedAppFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(PublishDir)**" Exclude="$(PublishDir)AssinaPDF.exe" />
+      <Files Include="$(PublishDir)**" />
     </ComponentGroup>
   </Fragment>
 </Wix>
