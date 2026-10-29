@@ -15,7 +15,9 @@
 
     <Feature Id="MainFeature" Title="AssinaPDF" Level="1">
       <ComponentGroupRef Id="PublishedAppFiles" />
-      <ComponentRef Id="AssinaPDFShortcuts" />
+      <ComponentRef Id="AssinaPDFExecutableComponent" />
+      <ComponentRef Id="AssinaPDFStartMenuShortcut" />
+      <ComponentRef Id="AssinaPDFDesktopShortcut" />
     </Feature>
   </Package>
 
@@ -30,15 +32,25 @@
     </StandardDirectory>
 
     <DirectoryRef Id="INSTALLFOLDER">
-      <Component Id="AssinaPDFShortcuts" Guid="D4B44A87-4E10-44E9-9E8F-55D6D68B5E21">
-        <File Id="AssinaPDFExecutable" Source="$(AppExePath)" KeyPath="yes">
-          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="AssinaPDF" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" Advertise="no" />
-          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="AssinaPDF" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" Advertise="no" />
-        </File>
-        <RemoveFolder Id="RemoveProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
-        <RegistryValue Root="HKLM" Key="Software\Future Soluções\AssinaPDF" Name="installed" Type="integer" Value="1" KeyPath="no" />
+      <Component Id="AssinaPDFExecutableComponent" Guid="D4B44A87-4E10-44E9-9E8F-55D6D68B5E21">
+        <File Id="AssinaPDFExecutable" Source="$(AppExePath)" KeyPath="yes" />
       </Component>
     </DirectoryRef>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="AssinaPDFStartMenuShortcut" Guid="9AB87B67-AE27-44B4-9A26-A8A0E82BDE1B">
+        <Shortcut Id="StartMenuShortcut" Name="AssinaPDF" Target="[#AssinaPDFExecutable]" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" />
+        <RegistryValue Root="HKCU" Key="Software\Future Soluções\AssinaPDF" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFolder Id="RemoveProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+      </Component>
+    </DirectoryRef>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="AssinaPDFDesktopShortcut" Guid="7DA9D706-2A8A-4B6D-B7B8-7A64E52B21E2">
+        <Shortcut Id="DesktopShortcut" Name="AssinaPDF" Target="[#AssinaPDFExecutable]" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" />
+        <RegistryValue Root="HKCU" Key="Software\Future Soluções\AssinaPDF" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
 
     <ComponentGroup Id="PublishedAppFiles" Directory="INSTALLFOLDER">
       <Files Include="$(PublishDir)**" />
