@@ -42,7 +42,7 @@ internal sealed class LauncherForm : Form
         BackColor = Color.FromArgb(18, 18, 27);
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 10F);
-        try { using var ms = new MemoryStream(Program.ReadResource("logo-future.png")); _logo = Image.FromStream(ms); }
+        try { using var ms = new MemoryStream(Program.ReadResource("logo-future.png")); using var loaded = Image.FromStream(ms); _logo = new Bitmap(loaded); }
         catch { _logo = null; }
 
         var header = new Panel { Dock = DockStyle.Top, Height = 150, BackColor = Color.FromArgb(39, 25, 62), Padding = new Padding(28, 18, 28, 18) };
