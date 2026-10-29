@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AssinaPDF-Iniciar</AssemblyName>
+    <RootNamespace>FutureSolucoes.AssinaPDF.Launcher</RootNamespace>
+    <ApplicationIcon>$(MSBuildThisFileDirectory)..\..\..\..\public\favicon.ico</ApplicationIcon>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\AssinaPDF-Setup-x64.msi" LogicalName="AssinaPDF-Setup-x64.msi" />
+    <EmbeddedResource Include="Resources\AssinaPDF-portable.zip" LogicalName="AssinaPDF-portable.zip" />
+    <EmbeddedResource Include="Resources\logo-future.png" LogicalName="logo-future.png" />
+  </ItemGroup>
+</Project>
