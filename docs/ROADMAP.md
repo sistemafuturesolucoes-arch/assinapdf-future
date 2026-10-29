@@ -33,7 +33,8 @@
 - [x] Salvar em novo arquivo por padrão e preservar o original.
 - [ ] Permitir selecionar a área da assinatura clicando diretamente no preview do PDF.
 - [ ] Executar testes independentes de integridade e interoperabilidade.
-- [x] Adicionar verificação local de integridade/assinatura criptográfica com aviso de que cadeia, revogação e carimbo do tempo não são validados nesta etapa.\n- [ ] Diferenciar resultados de integridade, cadeia de confiança, revogação e carimbo do tempo na validação completa.
+- [x] Adicionar verificação local de integridade/assinatura criptográfica com aviso de que cadeia, revogação e carimbo do tempo não são validados nesta etapa.
+- [ ] Diferenciar resultados de integridade, cadeia de confiança, revogação e carimbo do tempo na validação completa.
 - [ ] Implementar carimbo do tempo e perfis de validação de longo prazo somente após definir provedores e política.
 - [ ] Validar com ferramentas apropriadas, incluindo ITI quando aplicável.
 
@@ -43,7 +44,8 @@
 - [ ] Expandir testes para validação criptográfica independente, PDFs existentes, certificados A1 e token/cartão.
 - [ ] Auditar a dependência PAdES recente e fixar a versão aprovada.
 - [ ] Fazer revisão de segurança e análise de dependências/licenças.
-- [x] Criar projeto WiX para MSI x64 com instalação e desinstalação via Windows Installer.\n- [ ] Validar instalação, atualização e remoção do MSI em máquinas Windows limpas.
+- [x] Criar projeto WiX para MSI x64 com instalação e desinstalação via Windows Installer.
+- [ ] Validar instalação, atualização e remoção do MSI em máquinas Windows limpas.
 - [ ] Detectar ou instalar WebView2 Runtime conforme estratégia aprovada.
 - [ ] Definir licença e identidade comercial do produto.
 - [ ] Assinar executável/instalador quando houver certificado de assinatura de código adequado.
