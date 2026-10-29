@@ -16,6 +16,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\AssinaPDF-Setup-x64.msi" LogicalName="AssinaPDF-Setup-x64.msi" />
     <EmbeddedResource Include="Resources\AssinaPDF-portable.zip" LogicalName="AssinaPDF-portable.zip" />
+    <EmbeddedResource Include="Resources\MicrosoftEdgeWebView2Setup.exe" LogicalName="MicrosoftEdgeWebView2Setup.exe" />
     <EmbeddedResource Include="Resources\logo-future.png" LogicalName="logo-future.png" />
   </ItemGroup>
 </Project>
