@@ -9,7 +9,7 @@ Aplicativo desktop da Future Soluções para leitura local e assinatura digital 
 - Abrir PDF por seletor de arquivo ou arrastar o arquivo para a janela.
 - Consulta local ao repositório Pessoal de certificados do usuário atual do Windows.
 - Fluxo de assinatura PAdES básico (Baseline-B-B) usando o certificado selecionado, sem exportar a chave privada.
-- Configuração de aparência visível por página e coordenadas PDF; a seleção clicando diretamente sobre o preview ainda está pendente.
+- Configuração de aparência visível por página e coordenadas PDF; a seleção clicando diretamente sobre o preview ainda está pendente.\n- Verificação local inicial de integridade e assinatura criptográfica de PDFs assinados, sem alegar validação da cadeia, revogação ou carimbo do tempo.
 - O PDF assinado é salvo em um arquivo separado; o arquivo original é preservado.
 - Workflow independente de build/publicação, sem deploy do CRM.
 
