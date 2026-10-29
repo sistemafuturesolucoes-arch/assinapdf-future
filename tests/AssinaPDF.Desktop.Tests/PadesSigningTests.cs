@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using SimpleSign.Core.Signing;
 using SimpleSign.PAdES;
+using SimpleSign.PAdES.Signing;
 using Xunit;
 
 namespace FutureSolucoes.AssinaPDF.Tests;
