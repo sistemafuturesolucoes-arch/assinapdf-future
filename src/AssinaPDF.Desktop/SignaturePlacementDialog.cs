@@ -9,6 +9,7 @@ internal sealed record SignaturePlacementPoint(int Page, float X, float Y);
 internal sealed class SignaturePlacementDialog : Form
 {
     private readonly string _pdfPath;
+    private string? _viewerTempFolder;
     private readonly WebView2 _viewer;
     private readonly Label _selectionStatus;
     private readonly Button _continueButton;
@@ -63,6 +64,7 @@ internal sealed class SignaturePlacementDialog : Form
         CancelButton = cancel;
         AcceptButton = _continueButton;
         Shown += async (_, _) => await InitializeViewerAsync();
+        FormClosed += (_, _) => { try { if (_viewerTempFolder is not null && Directory.Exists(_viewerTempFolder)) Directory.Delete(_viewerTempFolder, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { } };
     }
 
     private async Task InitializeViewerAsync()
@@ -70,9 +72,13 @@ internal sealed class SignaturePlacementDialog : Form
         try
         {
             await _viewer.EnsureCoreWebView2Async();
-            _viewer.CoreWebView2.SetVirtualHostNameToFolderMapping("assinapdf-viewer.local", AppContext.BaseDirectory, CoreWebView2HostResourceAccessKind.Allow);
-            var pdfDirectory = Path.GetDirectoryName(_pdfPath) ?? throw new InvalidOperationException("Pasta do PDF indisponível.");
-            _viewer.CoreWebView2.SetVirtualHostNameToFolderMapping("assinapdf-pdf.local", pdfDirectory, CoreWebView2HostResourceAccessKind.Allow);
+            _viewerTempFolder = Path.Combine(Path.GetTempPath(), "AssinaPDF-Placement-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(_viewerTempFolder);
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "placement-viewer.html"), Path.Combine(_viewerTempFolder, "placement-viewer.html"));
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "placement-viewer.js"), Path.Combine(_viewerTempFolder, "placement-viewer.js"));
+            CopyDirectory(Path.Combine(AppContext.BaseDirectory, "viewer"), Path.Combine(_viewerTempFolder, "viewer"));
+            File.Copy(_pdfPath, Path.Combine(_viewerTempFolder, Path.GetFileName(_pdfPath)));
+            _viewer.CoreWebView2.SetVirtualHostNameToFolderMapping("assinapdf-viewer.local", _viewerTempFolder, CoreWebView2HostResourceAccessKind.Allow);
             _viewer.CoreWebView2.WebMessageReceived += (_, args) =>
             {
                 try
@@ -93,8 +99,7 @@ internal sealed class SignaturePlacementDialog : Form
                 catch (JsonException) { }
                 catch (InvalidOperationException) { }
             };
-            var pdfUrl = "https://assinapdf-pdf.local/" + Uri.EscapeDataString(Path.GetFileName(_pdfPath));
-            var viewerUrl = "https://assinapdf-viewer.local/placement-viewer.html?file=" + Uri.EscapeDataString(pdfUrl);
+            var viewerUrl = "https://assinapdf-viewer.local/placement-viewer.html?file=" + Uri.EscapeDataString(Path.GetFileName(_pdfPath));
             _viewer.CoreWebView2.Navigate(viewerUrl);
         }
         catch (Exception ex)
@@ -102,6 +107,15 @@ internal sealed class SignaturePlacementDialog : Form
             _selectionStatus.Text = "Não foi possível abrir a visualização para selecionar os locais.";
             MessageBox.Show(this, $"A visualização de seleção não pôde ser iniciada.\r\n\r\n{ex.Message}", "AssinaPDF", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var file in Directory.GetFiles(source))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), overwrite: true);
+        foreach (var directory in Directory.GetDirectories(source))
+            CopyDirectory(directory, Path.Combine(destination, Path.GetFileName(directory)));
     }
 
     private void UpdateSelectionStatus()
