@@ -77,6 +77,37 @@ public sealed class PadesSigningTests
         Assert.True(validation[0].IsSignatureValid, string.Join("; ", validation[0].Errors));
     }
 
+    [Fact]
+    public async Task SignAsync_CanApplyTwoVisibleSignaturesSequentially()
+    {
+        var pdf = MinimalPdf.Create();
+        using var certificate = CreateSigningCertificate();
+
+        var first = await PadesSigner
+            .Document(pdf)
+            .WithCertificate(certificate)
+            .WithMetadata(new SignatureMetadata { SignerName = "AssinaPDF Automated Test", Reason = "Local 1", Location = "Future Soluções" })
+            .WithAppearance(new SignatureAppearance { Page = 1, X = 50, Y = 50, ShowDate = true })
+            .WithLevel(AdesBaselineProfile.Basic())
+            .SignAsync();
+
+        var second = await PadesSigner
+            .Document(first)
+            .WithCertificate(certificate)
+            .WithMetadata(new SignatureMetadata { SignerName = "AssinaPDF Automated Test", Reason = "Local 2", Location = "Future Soluções" })
+            .WithAppearance(new SignatureAppearance { Page = 1, X = 250, Y = 150, ShowDate = true })
+            .WithLevel(AdesBaselineProfile.Basic())
+            .SignAsync();
+
+        var validation = await ValidateSignatureAsync(second);
+        Assert.Equal(2, validation.Count);
+        Assert.All(validation, result =>
+        {
+            Assert.True(result.IsIntegrityValid, string.Join("; ", result.Errors));
+            Assert.True(result.IsSignatureValid, string.Join("; ", result.Errors));
+        });
+    }
+
     private static async Task<IReadOnlyList<SimpleSign.Core.Validation.SignatureValidationResult>> ValidateSignatureAsync(byte[] signed)
     {
         var validator = new PdfSignatureValidator(new ValidationOptions
