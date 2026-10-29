@@ -38,14 +38,14 @@ internal sealed class LauncherForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = true;
-        ClientSize = new Size(700, 430);
-        BackColor = Color.FromArgb(18, 18, 27);
+        ClientSize = new Size(680, 400);
+        BackColor = Color.FromArgb(242, 243, 245);
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 10F);
         try { using var ms = new MemoryStream(Program.ReadResource("logo-future.png")); using var loaded = Image.FromStream(ms); _logo = new Bitmap(loaded); }
         catch { _logo = null; }
 
-        var header = new Panel { Dock = DockStyle.Top, Height = 150, BackColor = Color.FromArgb(39, 25, 62), Padding = new Padding(28, 18, 28, 18) };
+        var header = new Panel { Dock = DockStyle.Top, Height = 150, BackColor = Color.FromArgb(224, 227, 231), Padding = new Padding(28, 18, 28, 18) };
         var logo = new PictureBox { Dock = DockStyle.Left, Width = 150, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Transparent, Image = _logo };
         header.Controls.Add(logo);
         var titleArea = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
@@ -74,9 +74,9 @@ internal sealed class LauncherForm : Form
 
     private static Button CreateOption(string title, string description)
     {
-        var button = new Button { Dock = DockStyle.Fill, Text = title + Environment.NewLine + Environment.NewLine + description, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Semibold", 12F, FontStyle.Bold), BackColor = Color.FromArgb(124, 58, 237), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Margin = new Padding(8), Cursor = Cursors.Hand, Padding = new Padding(12) };
+        var button = new Button { Dock = DockStyle.Fill, Text = title + Environment.NewLine + Environment.NewLine + description, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Semibold", 12F, FontStyle.Bold), BackColor = Color.FromArgb(92, 98, 108), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Margin = new Padding(8), Cursor = Cursors.Hand, Padding = new Padding(12) };
         button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(142, 82, 246);
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(112, 118, 128);
         return button;
     }
 
