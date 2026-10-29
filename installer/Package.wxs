@@ -10,7 +10,7 @@
     <SummaryInformation Description="AssinaPDF — leitor e assinatura digital de PDFs" />
     <MajorUpgrade DowngradeErrorMessage="Já existe uma versão mais recente do AssinaPDF instalada." />
     <MediaTemplate EmbedCab="yes" />
-    <Icon Id="AssinaPDFIcon" SourceFile="$(PublishDir)AssinaPDF.exe" />
+    <Icon Id="AssinaPDFIcon" SourceFile="../../../public/favicon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AssinaPDFIcon" />
 
     <Feature Id="MainFeature" Title="AssinaPDF" Level="1">
