@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using SimpleSign.Core.Extensions;
 using SimpleSign.Core.Signing;
 using SimpleSign.PAdES;
 
@@ -334,6 +335,19 @@ internal sealed class MainForm : Form
             return;
         }
 
+        using var placementDialog = new SignaturePlacementDialog();
+        if (placementDialog.ShowDialog(this) != DialogResult.OK)
+            return;
+
+        var appearance = new SignatureAppearance
+        {
+            Page = placementDialog.PageNumber,
+            X = placementDialog.XCoordinate,
+            Y = placementDialog.YCoordinate,
+            ShowDate = true,
+            ShowReason = true
+        };
+
         var inputPath = Path.GetFullPath(_currentPdfPath);
         var inputInfo = new FileInfo(inputPath);
         if (!inputInfo.Exists || inputInfo.Length == 0)
@@ -378,6 +392,13 @@ internal sealed class MainForm : Form
             var signedBytes = await PadesSigner
                 .Document(pdfBytes)
                 .WithCertificate(certificate)
+                .WithMetadata(new SignatureMetadata
+                {
+                    SignerName = certificate.GetNameInfo(X509NameType.SimpleName, false),
+                    Reason = placementDialog.SigningReason,
+                    Location = "Future Soluções"
+                })
+                .WithAppearance(appearance)
                 .WithLevel(AdesBaselineProfile.Basic())
                 .SignAsync();
 
