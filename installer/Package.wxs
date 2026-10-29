@@ -19,8 +19,8 @@
 
   <Fragment>
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="FutureAppDirectory" Name="Programs">
-        <Directory Id="INSTALLFOLDER" Name="Future Soluções\AssinaPDF" />
+      <Directory Id="FutureAppDirectory" Name="Future Soluções">
+        <Directory Id="INSTALLFOLDER" Name="AssinaPDF" />
       </Directory>
     </StandardDirectory>
 
