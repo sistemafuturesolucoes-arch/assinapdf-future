@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -8,16 +8,16 @@
     <AssemblyName>AssinaPDF</AssemblyName>
     <RootNamespace>FutureSolucoes.AssinaPDF</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>../../../../public/favicon.ico</ApplicationIcon>
+    <ApplicationIcon>../../public/favicon.ico</ApplicationIcon>
     <Version>0.4.0</Version>
     <Product>AssinaPDF</Product>
-    <Company>Future Soluções</Company>
+    <Company>Future SoluÃ§Ãµes</Company>
     <Description>Leitor de PDF e assinatura digital PAdES.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="placement-viewer.html;placement-viewer.js" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="../../../../public/logo-future.png" Link="logo-future.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../public/logo-future.png" Link="logo-future.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="viewer\\**\\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
@@ -26,3 +26,4 @@
     <PackageReference Include="SimpleSign.PAdES" Version="0.9.2" />
   </ItemGroup>
 </Project>
+

@@ -1,16 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package
-    Name="AssinaPDF | Future Soluções"
-    Manufacturer="Future Soluções"
+    Name="AssinaPDF | Future SoluÃ§Ãµes"
+    Manufacturer="Future SoluÃ§Ãµes"
     Version="0.4.0"
     UpgradeCode="9F6C6C20-3BA4-4F69-9B6C-60C8DAE3D114"
     Scope="perMachine"
     Language="1046">
-    <SummaryInformation Description="AssinaPDF — leitor e assinatura digital de PDFs" />
-    <MajorUpgrade DowngradeErrorMessage="Já existe uma versão mais recente do AssinaPDF instalada." />
+    <SummaryInformation Description="AssinaPDF â€” leitor e assinatura digital de PDFs" />
+    <MajorUpgrade DowngradeErrorMessage="JÃ¡ existe uma versÃ£o mais recente do AssinaPDF instalada." />
     <MediaTemplate EmbedCab="yes" />
-    <Icon Id="AssinaPDFIcon" SourceFile="../../../public/favicon.ico" />
+    <Icon Id="AssinaPDFIcon" SourceFile="../public/favicon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AssinaPDFIcon" />
 
     <Feature Id="MainFeature" Title="AssinaPDF" Level="1">
@@ -23,7 +23,7 @@
 
   <Fragment>
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="FutureAppDirectory" Name="Future Soluções">
+      <Directory Id="FutureAppDirectory" Name="Future SoluÃ§Ãµes">
         <Directory Id="INSTALLFOLDER" Name="AssinaPDF" />
       </Directory>
     </StandardDirectory>
@@ -40,7 +40,7 @@
     <DirectoryRef Id="ApplicationProgramsFolder">
       <Component Id="AssinaPDFStartMenuShortcut" Guid="9AB87B67-AE27-44B4-9A26-A8A0E82BDE1B">
         <Shortcut Id="StartMenuShortcut" Name="AssinaPDF" Target="[#AssinaPDFExecutable]" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" />
-        <RegistryValue Root="HKCU" Key="Software\Future Soluções\AssinaPDF" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\Future SoluÃ§Ãµes\AssinaPDF" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
         <RemoveFolder Id="RemoveProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       </Component>
     </DirectoryRef>
@@ -48,7 +48,7 @@
     <StandardDirectory Id="DesktopFolder">
       <Component Id="AssinaPDFDesktopShortcut" Guid="7DA9D706-2A8A-4B6D-B7B8-7A64E52B21E2">
         <Shortcut Id="DesktopShortcut" Name="AssinaPDF" Target="[#AssinaPDFExecutable]" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" />
-        <RegistryValue Root="HKCU" Key="Software\Future Soluções\AssinaPDF" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\Future SoluÃ§Ãµes\AssinaPDF" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </StandardDirectory>
 
