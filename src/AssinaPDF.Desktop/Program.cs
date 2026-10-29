@@ -150,6 +150,11 @@ internal sealed class MainForm : Form
         Controls.Add(header);
 
         Shown += async (_, _) => await InitializeViewerAsync();
+        FormClosed += (_, _) =>
+        {
+            foreach (var item in _certificatePicker.Items.OfType<CertificateItem>())
+                item.Certificate.Dispose();
+        };
         LoadCertificates();
     }
 
@@ -263,6 +268,9 @@ internal sealed class MainForm : Form
 
     private void LoadCertificates()
     {
+        foreach (var previous in _certificatePicker.Items.OfType<CertificateItem>())
+            previous.Certificate.Dispose();
+
         _certificatePicker.BeginUpdate();
         _certificatePicker.Items.Clear();
         var found = 0;
@@ -281,11 +289,11 @@ internal sealed class MainForm : Form
                     var now = DateTime.Now;
                     var currentlyValid = now >= certificate.NotBefore && now <= certificate.NotAfter;
                     var name = certificate.GetNameInfo(X509NameType.SimpleName, false);
-                    var canAttemptSigning = hasPrivateKey && currentlyValid;
+                    var canAttemptSigning = hasPrivateKey && currentlyValid && AllowsDigitalSignature(certificate);
                     var item = new CertificateItem(
                         certificate,
                         $"{name} — válido até {certificate.NotAfter:dd/MM/yyyy}{(canAttemptSigning ? "" : " — não pronto para assinar")}",
-                        $"Titular: {name} | Emissor: {certificate.GetNameInfo(X509NameType.SimpleName, true)} | Validade: {certificate.NotBefore:dd/MM/yyyy} a {certificate.NotAfter:dd/MM/yyyy} | Chave privada disponível: {(hasPrivateKey ? "sim" : "não")} | Vigência local: {(currentlyValid ? "dentro do prazo" : "fora do prazo")}");
+                        $"Titular: {name} | Emissor: {certificate.GetNameInfo(X509NameType.SimpleName, true)} | Validade: {certificate.NotBefore:dd/MM/yyyy} a {certificate.NotAfter:dd/MM/yyyy} | Chave privada disponível: {(hasPrivateKey ? "sim" : "não")} | Uso de assinatura digital: {(AllowsDigitalSignature(certificate) ? "permitido/não restringido" : "não permitido pela extensão Key Usage")} | Vigência local: {(currentlyValid ? "dentro do prazo" : "fora do prazo")}");
                     _certificatePicker.Items.Add(item);
                     found++;
                     if (canAttemptSigning)
@@ -328,7 +336,7 @@ internal sealed class MainForm : Form
 
         var certificate = item.Certificate;
         var now = DateTime.Now;
-        if (!certificate.HasPrivateKey || now < certificate.NotBefore || now > certificate.NotAfter)
+        if (!certificate.HasPrivateKey || now < certificate.NotBefore || now > certificate.NotAfter || !AllowsDigitalSignature(certificate))
         {
             MessageBox.Show(this, "O certificado selecionado não tem chave privada acessível ou está fora da validade local. Escolha outro certificado.",
                 "Certificado indisponível", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -346,7 +354,8 @@ internal sealed class MainForm : Form
             X = placementDialog.XCoordinate,
             Y = placementDialog.YCoordinate,
             ShowDate = true,
-            ShowReason = true
+            ShowReason = true,
+            ShowLocation = true
         };
 
         var inputPath = Path.GetFullPath(_currentPdfPath);
@@ -446,6 +455,19 @@ internal sealed class MainForm : Form
         }
     }
 
+    private static bool AllowsDigitalSignature(X509Certificate2 certificate)
+    {
+        var keyUsage = certificate.Extensions
+            .OfType<X509KeyUsageExtension>()
+            .FirstOrDefault();
+
+        if (keyUsage is null)
+            return true;
+
+        const X509KeyUsageFlags allowed = X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.NonRepudiation;
+        return (keyUsage.KeyUsages & allowed) != 0;
+    }
+
     private void UpdateSigningAvailability()
     {
         if (_signButton is null || _signingInProgress)
@@ -457,7 +479,8 @@ internal sealed class MainForm : Form
         var certificateReady = item is not null
             && item.Certificate.HasPrivateKey
             && now >= item.Certificate.NotBefore
-            && now <= item.Certificate.NotAfter;
+            && now <= item.Certificate.NotAfter
+            && AllowsDigitalSignature(item.Certificate);
 
         _signButton.Enabled = hasPdf && certificateReady;
     }
