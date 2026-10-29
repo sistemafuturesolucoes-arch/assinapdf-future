@@ -6,6 +6,7 @@
     Version="0.3.0"
     UpgradeCode="9F6C6C20-3BA4-4F69-9B6C-60C8DAE3D114"
     Scope="perMachine"
+    Platform="x64"
     Language="1046">
     <SummaryInformation Description="AssinaPDF — leitor e assinatura digital de PDFs" />
     <MajorUpgrade DowngradeErrorMessage="Já existe uma versão mais recente do AssinaPDF instalada." />
@@ -25,12 +26,19 @@
     </StandardDirectory>
 
     <ComponentGroup Id="PublishedAppFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(PublishDir)**" />
+      <Files Include="$(PublishDir)**" Bitness="always64" />
     </ComponentGroup>
   </Fragment>
 
   <Fragment>
-    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder" Guid="7B1E8B1B-81F6-4DB2-8F18-7A1BA6D3F6E1">
+    <StandardDirectory Id="CommonProgramsFolder">
+      <Directory Id="FutureStartMenuFolder" Name="Future Soluções" />
+    </StandardDirectory>
+
+    <Component Id="StartMenuShortcut"
+               Directory="FutureStartMenuFolder"
+               Guid="7B1E8B1B-81F6-4DB2-8F18-7A1BA6D3F6E1"
+               Bitness="always64">
       <Shortcut Id="AssinaPDFStartMenuShortcut"
                 Name="AssinaPDF"
                 Description="Leitura e assinatura digital de PDFs"
