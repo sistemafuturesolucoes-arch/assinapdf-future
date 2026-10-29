@@ -40,8 +40,8 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(980, 680);
         Size = new Size(1280, 850);
-        BackColor = Color.FromArgb(18, 18, 24);
-        ForeColor = Color.White;
+        BackColor = Color.FromArgb(242, 243, 245);
+        ForeColor = Color.FromArgb(40, 43, 48);
         Font = new Font("Segoe UI", 10F);
         AllowDrop = true;
         DragEnter += HandleDragEnter;
@@ -52,7 +52,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Top,
             Height = 74,
             Padding = new Padding(22, 12, 22, 10),
-            BackColor = Color.FromArgb(35, 25, 54)
+            BackColor = Color.FromArgb(232, 234, 237)
         };
         header.Controls.Add(new Label
         {
@@ -75,7 +75,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Top,
             Height = 58,
             Padding = new Padding(16, 10, 16, 8),
-            BackColor = Color.FromArgb(24, 24, 32),
+            BackColor = Color.FromArgb(224, 227, 231),
             WrapContents = false,
             AutoScroll = true
         };
@@ -99,7 +99,7 @@ internal sealed class MainForm : Form
             Text = "Certificado do Windows:",
             AutoSize = true,
             Margin = new Padding(18, 9, 6, 0),
-            ForeColor = Color.Gainsboro
+            ForeColor = Color.FromArgb(55, 59, 65)
         });
 
         _certificatePicker = new ComboBox
@@ -130,7 +130,7 @@ internal sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             AllowExternalDrop = false,
-            DefaultBackgroundColor = Color.FromArgb(28, 28, 36)
+            DefaultBackgroundColor = Color.FromArgb(245, 246, 248)
         };
         _pdfViewer.CoreWebView2InitializationCompleted += ViewerInitializationCompleted;
 
@@ -140,8 +140,8 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Bottom,
             Height = 42,
             Padding = new Padding(18, 8, 18, 8),
-            BackColor = Color.FromArgb(24, 24, 32),
-            ForeColor = Color.FromArgb(185, 185, 200),
+            BackColor = Color.FromArgb(224, 227, 231),
+            ForeColor = Color.FromArgb(65, 69, 76),
             AutoEllipsis = true
         };
 
@@ -188,7 +188,10 @@ internal sealed class MainForm : Form
     {
         try
         {
-            await _pdfViewer.EnsureCoreWebView2Async();
+            var webViewData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FutureSolucoes", "AssinaPDF", "WebView2");
+            Directory.CreateDirectory(webViewData);
+            var environment = await CoreWebView2Environment.CreateAsync(null, webViewData);
+            await _pdfViewer.EnsureCoreWebView2Async(environment);
             _viewerReady = true;
             if (!string.IsNullOrWhiteSpace(_currentPdfPath))
                 NavigateToPdf(_currentPdfPath);
