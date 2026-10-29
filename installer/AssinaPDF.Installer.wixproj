@@ -3,7 +3,7 @@
     <OutputType>Package</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <Platform>x64</Platform>
-    <DefineConstants>PublishDir=$(PublishDir)</DefineConstants>
+    <DefineConstants>PublishDir=$(PublishDir);AppExePath=$(AppExePath)</DefineConstants>
     <OutputName>AssinaPDF-Setup-x64</OutputName>
   </PropertyGroup>
 </Project>
