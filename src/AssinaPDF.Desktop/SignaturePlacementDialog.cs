@@ -32,17 +32,17 @@ internal sealed class SignaturePlacementDialog : Form
         Font = new Font("Segoe UI", 10F);
 
         var header = new Panel { Dock = DockStyle.Top, Height = 94, Padding = new Padding(20, 12, 20, 10), BackColor = Color.FromArgb(224, 227, 231) };
-        header.Controls.Add(new Label { Text = "Selecione o local para assinar", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI Semibold", 17F, FontStyle.Bold), ForeColor = Color.White });
-        header.Controls.Add(new Label { Text = "Clique no PDF para adicionar uma marca de assinatura. Você pode selecionar mais de um local, inclusive em páginas diferentes.", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(222, 213, 236) });
+        header.Controls.Add(new Label { Text = "Selecione o local para assinar", Dock = DockStyle.Top, Height = 36, Font = new Font("Segoe UI Semibold", 17F, FontStyle.Bold), ForeColor = Color.FromArgb(45, 49, 56) });
+        header.Controls.Add(new Label { Text = "Clique no PDF para adicionar uma marca de assinatura. Você pode selecionar mais de um local, inclusive em páginas diferentes.", Dock = DockStyle.Top, Height = 32, ForeColor = Color.FromArgb(65, 69, 76) });
 
         _viewer = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(245, 246, 248) };
         var bottom = new Panel { Dock = DockStyle.Bottom, Height = 118, Padding = new Padding(18, 8, 18, 8), BackColor = Color.FromArgb(224, 227, 231) };
-        _selectionStatus = new Label { Dock = DockStyle.Top, Height = 25, Text = "Carregando documento...", ForeColor = Color.FromArgb(225, 218, 239) };
+        _selectionStatus = new Label { Dock = DockStyle.Top, Height = 25, Text = "Carregando documento...", ForeColor = Color.FromArgb(65, 69, 76) };
         var controls = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, BackColor = bottom.BackColor };
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
-        _reason = new TextBox { Dock = DockStyle.Fill, Text = "Assinatura digital", MaxLength = 200, BackColor = Color.FromArgb(38, 38, 48), ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 7, 10, 4) };
+        _reason = new TextBox { Dock = DockStyle.Fill, Text = "Assinatura digital", MaxLength = 200, BackColor = Color.White, ForeColor = Color.FromArgb(45, 49, 56), BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 7, 10, 4) };
         var clear = CreateButton("Limpar locais");
         clear.Click += async (_, _) => { _placements.Clear(); UpdateSelectionStatus(); if (_viewer.CoreWebView2 is not null) await _viewer.CoreWebView2.ExecuteScriptAsync("clearSelections()"); };
         _continueButton = CreateButton("Continuar");
