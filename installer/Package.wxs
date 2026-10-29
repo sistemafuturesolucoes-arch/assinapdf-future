@@ -3,16 +3,19 @@
   <Package
     Name="AssinaPDF | Future Soluções"
     Manufacturer="Future Soluções"
-    Version="0.3.0"
+    Version="0.4.0"
     UpgradeCode="9F6C6C20-3BA4-4F69-9B6C-60C8DAE3D114"
     Scope="perMachine"
     Language="1046">
     <SummaryInformation Description="AssinaPDF — leitor e assinatura digital de PDFs" />
     <MajorUpgrade DowngradeErrorMessage="Já existe uma versão mais recente do AssinaPDF instalada." />
     <MediaTemplate EmbedCab="yes" />
+    <Icon Id="AssinaPDFIcon" SourceFile="$(PublishDir)AssinaPDF.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AssinaPDFIcon" />
 
     <Feature Id="MainFeature" Title="AssinaPDF" Level="1">
       <ComponentGroupRef Id="PublishedAppFiles" />
+      <ComponentRef Id="AssinaPDFShortcuts" />
     </Feature>
   </Package>
 
@@ -22,9 +25,23 @@
         <Directory Id="INSTALLFOLDER" Name="AssinaPDF" />
       </Directory>
     </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="AssinaPDF" />
+    </StandardDirectory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AssinaPDFShortcuts" Guid="D4B44A87-4E10-44E9-9E8F-55D6D68B5E21">
+        <File Id="AssinaPDFExecutable" Source="$(PublishDir)AssinaPDF.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="AssinaPDF" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" Advertise="no" />
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="AssinaPDF" WorkingDirectory="INSTALLFOLDER" Icon="AssinaPDFIcon" Advertise="no" />
+        </File>
+        <RemoveFolder Id="RemoveProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="Software\Future Soluções\AssinaPDF" Name="installed" Type="integer" Value="1" KeyPath="no" />
+      </Component>
+    </DirectoryRef>
 
     <ComponentGroup Id="PublishedAppFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(PublishDir)**" />
+      <Files Include="$(PublishDir)**" Exclude="$(PublishDir)AssinaPDF.exe" />
     </ComponentGroup>
   </Fragment>
 </Wix>
