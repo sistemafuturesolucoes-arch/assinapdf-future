@@ -748,53 +748,46 @@ public partial class EditorWindow : Window
             state.FontSize = (float)run.FontSize;
 
         string currentFontFamily = state.FontName ?? string.Empty;
-        string normalizedCurrentFamily = NormalizePdfFontFamily(currentFontFamily);
-        bool fontFamilyChanged =
-            !string.IsNullOrWhiteSpace(run.FontFamily) &&
-            !string.Equals(normalizedCurrentFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
+        // Every editor run must carry an explicit face, including regular runs.
+        // An isolated TextSegment can still inherit the fragment's face when its
+        // FontTouched flag is false. That is exactly what caused a plain space
+        // between two differently formatted runs to be serialized with the
+        // neighbouring run's embedded italic face and size.
+        string fontFamily = !string.IsNullOrWhiteSpace(run.FontFamily)
+            ? run.FontFamily
+            : !string.IsNullOrWhiteSpace(originalFontName)
+                ? originalFontName
+                : !string.IsNullOrWhiteSpace(currentFontFamily)
+                    ? currentFontFamily
+                    : "Helvetica";
 
-        if (fontFamilyChanged || run.IsBold || run.IsItalic)
+        FontStyles requestedStyle =
+            (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
+            (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
+
+        try
         {
-            string fontFamily = fontFamilyChanged && !string.IsNullOrWhiteSpace(run.FontFamily)
-                ? run.FontFamily
-                : !string.IsNullOrWhiteSpace(originalFontName)
-                    ? originalFontName
-                    : currentFontFamily;
-
-            if (!string.IsNullOrWhiteSpace(fontFamily))
-            {
-                FontStyles requestedStyle =
-                    (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
-                    (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
-
-                try
-                {
-                    string faceName = GetPdfFontFaceName(fontFamily, run.IsBold, run.IsItalic);
-                    state.Font = IsStandard14Family(fontFamily)
-                        ? FontRepository.FindFont(faceName)
-                        : FontRepository.FindFont(fontFamily, requestedStyle);
-                }
-                catch (Exception ex)
-                {
-                    throw new InvalidOperationException(
-                        $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
-                        $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : requestedStyle.ToString())}. " +
-                        "Escolha outra família de fonte antes de aplicar a edição.",
-                        ex);
-                }
-
-                // Set FontStyle on the owned state (not on a detached clone). For
-                // absorbed text this also lets Aspose attempt a source-font swap;
-                // for TextBuilder-owned text it records the flags for serialization.
-                state.FontStyle = requestedStyle;
-            }
+            string faceName = GetPdfFontFaceName(fontFamily, run.IsBold, run.IsItalic);
+            // Assign even when the family appears unchanged. This marks the face
+            // as explicitly owned by this segment and makes the PDF writer emit
+            // the correct Tf for regular runs as well as styled runs.
+            state.Font = IsStandard14Family(fontFamily)
+                ? FontRepository.FindFont(faceName)
+                : FontRepository.FindFont(fontFamily, requestedStyle);
         }
-        else
+        catch (Exception ex)
         {
-            state.FontStyle =
-                (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
-                (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
+            throw new InvalidOperationException(
+                $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
+                $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : requestedStyle.ToString())}. " +
+                "Escolha outra família de fonte antes de aplicar a edição.",
+                ex);
         }
+
+        // Set FontStyle on the owned state (not on a detached clone). For
+        // absorbed text this also lets Aspose attempt a source-font swap;
+        // for TextBuilder-owned text it records the flags for serialization.
+        state.FontStyle = requestedStyle;
 
         // Assign colours directly to the final owned state. The setters retain the
         // values consumed by the PDF writer; on absorbed text they also perform the
