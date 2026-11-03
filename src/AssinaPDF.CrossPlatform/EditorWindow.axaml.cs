@@ -207,8 +207,10 @@ public partial class EditorWindow : Window
                     ? "Digite o texto que deseja inserir"
                     : "Edite o texto selecionado"
             };
-            var installedFonts = Avalonia.Media.FontManager.Current
-                .GetInstalledFontFamilyNames()
+            var installedFonts = Avalonia.Media.FontManager.Current.SystemFonts
+                .Select(fontFamily => fontFamily.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
                 .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
             var fontBox = new ComboBox
