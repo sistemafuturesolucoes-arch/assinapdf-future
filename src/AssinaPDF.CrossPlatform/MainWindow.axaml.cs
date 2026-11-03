@@ -801,7 +801,8 @@ public partial class MainWindow : Window
                 report.AppendLine(new string('-', 68));
                 report.AppendLine($"Campo: {result.FieldName}");
                 report.AppendLine($"Titular: {result.SignerName}");
-                report.AppendLine($"Data da assinatura: {result.SigningTime}");
+                report.AppendLine($"Data da assinatura (horário local): {result.SigningTime.ToLocalTime():dd/MM/yyyy 'às' HH:mm:ss zzz}");
+                report.AppendLine($"Data da assinatura (UTC): {result.SigningTime.ToUniversalTime():dd/MM/yyyy HH:mm:ss 'UTC'}");
                 report.AppendLine($"Integridade do documento: {(result.IsIntegrityValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
                 report.AppendLine($"Assinatura criptográfica: {(result.IsSignatureValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
                 report.AppendLine($"Cadeia de confiança: {(result.IsCertificateChainValid ? "CONFIÁVEL" : "NÃO CONFIRMADA NESTA ETAPA")}");
@@ -901,7 +902,8 @@ public partial class MainWindow : Window
                 report.AppendLine(new string('=', 56));
                 report.AppendLine($"Campo: {match.FieldName}");
                 report.AppendLine($"Titular: {match.SignerName}");
-                report.AppendLine($"Data da assinatura: {match.SigningTime}");
+                report.AppendLine($"Data da assinatura (horário local): {match.SigningTime.ToLocalTime():dd/MM/yyyy 'às' HH:mm:ss zzz}");
+                report.AppendLine($"Data da assinatura (UTC): {match.SigningTime.ToUniversalTime():dd/MM/yyyy HH:mm:ss 'UTC'}");
                 report.AppendLine($"Integridade do documento: {(match.IsIntegrityValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
                 report.AppendLine($"Assinatura criptográfica: {(match.IsSignatureValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
                 report.AppendLine($"Cadeia de confiança: {(match.IsCertificateChainValid ? "CONFIÁVEL" : "NÃO CONFIRMADA NESTA ETAPA")}");
