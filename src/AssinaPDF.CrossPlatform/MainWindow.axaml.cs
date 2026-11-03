@@ -194,7 +194,8 @@ public partial class MainWindow : Window
                 UpdateActionButtons();
 
                 StatusText.Text =
-                    $"PDF aberto com sucesso. {newDocument.PageCount} página(s) disponíveis na visualização contínua.";
+                    $"PDF aberto com sucesso. {newDocument.PageCount} página(s). " +
+                    $"{_signatureWidgets.Count} campo(s) de assinatura visível(is) localizado(s).";
             }
             catch
             {
