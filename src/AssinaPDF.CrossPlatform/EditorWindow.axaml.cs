@@ -645,17 +645,34 @@ public partial class EditorWindow : Window
                     $"Nenhum segmento PDF foi associado ao trecho formatado na posição {orderedRuns[i].Start}.");
             }
         }
+
+        // Absorbed fragments deliberately do not infer their fragment-level state
+        // from segments (TextFragmentState.SharedBySegments is disabled for them).
+        // When the complete text has one uniform run, the writer takes the
+        // fragment-level path (one segment) and would otherwise serialize the
+        // original fragment size/face/style instead of the segment override.
+        // Apply the same style to both levels so existing text and newly appended
+        // text use the same serialization path.
+        if (orderedRuns.Length == 1 &&
+            orderedRuns[0].Start == 0 &&
+            orderedRuns[0].Length == fragment.Text.Length)
+        {
+            ApplyRunStyle(
+                fragment.TextState,
+                orderedRuns[0],
+                originalFontName,
+                originalFontEmbedded);
+        }
     }
 
     private static void ApplyRunStyle(
-        TextSegment segment,
+        Aspose.Pdf.Text.TextState state,
         EditedTextRun run,
         string? originalFontName,
         bool originalFontEmbedded)
     {
-        // Capture the owner-linked state from the segment. ApplyChangesFrom copies
-        // formatting values while preserving that link to the PDF content operator.
-        var state = segment.TextState;
+        // Keep the original TextState instance: it carries the fragment/segment
+        // ownership used by Aspose while saving the PDF.
         var desired = new Aspose.Pdf.Text.TextState();
         desired.ApplyChangesFrom(state);
 
