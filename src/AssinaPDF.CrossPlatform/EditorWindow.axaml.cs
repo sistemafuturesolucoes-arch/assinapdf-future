@@ -436,6 +436,8 @@ public partial class EditorWindow : Window
             var alignment = editedParagraphs.FirstOrDefault()?.TextAlignment
                 ?? Avalonia.Media.TextAlignment.Left;
 
+            Aspose.Pdf.Rectangle? expectedBounds = null;
+
             ApplyPdfEdit(document =>
             {
                 TextFragment target;
@@ -488,6 +490,16 @@ public partial class EditorWindow : Window
 
                 if (originalText == null)
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
+
+                var editedRectangle = target.Rectangle;
+                if (editedRectangle != null)
+                    expectedBounds = new Aspose.Pdf.Rectangle(
+                        editedRectangle.LLX, editedRectangle.LLY,
+                        editedRectangle.URX, editedRectangle.URY);
+                else if (originalBounds != null)
+                    expectedBounds = new Aspose.Pdf.Rectangle(
+                        originalBounds.LLX, originalBounds.LLY,
+                        originalBounds.URX, originalBounds.URY);
             }, originalText == null
                 ? $"Texto inserido na página {pageIndex + 1}."
                 : "Texto e formatação atualizados.",
@@ -507,7 +519,7 @@ public partial class EditorWindow : Window
 
                     string? formattingFailure = VerifyRichTextFormatting(
                         savedDocument, pageIndex, replacementText, editedRuns,
-                        originalFontName, originalFontEmbedded);
+                        originalFontName, originalFontEmbedded, expectedBounds);
                     if (formattingFailure != null)
                         throw new InvalidOperationException("Diagnóstico da formatação: " + formattingFailure);
 
@@ -706,7 +718,8 @@ public partial class EditorWindow : Window
         string expectedText,
         IReadOnlyList<EditedTextRun> expectedRuns,
         string? originalFontName,
-        bool originalFontEmbedded)
+        bool originalFontEmbedded,
+        Aspose.Pdf.Rectangle? expectedBounds)
     {
         string Fail(string reason) => reason;
 
@@ -717,11 +730,40 @@ public partial class EditorWindow : Window
         document.Pages[pageIndex + 1].Accept(absorber);
 
         string normalizedExpected = NormalizePdfText(expectedText);
-        var fragment = absorber.TextFragments.FirstOrDefault(item =>
-            NormalizePdfText(item.Text) == normalizedExpected);
+        var candidates = absorber.TextFragments
+            .Where(item => NormalizePdfText(item.Text) == normalizedExpected)
+            .ToArray();
 
-        if (fragment == null)
+        if (candidates.Length == 0)
             return Fail("o texto editado não foi encontrado como um único bloco após reabrir o PDF.");
+
+        // A mesma frase pode aparecer mais de uma vez na página. Verificar sempre
+        // a primeira ocorrência pode inspecionar um trecho intocado e rejeitar uma
+        // edição que foi gravada corretamente. Use a posição editada como referência.
+        TextFragment fragment;
+        if (expectedBounds != null)
+        {
+            double expectedX = (expectedBounds.LLX + expectedBounds.URX) / 2;
+            double expectedY = (expectedBounds.LLY + expectedBounds.URY) / 2;
+            fragment = candidates
+                .Where(item => item.Rectangle != null)
+                .OrderBy(item =>
+                {
+                    var bounds = item.Rectangle!;
+                    double dx = (bounds.LLX + bounds.URX) / 2 - expectedX;
+                    double dy = (bounds.LLY + bounds.URY) / 2 - expectedY;
+                    return (dx * dx) + (dy * dy);
+                })
+                .FirstOrDefault() ?? candidates[0];
+        }
+        else if (candidates.Length == 1)
+        {
+            fragment = candidates[0];
+        }
+        else
+        {
+            return Fail("o texto aparece em mais de uma posição e não foi possível identificar com segurança o trecho editado.");
+        }
         if (fragment.Segments.Count == 0)
             return Fail("o texto foi encontrado, mas o Aspose não retornou segmentos para verificar.");
 
