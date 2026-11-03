@@ -324,6 +324,7 @@ public partial class MainWindow : Window
         _pageImages.Clear();
         _thumbnailImages.Clear();
         _pageCards.Clear();
+        _signatureOverlays.Clear();
 
         for (int i = 0; i < _pageBitmaps.Count; i++)
         {
@@ -347,9 +348,38 @@ public partial class MainWindow : Window
                 Margin = new Thickness(0, 0, 0, 8)
             };
 
+            var signatureOverlay = new Canvas
+            {
+                IsHitTestVisible = true,
+                ClipToBounds = true
+            };
+            foreach (var widget in _signatureWidgets.Where(x => x.PageIndex == pageIndex))
+            {
+                var marker = new Button
+                {
+                    Content = "Assinatura digital",
+                    Tag = widget,
+                    Padding = new Thickness(3),
+                    FontSize = 10,
+                    FontWeight = FontWeight.SemiBold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(30, 77, 125)),
+                    Background = new SolidColorBrush(Color.FromArgb(42, 65, 145, 220)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(43, 120, 197)),
+                    BorderThickness = new Thickness(2),
+                    CornerRadius = new CornerRadius(3)
+                };
+                marker.Click += async (_, _) => await ShowSignatureWidgetAsync(widget);
+                signatureOverlay.Children.Add(marker);
+            }
+
+            var pageVisual = new Grid();
+            pageVisual.Children.Add(image);
+            pageVisual.Children.Add(signatureOverlay);
+
             var pageContent = new StackPanel { Spacing = 4 };
             pageContent.Children.Add(pageLabel);
-            pageContent.Children.Add(image);
+            pageContent.Children.Add(pageVisual);
+            _signatureOverlays.Add(signatureOverlay);
 
             var pageCard = new Border
             {
