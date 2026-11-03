@@ -724,7 +724,7 @@ public partial class EditorWindow : Window
 
                 if (verifySavedDocument != null && !verifySavedDocument(savedDocument))
                     throw new IOException(
-                        "O PDF foi gerado, mas a alteração de texto não foi encontrada no arquivo salvo. A cópia anterior foi preservada.");
+                        "O PDF foi gerado, mas o texto ou a formatação não foram preservados no arquivo salvo. A cópia anterior foi preservada.");
             }
 
             _document?.Dispose();
