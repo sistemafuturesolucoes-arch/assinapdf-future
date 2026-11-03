@@ -385,7 +385,7 @@ public partial class MainWindow : Window
         _isPanning = true;
         _panStart = e.GetPosition(PdfScrollViewer);
         _panStartOffset = PdfScrollViewer.Offset;
-        PdfScrollViewer.Cursor = new Cursor(StandardCursorType.SizeAll);
+        PdfScrollViewer.Cursor = new Cursor(StandardCursorType.Hand);
         e.Pointer.Capture(PdfScrollViewer);
         e.Handled = true;
     }
