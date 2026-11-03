@@ -193,7 +193,9 @@ public sealed class PdfTextFormattingTests
         _output.WriteLine($"FONTE DO FRAGMENTO: FontName={target.TextState.FontName}; Font={target.TextState.Font?.FontName}; BaseFont={target.TextState.Font?.BaseFont}; FontData={target.TextState.FontData?.FontName}");
         foreach (var item in beforeSaveOffsets)
         {
-            _output.WriteLine($"ANTES [{item.Start},{item.End}): {DescribeSegment(item.Segment)}; Font={item.Segment.TextState.Font?.FontName}; BaseFont={item.Segment.TextState.Font?.BaseFont}; FontData={item.Segment.TextState.FontData?.FontName}");
+            var ownerProperty = typeof(TextState).GetProperty("OwnerSegment", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var owner = ownerProperty?.GetValue(item.Segment.TextState);
+            _output.WriteLine($"ANTES [{item.Start},{item.End}): {DescribeSegment(item.Segment)}; StateRef={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(item.Segment.TextState)}; OwnerMatches={ReferenceEquals(owner, item.Segment)}; Font={item.Segment.TextState.Font?.FontName}; BaseFont={item.Segment.TextState.Font?.BaseFont}; FontData={item.Segment.TextState.FontData?.FontName}");
         }
         AssertRun(beforeSaveOffsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(beforeSaveOffsets, 5, 6, 10, bold: false, italic: false);
