@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.EditorWindow"
+        Title="AssinaPDF | Editor de PDF"
+        Width="1180" Height="820"
+        MinWidth="850" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+  <Grid RowDefinitions="64,*,38">
+    <Border Grid.Row="0" Background="#292D36" Padding="18,8">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+        <StackPanel VerticalAlignment="Center" Spacing="2">
+          <TextBlock Text="Editor de PDF" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+          <TextBlock x:Name="DocumentNameText" Text="Cópia de trabalho" FontSize="11" Foreground="#D5D8DE"/>
+        </StackPanel>
+        <Button Grid.Column="1" Content="Salvar como novo PDF..." Click="SaveAs_Click"
+                VerticalAlignment="Center" Padding="16,9"
+                Background="#FFFFFF" Foreground="#292D36" BorderThickness="0"/>
+        <Button Grid.Column="2" Content="Fechar editor" Click="CloseEditor_Click"
+                VerticalAlignment="Center" Padding="16,9"
+                Background="#555C68" Foreground="White" BorderThickness="0"/>
+      </Grid>
+    </Border>
+    <Border Grid.Row="1" Background="#D9DCE0" Padding="12">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="EditorPagesPanel" Spacing="18" HorizontalAlignment="Center"/>
+      </ScrollViewer>
+    </Border>
+    <Border Grid.Row="2" Background="#E7E9ED" Padding="12,4">
+      <TextBlock x:Name="EditorStatusText"
+                 Text="O documento está aberto em uma cópia temporária. O original permanece preservado."
+                 FontSize="11" Foreground="#555B63" VerticalAlignment="Center"/>
+    </Border>
+  </Grid>
+</Window>
