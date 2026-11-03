@@ -483,7 +483,6 @@ public partial class EditorWindow : Window
                     };
                 }
 
-                ApplyRichTextFormatting(target, editedRuns, originalFontName, originalFontEmbedded);
                 target.HorizontalAlignment = alignment switch
                 {
                     Avalonia.Media.TextAlignment.Center => Aspose.Pdf.HorizontalAlignment.Center,
@@ -491,8 +490,16 @@ public partial class EditorWindow : Window
                     _ => Aspose.Pdf.HorizontalAlignment.Left
                 };
 
+                // A new TextFragment ainda não está vinculado aos operadores de conteúdo
+                // do PDF antes de AppendText. Aplicar TextState nesse momento altera apenas
+                // o objeto em memória e o Aspose pode gravar o texto com estilo padrão.
+                // Primeiro anexe o fragmento à página; depois aplique os estilos aos
+                // segmentos já pertencentes ao documento. Para texto existente, ele já
+                // está anexado e a mesma rotina continua funcionando.
                 if (originalText == null)
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
+
+                ApplyRichTextFormatting(target, editedRuns, originalFontName, originalFontEmbedded);
 
                 var editedRectangle = target.Rectangle;
                 if (editedRectangle != null)
