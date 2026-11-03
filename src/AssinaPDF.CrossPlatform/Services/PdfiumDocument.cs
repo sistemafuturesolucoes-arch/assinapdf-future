@@ -41,6 +41,8 @@ public sealed class PdfiumDocument : IDisposable
     private readonly byte[] _pdfBytes;
     private GCHandle _pinnedBytes;
     private IntPtr _document;
+    private IntPtr _formHandle;
+    private IntPtr _formFillInfo;
     private bool _disposed;
 
     public int PageCount { get; }
@@ -82,6 +84,26 @@ public sealed class PdfiumDocument : IDisposable
 
                     throw new InvalidDataException(
                         $"Não foi possível abrir o PDF. Código PDFium: {error}.");
+                }
+
+                // PDFium exige uma estrutura FPDF_FORMFILLINFO válida para
+                // inicializar o renderizador de campos interativos (widgets).
+                // Reservamos memória nativa zerada e definimos a versão 1;
+                // os callbacks opcionais permanecem nulos nesta etapa.
+                _formFillInfo = Marshal.AllocHGlobal(1024);
+                for (int i = 0; i < 1024; i++)
+                    Marshal.WriteByte(_formFillInfo, i, 0);
+                Marshal.WriteInt32(_formFillInfo, 1);
+
+                try
+                {
+                    _formHandle = PdfiumNative.InitFormFillEnvironment(
+                        _document,
+                        _formFillInfo);
+                }
+                catch (EntryPointNotFoundException)
+                {
+                    _formHandle = IntPtr.Zero;
                 }
 
                 PageCount = PdfiumNative.GetPageCount(_document);
@@ -172,6 +194,9 @@ public sealed class PdfiumDocument : IDisposable
                     throw new InvalidOperationException(
                         "O PDFium não conseguiu criar a imagem da página.");
 
+                if (_formHandle != IntPtr.Zero)
+                    PdfiumNative.FormOnAfterLoadPage(page, _formHandle);
+
                 PdfiumNative.RenderPageBitmap(
                     bitmap,
                     page,
@@ -181,6 +206,22 @@ public sealed class PdfiumDocument : IDisposable
                     height,
                     0,
                     1);
+
+                // Widgets de formulários, incluindo campos de assinatura,
+                // são desenhados pela API FPDF_FFLDraw após o conteúdo da página.
+                if (_formHandle != IntPtr.Zero)
+                {
+                    PdfiumNative.FormFillDraw(
+                        _formHandle,
+                        bitmap,
+                        page,
+                        0,
+                        0,
+                        width,
+                        height,
+                        0,
+                        1);
+                }
 
                 IntPtr buffer = PdfiumNative.BitmapGetBuffer(bitmap);
                 int stride = PdfiumNative.BitmapGetStride(bitmap);
@@ -201,11 +242,16 @@ public sealed class PdfiumDocument : IDisposable
             }
             finally
             {
+                if (page != IntPtr.Zero)
+                {
+                    if (_formHandle != IntPtr.Zero)
+                        PdfiumNative.FormOnBeforeClosePage(page, _formHandle);
+
+                    PdfiumNative.ClosePage(page);
+                }
+
                 if (bitmap != IntPtr.Zero)
                     PdfiumNative.BitmapDestroy(bitmap);
-
-                if (page != IntPtr.Zero)
-                    PdfiumNative.ClosePage(page);
             }
         }
     }
@@ -217,6 +263,18 @@ public sealed class PdfiumDocument : IDisposable
 
     private void CloseDocument()
     {
+        if (_formHandle != IntPtr.Zero)
+        {
+            PdfiumNative.ExitFormFillEnvironment(_formHandle);
+            _formHandle = IntPtr.Zero;
+        }
+
+        if (_formFillInfo != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(_formFillInfo);
+            _formFillInfo = IntPtr.Zero;
+        }
+
         if (_document != IntPtr.Zero)
         {
             PdfiumNative.CloseDocument(_document);
