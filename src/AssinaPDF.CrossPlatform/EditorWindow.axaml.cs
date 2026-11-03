@@ -242,7 +242,7 @@ public partial class EditorWindow : Window
 
     private static bool TryParseHexColor(string? value, out Aspose.Pdf.Color color)
     {
-        color = Aspose.Pdf.Color.Black;
+        color = Aspose.Pdf.Color.FromRgb(0, 0, 0);
         string hex = (value ?? string.Empty).Trim();
         if (hex.StartsWith("#", StringComparison.Ordinal))
             hex = hex[1..];
