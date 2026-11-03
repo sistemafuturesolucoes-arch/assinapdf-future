@@ -96,6 +96,7 @@ public partial class MainWindow : Window
 
             _futureLogo = new Bitmap(logoPath);
             FutureLogo.Source = _futureLogo;
+            Icon = new WindowIcon(_futureLogo);
         }
         catch (Exception ex)
         {
