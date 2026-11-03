@@ -557,7 +557,12 @@ public partial class EditorWindow : Window
 
     private static void ApplyRunStyle(Aspose.Pdf.Text.TextState state, EditedTextRun run)
     {
-        if (!string.IsNullOrWhiteSpace(run.FontFamily))
+        string currentFontFamily = state.FontName ?? string.Empty;
+        bool fontFamilyChanged =
+            !string.IsNullOrWhiteSpace(run.FontFamily) &&
+            !string.Equals(currentFontFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
+
+        if (fontFamilyChanged)
             state.FontName = run.FontFamily;
 
         if (run.FontSize > 0)
@@ -572,23 +577,29 @@ public partial class EditorWindow : Window
                 ? FontStyles.Italic
                 : FontStyles.Regular;
 
-        string fontFamily = !string.IsNullOrWhiteSpace(run.FontFamily)
-            ? run.FontFamily
-            : state.FontName ?? string.Empty;
-
-        if (!string.IsNullOrWhiteSpace(fontFamily))
+        // Preserve a fonte original incorporada/subsetada quando o usuário não
+        // mudou a família nem pediu uma face estilizada. Só resolva uma fonte do
+        // sistema quando realmente for necessário trocar família ou variante.
+        if (fontFamilyChanged || run.IsBold || run.IsItalic)
         {
-            try
+            string fontFamily = !string.IsNullOrWhiteSpace(run.FontFamily)
+                ? run.FontFamily
+                : currentFontFamily;
+
+            if (!string.IsNullOrWhiteSpace(fontFamily))
             {
-                state.Font = FontRepository.FindFont(fontFamily, faceStyle);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException(
-                    $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
-                    $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : faceStyle.ToString())}. " +
-                    "Instale essa fonte ou escolha outra antes de aplicar a edição.",
-                    ex);
+                try
+                {
+                    state.Font = FontRepository.FindFont(fontFamily, faceStyle);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
+                        $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : faceStyle.ToString())}. " +
+                        "Instale essa fonte ou escolha outra antes de aplicar a edição.",
+                        ex);
+                }
             }
         }
 
