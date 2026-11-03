@@ -818,10 +818,10 @@ public partial class MainWindow : Window
             MinHeight = 420,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = true,
-            Content = new StackPanel
+            Content = new Grid
             {
                 Margin = new Thickness(18),
-                Spacing = 8,
+                RowDefinitions = new RowDefinitions("Auto,*,Auto"),
                 Children =
                 {
                     new TextBlock
@@ -829,13 +829,17 @@ public partial class MainWindow : Window
                         Text = title,
                         FontSize = 19,
                         FontWeight = FontWeight.SemiBold,
-                        Margin = new Thickness(0, 0, 0, 6)
+                        Margin = new Thickness(0, 0, 0, 12)
                     },
                     reportText,
                     closeButton
                 }
             }
         };
+
+        var contentGrid = (Grid)dialog.Content!;
+        Grid.SetRow(reportText, 1);
+        Grid.SetRow(closeButton, 2);
 
         closeButton.Click += (_, _) => dialog.Close();
         await dialog.ShowDialog(this);
