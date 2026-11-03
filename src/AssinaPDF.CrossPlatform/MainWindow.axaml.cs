@@ -446,14 +446,27 @@ public partial class MainWindow : Window
             if (saveFile == null)
                 return;
 
+            string destinationPath = System.IO.Path.GetFullPath(saveFile.Path.LocalPath);
+            string sourcePath = System.IO.Path.GetFullPath(_currentPdfPath);
+            if (string.Equals(
+                sourcePath,
+                destinationPath,
+                OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal))
+            {
+                StatusText.Text = "Escolha outro nome para preservar o PDF original.";
+                return;
+            }
+
             using var source = PdfReader.Open(
-                _currentPdfPath,
+                sourcePath,
                 PdfDocumentOpenMode.Import);
             using var output = new PdfSharp.Pdf.PdfDocument();
             output.AddPage(source.Pages[pageIndex]);
-            output.Save(saveFile.Path.LocalPath);
+            output.Save(destinationPath);
 
-            StatusText.Text = $"Página {pageIndex + 1} exportada: {saveFile.Path.LocalPath}";
+            StatusText.Text = $"Página {pageIndex + 1} exportada: {destinationPath}";
         }
         catch (Exception ex)
         {
