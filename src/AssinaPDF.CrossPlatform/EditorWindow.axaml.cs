@@ -165,6 +165,7 @@ public partial class EditorWindow : Window
         {
             string? originalText = null;
             Aspose.Pdf.Rectangle? originalBounds = null;
+            bool originalBold = false;
 
             using (var document = Document.Open(_workingCopyPath))
             {
@@ -177,6 +178,7 @@ public partial class EditorWindow : Window
                     var bounds = fragment.Rectangle;
                     if (bounds == null)
                         continue;
+
                     double dx = x < bounds.LLX ? bounds.LLX - x :
                         x > bounds.URX ? x - bounds.URX : 0;
                     double dy = y < bounds.LLY ? bounds.LLY - y :
@@ -188,71 +190,142 @@ public partial class EditorWindow : Window
                     {
                         bestDistance = distance;
                         originalText = fragment.Text;
+                        originalBold = fragment.TextState.IsBold;
                         originalBounds = new Aspose.Pdf.Rectangle(
                             bounds.LLX, bounds.LLY, bounds.URX, bounds.URY);
                     }
                 }
             }
 
-            if (originalText == null || originalBounds == null)
+            var textBox = new TextBox
             {
-                EditorStatusText.Text =
-                    "Não encontrei texto selecionável nesse ponto. Se a página for digitalizada, será necessário OCR.";
-                return;
-            }
+                Text = originalText ?? string.Empty,
+                AcceptsReturn = true,
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                MinHeight = 76,
+                Watermark = originalText == null
+                    ? "Digite o texto que deseja inserir"
+                    : "Edite o texto selecionado"
+            };
+            var fontBox = new TextBox
+            {
+                Width = 170,
+                Watermark = "Fonte (ex.: Arial)"
+            };
+            var sizeBox = new TextBox
+            {
+                Width = 76,
+                Text = "12",
+                Watermark = "Tamanho"
+            };
+            var boldCheck = new CheckBox
+            {
+                Content = "Negrito",
+                IsChecked = originalText == null ? false : originalBold,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+            };
+            var textColorBox = new TextBox
+            {
+                Width = 112,
+                Watermark = "Fonte #000000"
+            };
+            var highlightBox = new TextBox
+            {
+                Width = 112,
+                Watermark = "Marcação #FFFF00"
+            };
+            var alignmentBox = new ComboBox
+            {
+                Width = 160,
+                ItemsSource = new[] { "Esquerda", "Centralizado", "Direita" },
+                SelectedIndex = 0
+            };
 
-            var editBox = new TextBox
-            {
-                Text = originalText,
-                AcceptsReturn = false,
-                TextWrapping = Avalonia.Media.TextWrapping.NoWrap,
-                MinWidth = 380,
-                PlaceholderText = "Edite o texto selecionado"
-            };
-            var applyButton = new Button
-            {
-                Content = "Aplicar alteração",
-                MinWidth = 140,
-                Padding = new Thickness(12, 8)
-            };
-            var cancelButton = new Button
-            {
-                Content = "Cancelar",
-                MinWidth = 100,
-                Padding = new Thickness(12, 8)
-            };
-            var actions = new StackPanel
-            {
-                Orientation = Avalonia.Layout.Orientation.Horizontal,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                Spacing = 8,
-                Children = { cancelButton, applyButton }
-            };
             var dialog = new Window
             {
-                Title = "Editar texto do PDF",
-                Width = 540,
-                Height = 190,
-                MinWidth = 440,
+                Title = originalText == null ? "Inserir texto no PDF" : "Editar texto do PDF",
+                Width = 650,
+                Height = 390,
+                MinWidth = 560,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                CanResize = false,
+                CanResize = true,
                 Content = new StackPanel
                 {
                     Margin = new Thickness(20),
-                    Spacing = 14,
+                    Spacing = 12,
                     Children =
                     {
                         new TextBlock
                         {
-                            Text = "Texto selecionado — altere o conteúdo e aplique:",
-                            FontSize = 13
+                            Text = originalText == null
+                                ? $"Novo texto na página {pageIndex + 1}"
+                                : "Texto selecionado",
+                            FontSize = 14,
+                            FontWeight = Avalonia.Media.FontWeight.SemiBold
                         },
-                        editBox,
-                        actions
+                        textBox,
+                        new TextBlock
+                        {
+                            Text = "Formatação",
+                            FontSize = 13,
+                            FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                            Margin = new Thickness(0, 4, 0, 0)
+                        },
+                        new StackPanel
+                        {
+                            Orientation = Avalonia.Layout.Orientation.Horizontal,
+                            Spacing = 10,
+                            Children = { fontBox, sizeBox, boldCheck }
+                        },
+                        new StackPanel
+                        {
+                            Orientation = Avalonia.Layout.Orientation.Horizontal,
+                            Spacing = 10,
+                            Children = { textColorBox, highlightBox }
+                        },
+                        new StackPanel
+                        {
+                            Orientation = Avalonia.Layout.Orientation.Horizontal,
+                            Spacing = 10,
+                            Children =
+                            {
+                                new TextBlock
+                                {
+                                    Text = "Alinhamento:",
+                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                                },
+                                alignmentBox
+                            }
+                        },
+                        new StackPanel
+                        {
+                            Orientation = Avalonia.Layout.Orientation.Horizontal,
+                            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                            Spacing = 8,
+                            Children =
+                            {
+                                new Button
+                                {
+                                    Content = "Cancelar",
+                                    MinWidth = 100,
+                                    Padding = new Thickness(12, 8),
+                                    Command = null
+                                },
+                                new Button
+                                {
+                                    Content = originalText == null ? "Inserir texto" : "Aplicar alteração",
+                                    MinWidth = 140,
+                                    Padding = new Thickness(12, 8)
+                                }
+                            }
+                        }
                     }
                 }
             };
 
+            var actionPanel = (StackPanel)((StackPanel)dialog.Content!).Children[^1];
+            var cancelButton = (Button)actionPanel.Children[0];
+            var applyButton = (Button)actionPanel.Children[1];
             applyButton.Click += (_, _) => dialog.Close(true);
             cancelButton.Click += (_, _) => dialog.Close(false);
 
@@ -260,57 +333,111 @@ public partial class EditorWindow : Window
             if (!accepted)
                 return;
 
-            string replacement = editBox.Text ?? string.Empty;
+            string replacement = textBox.Text ?? string.Empty;
             if (string.IsNullOrWhiteSpace(replacement))
             {
-                EditorStatusText.Text =
-                    "O texto não foi alterado. Para remover conteúdo, use uma ferramenta de remoção específica.";
+                EditorStatusText.Text = "Digite algum texto antes de aplicar.";
                 return;
             }
 
-            var selectedBounds = originalBounds;
-            if (selectedBounds == null)
+            string fontName = fontBox.Text?.Trim() ?? string.Empty;
+            string fontSizeText = sizeBox.Text?.Trim() ?? string.Empty;
+            string textColor = textColorBox.Text?.Trim() ?? string.Empty;
+            string highlightColor = highlightBox.Text?.Trim() ?? string.Empty;
+            string alignment = alignmentBox.SelectedItem?.ToString() ?? "Esquerda";
+
+            if (!string.IsNullOrWhiteSpace(fontSizeText) &&
+                (!float.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedSize) ||
+                 parsedSize <= 0))
+            {
+                EditorStatusText.Text = "Informe um tamanho de fonte válido, maior que zero.";
                 return;
+            }
 
             ApplyPdfEdit(document =>
             {
-                var pageAbsorber = new TextFragmentAbsorber();
-                document.Pages[pageIndex + 1].Accept(pageAbsorber);
-
-                TextFragment? target = null;
-                double closest = double.MaxValue;
-                foreach (TextFragment fragment in pageAbsorber.TextFragments)
+                if (originalBounds != null && originalText != null)
                 {
-                    var bounds = fragment.Rectangle;
-                    if (bounds == null)
-                        continue;
-                    double cx = (bounds.LLX + bounds.URX) / 2;
-                    double cy = (bounds.LLY + bounds.URY) / 2;
-                    double ox = (selectedBounds.LLX + selectedBounds.URX) / 2;
-                    double oy = (selectedBounds.LLY + selectedBounds.URY) / 2;
-                    double distance = Math.Sqrt(
-                        Math.Pow(cx - ox, 2) + Math.Pow(cy - oy, 2));
+                    var pageAbsorber = new TextFragmentAbsorber();
+                    document.Pages[pageIndex + 1].Accept(pageAbsorber);
 
-                    if (string.Equals(fragment.Text, originalText, StringComparison.Ordinal) &&
-                        distance < closest)
+                    TextFragment? target = null;
+                    double closest = double.MaxValue;
+                    foreach (TextFragment fragment in pageAbsorber.TextFragments)
                     {
-                        closest = distance;
-                        target = fragment;
+                        var bounds = fragment.Rectangle;
+                        if (bounds == null)
+                            continue;
+                        double cx = (bounds.LLX + bounds.URX) / 2;
+                        double cy = (bounds.LLY + bounds.URY) / 2;
+                        double ox = (originalBounds.LLX + originalBounds.URX) / 2;
+                        double oy = (originalBounds.LLY + originalBounds.URY) / 2;
+                        double distance = Math.Sqrt(Math.Pow(cx - ox, 2) + Math.Pow(cy - oy, 2));
+
+                        if (string.Equals(fragment.Text, originalText, StringComparison.Ordinal) &&
+                            distance < closest)
+                        {
+                            closest = distance;
+                            target = fragment;
+                        }
                     }
+
+                    if (target == null || closest > 8.0)
+                        throw new InvalidOperationException("O texto selecionado não foi localizado novamente no PDF.");
+
+                    target.Text = replacement;
+                    ApplyDialogFormatting(target, fontName, fontSizeText, boldCheck.IsChecked == true,
+                        textColor, highlightColor, alignment);
                 }
-
-                if (target == null || closest > 8.0)
-                    throw new InvalidOperationException(
-                        "O texto selecionado não foi localizado novamente no PDF.");
-
-                target.Text = replacement;
-                ApplyOptionalStyle(target.TextState, preserveFontWhenBlank: true);
-            }, "Texto editado diretamente na página.");
+                else
+                {
+                    var fragment = new TextFragment(replacement)
+                    {
+                        Position = new Position(x, y)
+                    };
+                    ApplyDialogFormatting(fragment, fontName, fontSizeText, boldCheck.IsChecked == true,
+                        textColor, highlightColor, alignment);
+                    new TextBuilder(document.Pages[pageIndex + 1]).AppendText(fragment);
+                }
+            }, originalText == null
+                ? $"Texto inserido na página {pageIndex + 1}."
+                : "Texto e formatação atualizados.");
         }
         catch (Exception ex)
         {
-            EditorStatusText.Text = $"Não foi possível editar o texto selecionado: {ex.Message}";
+            EditorStatusText.Text = $"Não foi possível concluir a edição: {ex.Message}";
         }
+    }
+
+    private static void ApplyDialogFormatting(
+        TextFragment fragment,
+        string fontName,
+        string fontSizeText,
+        bool isBold,
+        string textColor,
+        string highlightColor,
+        string alignment)
+    {
+        if (!string.IsNullOrWhiteSpace(fontName))
+            fragment.TextState.FontName = fontName;
+
+        if (float.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float size) && size > 0)
+            fragment.TextState.FontSize = size;
+
+        fragment.TextState.IsBold = isBold;
+
+        if (TryParseHexColor(textColor, out var foreground))
+            fragment.TextState.ForegroundColor = foreground;
+
+        if (TryParseHexColor(highlightColor, out var background))
+            fragment.TextState.BackgroundColor = background;
+
+        fragment.HorizontalAlignment = alignment switch
+        {
+            "Centralizado" => Aspose.Pdf.HorizontalAlignment.Center,
+            "Direita" => Aspose.Pdf.HorizontalAlignment.Right,
+            _ => Aspose.Pdf.HorizontalAlignment.Left
+        };
     }
 
     private void ReplaceText_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -335,7 +462,6 @@ public partial class EditorWindow : Window
                 foreach (var fragment in absorber.TextFragments)
                 {
                     fragment.Text = replacement;
-                    ApplyOptionalStyle(fragment.TextState, preserveFontWhenBlank: true);
                 }
             }, $"Texto atualizado: {changed} ocorrência(s).");
             if (changed == 0)
@@ -345,81 +471,6 @@ public partial class EditorWindow : Window
         {
             EditorStatusText.Text = $"Não foi possível editar o texto: {ex.Message}";
         }
-    }
-
-    private void AddText_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        string text = NewTextBox.Text ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            EditorStatusText.Text = "Digite o texto que deseja inserir.";
-            return;
-        }
-
-        if (!int.TryParse(PageNumberTextBox.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int pageNumber) ||
-            !double.TryParse(XPositionTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double x) ||
-            !double.TryParse(YPositionTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double y))
-        {
-            EditorStatusText.Text = "Página, X e Y precisam conter números válidos. X/Y são medidos em pontos a partir do canto inferior esquerdo.";
-            return;
-        }
-
-        try
-        {
-            ApplyPdfEdit(document =>
-            {
-                if (pageNumber < 1 || pageNumber > document.Pages.Count)
-                    throw new ArgumentOutOfRangeException(nameof(pageNumber), $"O PDF possui {document.Pages.Count} página(s).");
-
-                var fragment = new TextFragment(text)
-                {
-                    Position = new Position(x, y)
-                };
-
-                fragment.TextState.FontName = string.IsNullOrWhiteSpace(FontNameTextBox.Text)
-                    ? "Helvetica"
-                    : FontNameTextBox.Text.Trim();
-                fragment.TextState.FontSize = ParseFontSize(12f);
-                fragment.TextState.IsBold = IsBoldCheckBox.IsChecked == true;
-
-                if (TryParseHexColor(TextColorTextBox.Text, out var foreground))
-                    fragment.TextState.ForegroundColor = foreground;
-                if (TryParseHexColor(HighlightColorTextBox.Text, out var background))
-                    fragment.TextState.BackgroundColor = background;
-
-                new TextBuilder(document.Pages[pageNumber]).AppendText(fragment);
-            }, $"Texto inserido na página {pageNumber}.");
-        }
-        catch (Exception ex)
-        {
-            EditorStatusText.Text = $"Não foi possível inserir o texto: {ex.Message}";
-        }
-    }
-
-    private void ApplyOptionalStyle(TextState state, bool preserveFontWhenBlank)
-    {
-        string fontName = FontNameTextBox.Text?.Trim() ?? string.Empty;
-        if (!preserveFontWhenBlank || !string.IsNullOrWhiteSpace(fontName))
-            state.FontName = string.IsNullOrWhiteSpace(fontName) ? "Helvetica" : fontName;
-
-        if (float.TryParse(FontSizeTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float size) && size > 0)
-            state.FontSize = size;
-
-        if (IsBoldCheckBox.IsChecked == true)
-            state.IsBold = true;
-
-        if (TryParseHexColor(TextColorTextBox.Text, out var foreground))
-            state.ForegroundColor = foreground;
-
-        if (TryParseHexColor(HighlightColorTextBox.Text, out var background))
-            state.BackgroundColor = background;
-    }
-
-    private float ParseFontSize(float fallback)
-    {
-        return float.TryParse(FontSizeTextBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out float size) && size > 0
-            ? size
-            : fallback;
     }
 
     private static bool TryParseHexColor(string? value, out Aspose.Pdf.Color color)
