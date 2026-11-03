@@ -1,35 +1,32 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-
   <Package
-    Name="AssinaPDF | Future Solucoes"
-    Manufacturer="Future Solucoes"
-    Version="0.4.0"
+    Name="AssinaPDF | Future Soluções"
+    Manufacturer="Future Soluções"
+    Version="0.4.1"
     UpgradeCode="B7D9E2A1-6F43-4C85-9A12-8D5E7B3F2046"
     Scope="perMachine"
+    Platform="x64"
     Language="1046">
 
-    <SummaryInformation Description="AssinaPDF CrossPlatform - PDF reader and digital signature" />
-
-    <MajorUpgrade DowngradeErrorMessage="A newer version of AssinaPDF is already installed." />
-
+    <SummaryInformation Description="AssinaPDF Future - leitor e assinatura digital de PDFs" />
+    <MajorUpgrade DowngradeErrorMessage="Já existe uma versão mais recente do AssinaPDF instalada." />
     <MediaTemplate EmbedCab="yes" />
 
-    <Icon Id="AssinaPDFIcon" SourceFile="../public/favicon.ico" />
+    <Icon Id="AssinaPDFIcon" SourceFile="../src/AssinaPDF.CrossPlatform/Assets/assinapdf.ico" />
     <Property Id="ARPPRODUCTICON" Value="AssinaPDFIcon" />
 
     <Feature Id="MainFeature" Title="AssinaPDF" Level="1">
       <ComponentGroupRef Id="PublishedAppFiles" />
+      <ComponentRef Id="AssinaPDFExecutableComponent" />
       <ComponentRef Id="AssinaPDFStartMenuShortcut" />
       <ComponentRef Id="AssinaPDFDesktopShortcut" />
     </Feature>
-
   </Package>
 
   <Fragment>
-
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="FutureAppDirectory" Name="Future Solucoes">
+      <Directory Id="FutureAppDirectory" Name="Future Soluções">
         <Directory Id="INSTALLFOLDER" Name="AssinaPDF" />
       </Directory>
     </StandardDirectory>
@@ -38,46 +35,30 @@
       <Directory Id="ApplicationProgramsFolder" Name="AssinaPDF" />
     </StandardDirectory>
 
-    <StandardDirectory Id="DesktopFolder">
-      <Component Id="AssinaPDFDesktopShortcut" Guid="*">
-        <Shortcut
-          Id="DesktopShortcut"
-          Name="AssinaPDF"
-          Target="[INSTALLFOLDER]AssinaPDF.MacPrototype.exe"
-          WorkingDirectory="INSTALLFOLDER"
-          Icon="AssinaPDFIcon" />
-
-        <RegistryValue
-          Root="HKCU"
-          Key="Software\Future Solucoes\AssinaPDF"
-          Name="DesktopShortcut"
-          Type="integer"
-          Value="1"
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AssinaPDFExecutableComponent" Guid="*">
+        <File
+          Id="AssinaPDFExecutable"
+          Source="$(PublishDir)AssinaPDF.MacPrototype.exe"
           KeyPath="yes" />
       </Component>
-    </StandardDirectory>
-
-    <ComponentGroup Id="PublishedAppFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(PublishDir)**" />
-    </ComponentGroup>
+    </DirectoryRef>
 
     <DirectoryRef Id="ApplicationProgramsFolder">
       <Component Id="AssinaPDFStartMenuShortcut" Guid="*">
         <Shortcut
           Id="StartMenuShortcut"
           Name="AssinaPDF"
-          Target="[INSTALLFOLDER]AssinaPDF.MacPrototype.exe"
+          Target="[#AssinaPDFExecutable]"
           WorkingDirectory="INSTALLFOLDER"
           Icon="AssinaPDFIcon" />
-
         <RegistryValue
-          Root="HKCU"
-          Key="Software\Future Solucoes\AssinaPDF"
-          Name="StartMenuShortcut"
+          Root="HKLM"
+          Key="Software\Future Soluções\AssinaPDF\Shortcuts"
+          Name="StartMenu"
           Type="integer"
           Value="1"
           KeyPath="yes" />
-
         <RemoveFolder
           Id="RemoveProgramMenuFolder"
           Directory="ApplicationProgramsFolder"
@@ -85,6 +66,28 @@
       </Component>
     </DirectoryRef>
 
-  </Fragment>
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="AssinaPDFDesktopShortcut" Guid="*">
+        <Shortcut
+          Id="DesktopShortcut"
+          Name="AssinaPDF"
+          Target="[#AssinaPDFExecutable]"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AssinaPDFIcon" />
+        <RegistryValue
+          Root="HKLM"
+          Key="Software\Future Soluções\AssinaPDF\Shortcuts"
+          Name="Desktop"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
 
+    <ComponentGroup Id="PublishedAppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(PublishDir)**">
+        <Exclude Files="$(PublishDir)AssinaPDF.MacPrototype.exe" />
+      </Files>
+    </ComponentGroup>
+  </Fragment>
 </Wix>
