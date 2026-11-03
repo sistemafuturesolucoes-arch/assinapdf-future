@@ -416,8 +416,11 @@ public partial class EditorWindow : Window
             // estejam disponíveis. O download exige autorização e nunca instala fontes no SO.
             var requiredFonts = editedRuns
                 .Where(run => !string.IsNullOrWhiteSpace(run.FontFamily) &&
-                    (!string.Equals(run.FontFamily, originalFontName, StringComparison.OrdinalIgnoreCase) ||
-                     (!originalFontEmbedded && (run.IsBold || run.IsItalic))))
+                    (!string.Equals(
+                        NormalizePdfFontFamily(run.FontFamily),
+                        NormalizePdfFontFamily(originalFontName),
+                        StringComparison.OrdinalIgnoreCase) ||
+                     run.IsBold || run.IsItalic))
                 .Select(run => run.FontFamily!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -654,9 +657,10 @@ public partial class EditorWindow : Window
             desired.FontSize = (float)run.FontSize;
 
         string currentFontFamily = segment.TextState.FontName ?? string.Empty;
+        string normalizedCurrentFamily = NormalizePdfFontFamily(currentFontFamily);
         bool fontFamilyChanged =
             !string.IsNullOrWhiteSpace(run.FontFamily) &&
-            !string.Equals(currentFontFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
+            !string.Equals(normalizedCurrentFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
 
         if (fontFamilyChanged || run.IsBold || run.IsItalic)
         {
