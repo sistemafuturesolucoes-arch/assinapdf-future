@@ -11,19 +11,24 @@ public sealed class PdfTextFormattingTests
     [Fact]
     public void ApplyRichTextFormatting_PersistsCombinedStyleAfterSaveAndReload()
     {
-        using var document = new Document();
-        var page = document.Pages.Add();
-        var fragment = new TextFragment("Diogo")
-        {
-            TextState =
-            {
-                FontName = "Helvetica",
-                FontSize = 8.04f
-            }
-        };
+        using var original = new Document();
+        var originalPage = original.Pages.Add();
+        var originalFragment = new TextFragment("Diogo");
+        originalFragment.TextState.FontName = "Helvetica";
+        originalFragment.TextState.FontSize = 8.04f;
+        new TextBuilder(originalPage).AppendText(originalFragment);
+
+        using var initialPdf = new MemoryStream();
+        original.Save(initialPdf);
+        initialPdf.Position = 0;
+
+        using var editable = Document.Open(initialPdf);
+        var pageAbsorber = new TextFragmentAbsorber("Diogo");
+        editable.Pages[1].Accept(pageAbsorber);
+        var target = Assert.Single(pageAbsorber.TextFragments.Cast<TextFragment>());
 
         EditorWindow.ApplyRichTextFormatting(
-            fragment,
+            target,
             new[]
             {
                 new EditorWindow.EditedTextRun(
@@ -33,10 +38,8 @@ public sealed class PdfTextFormattingTests
             "Helvetica",
             originalFontEmbedded: false);
 
-        new TextBuilder(page).AppendText(fragment);
-
         using var output = new MemoryStream();
-        document.Save(output);
+        editable.Save(output);
         output.Position = 0;
 
         using var reopened = Document.Open(output);
@@ -53,12 +56,8 @@ public sealed class PdfTextFormattingTests
             Assert.InRange(Math.Abs(state.FontSize - 20), 0, 0.01);
             Assert.True(state.IsBold);
             Assert.True(state.IsItalic);
-            Assert.Equal(Aspose.Pdf.Color.FromRgb(1, 0, 0).R, state.ForegroundColor!.R);
-            Assert.Equal(Aspose.Pdf.Color.FromRgb(1, 0, 0).G, state.ForegroundColor.G);
-            Assert.Equal(Aspose.Pdf.Color.FromRgb(1, 0, 0).B, state.ForegroundColor.B);
-            Assert.Equal(Aspose.Pdf.Color.FromRgb(1, 1, 0).R, state.BackgroundColor!.R);
-            Assert.Equal(Aspose.Pdf.Color.FromRgb(1, 1, 0).G, state.BackgroundColor.G);
-            Assert.Equal(Aspose.Pdf.Color.FromRgb(1, 1, 0).B, state.BackgroundColor.B);
+            AssertColor(state.ForegroundColor, 255, 0, 0);
+            AssertColor(state.BackgroundColor, 255, 255, 0);
         }
     }
 
@@ -66,19 +65,24 @@ public sealed class PdfTextFormattingTests
     public void ApplyRichTextFormatting_PreservesDifferentStylesAcrossAdjacentRuns()
     {
         const string text = "Diogo Gross";
-        using var document = new Document();
-        var page = document.Pages.Add();
-        var fragment = new TextFragment(text)
-        {
-            TextState =
-            {
-                FontName = "Helvetica",
-                FontSize = 8.04f
-            }
-        };
+        using var original = new Document();
+        var originalPage = original.Pages.Add();
+        var originalFragment = new TextFragment(text);
+        originalFragment.TextState.FontName = "Helvetica";
+        originalFragment.TextState.FontSize = 8.04f;
+        new TextBuilder(originalPage).AppendText(originalFragment);
+
+        using var initialPdf = new MemoryStream();
+        original.Save(initialPdf);
+        initialPdf.Position = 0;
+
+        using var editable = Document.Open(initialPdf);
+        var pageAbsorber = new TextFragmentAbsorber(text);
+        editable.Pages[1].Accept(pageAbsorber);
+        var target = Assert.Single(pageAbsorber.TextFragments.Cast<TextFragment>());
 
         EditorWindow.ApplyRichTextFormatting(
-            fragment,
+            target,
             new[]
             {
                 new EditorWindow.EditedTextRun(
@@ -94,18 +98,14 @@ public sealed class PdfTextFormattingTests
             "Helvetica",
             originalFontEmbedded: false);
 
-        new TextBuilder(page).AppendText(fragment);
-
         using var output = new MemoryStream();
-        document.Save(output);
+        editable.Save(output);
         output.Position = 0;
 
         using var reopened = Document.Open(output);
-        var absorber = new TextFragmentAbsorber();
+        var absorber = new TextFragmentAbsorber(text);
         reopened.Pages[1].Accept(absorber);
-        var savedFragment = Assert.Single(
-            absorber.TextFragments.Cast<TextFragment>()
-                .Where(item => item.Text == text));
+        var savedFragment = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
 
         var offsets = new List<(int Start, int End, TextSegment Segment)>();
         int offset = 0;
@@ -142,5 +142,17 @@ public sealed class PdfTextFormattingTests
             Assert.Equal(bold, item.Segment.TextState.IsBold);
             Assert.Equal(italic, item.Segment.TextState.IsItalic);
         }
+    }
+
+    private static void AssertColor(
+        Aspose.Pdf.Color? actual,
+        byte red,
+        byte green,
+        byte blue)
+    {
+        Assert.NotNull(actual);
+        Assert.InRange(Math.Abs(actual!.R - red), 0, 2);
+        Assert.InRange(Math.Abs(actual.G - green), 0, 2);
+        Assert.InRange(Math.Abs(actual.B - blue), 0, 2);
     }
 }
