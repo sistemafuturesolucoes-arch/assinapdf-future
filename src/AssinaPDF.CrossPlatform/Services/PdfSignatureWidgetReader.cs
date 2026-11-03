@@ -50,11 +50,13 @@ public static class PdfSignatureWidgetReader
                 // /FT and /T may be inherited from one or more parent fields.
                 for (int depth = 0; depth < 16 && field != null; depth++)
                 {
-                    if (string.IsNullOrEmpty(fieldType))
-                        fieldType = field.Elements.GetName("/FT");
+                    if (string.IsNullOrEmpty(fieldType) &&
+                        field.Elements.TryGetName("/FT", out var inheritedType))
+                        fieldType = inheritedType;
 
-                    if (string.IsNullOrEmpty(fieldName))
-                        fieldName = field.Elements.GetString("/T", false);
+                    if (string.IsNullOrEmpty(fieldName) &&
+                        field.Elements.TryGetString("/T", out var inheritedName))
+                        fieldName = inheritedName;
 
                     field = field.Elements.GetDictionary("/Parent");
                 }
