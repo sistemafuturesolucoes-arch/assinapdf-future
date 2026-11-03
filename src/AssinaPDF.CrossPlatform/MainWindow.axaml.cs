@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private Point _panStart;
     private Vector _panStartOffset;
     private double _zoom = 1.0;
+    private float _renderScale = 1.5f;
 
     private readonly List<SignaturePlacement> _signaturePlacements = new();
 
@@ -52,6 +53,10 @@ public partial class MainWindow : Window
         InitializeComponent();
         LoadFutureLogo();
         PdfScrollViewer.SizeChanged += (_, _) => ApplyZoom();
+        PdfScrollViewer.AddHandler(
+            InputElement.PointerWheelChangedEvent,
+            PdfScrollViewer_PointerWheelChanged,
+            Avalonia.Interactivity.RoutingStrategies.Tunnel);
         KeyDown += MainWindow_KeyDown;
 
         Closed += (_, _) =>
@@ -144,7 +149,7 @@ public partial class MainWindow : Window
             {
                 for (int i = 0; i < newDocument.PageCount; i++)
                 {
-                    var renderedPage = newDocument.RenderPage(i, 0.9f);
+                    var renderedPage = newDocument.RenderPage(i, 1.5f);
                     newBitmaps.Add(CreateBitmap(renderedPage));
                 }
 
@@ -152,6 +157,7 @@ public partial class MainWindow : Window
                 var oldBitmaps = _pageBitmaps.ToArray();
 
                 _pdfDocument = newDocument;
+                _renderScale = 1.5f;
                 _currentPdfPath = path;
                 _signaturePlacements.Clear();
 
@@ -342,8 +348,51 @@ public partial class MainWindow : Window
 
     private void ChangeZoom(double factor)
     {
-        _zoom = Math.Clamp(_zoom * factor, 0.5, 5.0);
+        double nextZoom = Math.Clamp(_zoom * factor, 0.5, 5.0);
+        if (Math.Abs(nextZoom - _zoom) < 0.0001)
+            return;
+
+        _zoom = nextZoom;
+        RerenderPagesForZoom();
         ApplyZoom();
+    }
+
+    private void RerenderPagesForZoom()
+    {
+        if (_pdfDocument == null || _pageBitmaps.Count == 0)
+            return;
+
+        // A home usa o PDFium para rasterizar. Aumentamos a resolução real
+        // conforme o zoom para não ampliar indefinidamente a imagem inicial.
+        float requestedScale = 1.5f * (float)Math.Max(1.0, _zoom);
+        if (requestedScale <= _renderScale * 1.20f)
+            return;
+
+        var replacements = new List<WriteableBitmap>(_pageBitmaps.Count);
+        try
+        {
+            for (int i = 0; i < _pageBitmaps.Count; i++)
+            {
+                var rendered = _pdfDocument.RenderPage(i, requestedScale);
+                replacements.Add(CreateBitmap(rendered));
+            }
+
+            for (int i = 0; i < replacements.Count; i++)
+            {
+                var previous = _pageBitmaps[i];
+                _pageBitmaps[i] = replacements[i];
+                _pageImages[i].Source = replacements[i];
+                previous.Dispose();
+            }
+
+            _renderScale = requestedScale;
+        }
+        catch
+        {
+            foreach (var bitmap in replacements)
+                bitmap.Dispose();
+            throw;
+        }
     }
 
     private void MainWindow_KeyDown(object? sender, KeyEventArgs e)
@@ -368,6 +417,9 @@ public partial class MainWindow : Window
         PointerWheelEventArgs e)
     {
         if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+            return;
+
+        if (e.Delta.Y == 0)
             return;
 
         ChangeZoom(e.Delta.Y > 0 ? 1.15 : 1.0 / 1.15);
