@@ -74,6 +74,8 @@ public partial class MainWindow : Window
             _futureLogo = null;
         };
 
+        DashboardView.IsVisible = true;
+        WorkspaceView.IsVisible = false;
         RefreshCertificates();
     }
 
@@ -166,6 +168,8 @@ public partial class MainWindow : Window
                 _pageBitmaps.AddRange(newBitmaps);
                 BuildHomePageViewer();
 
+                DashboardView.IsVisible = false;
+                WorkspaceView.IsVisible = true;
                 PdfScrollViewer.IsVisible = true;
                 ViewerPlaceholder.IsVisible = false;
                 SelectedFileText.Text = files[0].Name;
@@ -193,6 +197,59 @@ public partial class MainWindow : Window
         {
             StatusText.Text = $"Não foi possível abrir o PDF: {ex.Message}";
         }
+    }
+
+    private void GoHome_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        DashboardView.IsVisible = true;
+        WorkspaceView.IsVisible = false;
+        DashboardStatusText.Text = string.IsNullOrWhiteSpace(_currentPdfPath)
+            ? "Pronto para começar."
+            : $"Último documento aberto: {System.IO.Path.GetFileName(_currentPdfPath)}";
+    }
+
+    private void DashboardOpen_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        OpenPdf_Click(sender, e);
+    }
+
+    private void DashboardSign_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        OpenPdf_Click(sender, e);
+    }
+
+    private void DashboardValidate_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        OpenPdf_Click(sender, e);
+    }
+
+    private void DashboardEdit_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        DashboardStatusText.Text = "As ferramentas de edição serão disponibilizadas em uma próxima etapa.";
+    }
+
+    private void DashboardOrganize_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        DashboardStatusText.Text = "As ferramentas de organização serão disponibilizadas em uma próxima etapa.";
+    }
+
+    private void DashboardConvert_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        DashboardStatusText.Text = "O conversor de documentos será disponibilizado em uma próxima etapa.";
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
