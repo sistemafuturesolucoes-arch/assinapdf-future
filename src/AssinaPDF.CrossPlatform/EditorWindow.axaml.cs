@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
+using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Aspose.Pdf;
@@ -14,6 +15,8 @@ using Aspose.Pdf.Text;
 using AssinaPDF.MacPrototype.Services;
 
 namespace AssinaPDF.MacPrototype;
+
+internal sealed record PagePreviewInfo(int PageIndex, float WidthPoints, float HeightPoints);
 
 public partial class EditorWindow : Window
 {
@@ -96,11 +99,13 @@ public partial class EditorWindow : Window
                         {
                             Source = bitmap,
                             Stretch = Avalonia.Media.Stretch.Uniform,
-                            IsHitTestVisible = false
+                            Tag = new PagePreviewInfo(i, rendered.PageWidthPoints, rendered.PageHeightPoints)
                         }
                     }
                 }
             };
+            var pageImage = ((StackPanel)page.Child!).Children.OfType<Image>().Single();
+            pageImage.PointerPressed += PageImage_PointerPressed;
             EditorPagesPanel.Children.Add(page);
         }
     }
@@ -128,6 +133,172 @@ public partial class EditorWindow : Window
         {
             bitmap.Dispose();
             throw;
+        }
+    }
+
+    private async void PageImage_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.ClickCount != 2 || sender is not Image image ||
+            image.Tag is not PagePreviewInfo pageInfo)
+            return;
+
+        var point = e.GetPosition(image);
+        if (image.Bounds.Width <= 0 || image.Bounds.Height <= 0 ||
+            point.X < 0 || point.Y < 0 ||
+            point.X > image.Bounds.Width || point.Y > image.Bounds.Height)
+            return;
+
+        double pdfX = point.X / image.Bounds.Width * pageInfo.WidthPoints;
+        double pdfY = pageInfo.HeightPoints -
+            point.Y / image.Bounds.Height * pageInfo.HeightPoints;
+
+        e.Handled = true;
+        await EditTextAtPointAsync(pageInfo.PageIndex, pdfX, pdfY);
+    }
+
+    private async Task EditTextAtPointAsync(int pageIndex, double x, double y)
+    {
+        try
+        {
+            string? originalText = null;
+            Aspose.Pdf.Rectangle? originalBounds = null;
+
+            using (var document = Document.Open(_workingCopyPath))
+            {
+                var absorber = new TextFragmentAbsorber();
+                document.Pages[pageIndex + 1].Accept(absorber);
+
+                double bestDistance = double.MaxValue;
+                foreach (TextFragment fragment in absorber.TextFragments)
+                {
+                    var bounds = fragment.Rectangle;
+                    double dx = x < bounds.LLX ? bounds.LLX - x :
+                        x > bounds.URX ? x - bounds.URX : 0;
+                    double dy = y < bounds.LLY ? bounds.LLY - y :
+                        y > bounds.URY ? y - bounds.URY : 0;
+                    double distance = Math.Sqrt(dx * dx + dy * dy);
+
+                    if (distance <= 5.0 && distance < bestDistance &&
+                        !string.IsNullOrWhiteSpace(fragment.Text))
+                    {
+                        bestDistance = distance;
+                        originalText = fragment.Text;
+                        originalBounds = new Aspose.Pdf.Rectangle(
+                            bounds.LLX, bounds.LLY, bounds.URX, bounds.URY);
+                    }
+                }
+            }
+
+            if (originalText == null || originalBounds == null)
+            {
+                EditorStatusText.Text =
+                    "Não encontrei texto selecionável nesse ponto. Se a página for digitalizada, será necessário OCR.";
+                return;
+            }
+
+            var editBox = new TextBox
+            {
+                Text = originalText,
+                AcceptsReturn = false,
+                TextWrapping = Avalonia.Media.TextWrapping.NoWrap,
+                MinWidth = 380,
+                Watermark = "Edite o texto selecionado"
+            };
+            var applyButton = new Button
+            {
+                Content = "Aplicar alteração",
+                MinWidth = 140,
+                Padding = new Thickness(12, 8)
+            };
+            var cancelButton = new Button
+            {
+                Content = "Cancelar",
+                MinWidth = 100,
+                Padding = new Thickness(12, 8)
+            };
+            var actions = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                Spacing = 8,
+                Children = { cancelButton, applyButton }
+            };
+            var dialog = new Window
+            {
+                Title = "Editar texto do PDF",
+                Width = 540,
+                Height = 190,
+                MinWidth = 440,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                CanResize = false,
+                Content = new StackPanel
+                {
+                    Margin = new Thickness(20),
+                    Spacing = 14,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = "Texto selecionado — altere o conteúdo e aplique:",
+                            FontSize = 13
+                        },
+                        editBox,
+                        actions
+                    }
+                }
+            };
+
+            applyButton.Click += (_, _) => dialog.Close(true);
+            cancelButton.Click += (_, _) => dialog.Close(false);
+
+            bool accepted = await dialog.ShowDialog<bool>(this);
+            if (!accepted)
+                return;
+
+            string replacement = editBox.Text ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(replacement))
+            {
+                EditorStatusText.Text =
+                    "O texto não foi alterado. Para remover conteúdo, use uma ferramenta de remoção específica.";
+                return;
+            }
+
+            ApplyPdfEdit(document =>
+            {
+                var pageAbsorber = new TextFragmentAbsorber();
+                document.Pages[pageIndex + 1].Accept(pageAbsorber);
+
+                TextFragment? target = null;
+                double closest = double.MaxValue;
+                foreach (TextFragment fragment in pageAbsorber.TextFragments)
+                {
+                    var bounds = fragment.Rectangle;
+                    double cx = (bounds.LLX + bounds.URX) / 2;
+                    double cy = (bounds.LLY + bounds.URY) / 2;
+                    double ox = (originalBounds.LLX + originalBounds.URX) / 2;
+                    double oy = (originalBounds.LLY + originalBounds.URY) / 2;
+                    double distance = Math.Sqrt(
+                        Math.Pow(cx - ox, 2) + Math.Pow(cy - oy, 2));
+
+                    if (string.Equals(fragment.Text, originalText, StringComparison.Ordinal) &&
+                        distance < closest)
+                    {
+                        closest = distance;
+                        target = fragment;
+                    }
+                }
+
+                if (target == null || closest > 8.0)
+                    throw new InvalidOperationException(
+                        "O texto selecionado não foi localizado novamente no PDF.");
+
+                target.Text = replacement;
+                ApplyOptionalStyle(target.TextState, preserveFontWhenBlank: true);
+            }, "Texto editado diretamente na página.");
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text = $"Não foi possível editar o texto selecionado: {ex.Message}";
         }
     }
 
