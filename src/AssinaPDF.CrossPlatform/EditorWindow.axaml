@@ -6,7 +6,7 @@
         MinWidth="820" MinHeight="600"
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
-  <Grid RowDefinitions="64,42,48,*,38">
+  <Grid RowDefinitions="64,48,*,38">
     <Border Grid.Row="0" Background="#292D36" Padding="18,8">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
         <StackPanel VerticalAlignment="Center" Spacing="2">
@@ -22,49 +22,29 @@
       </Grid>
     </Border>
 
-    <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,4">
+    <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,5">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-          <Button Content="✎" FontSize="18" Width="38" Height="32" Click="ReplaceText_Click" ToolTip.Tip="Localizar e editar texto"/>
-          <Button Content="T+" FontSize="15" Width="38" Height="32" Click="AddText_Click" ToolTip.Tip="Adicionar texto"/>
-          <Border Width="1" Height="24" Background="#D9DCE0" Margin="3,0"/>
+        <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
           <Button Content="↶" FontSize="20" Width="38" Height="32" Click="Undo_Click" ToolTip.Tip="Desfazer"/>
           <Button Content="↷" FontSize="20" Width="38" Height="32" Click="Redo_Click" ToolTip.Tip="Refazer"/>
+          <Border Width="1" Height="25" Background="#D9DCE0" Margin="3,0"/>
           <TextBlock Text="Localizar:" VerticalAlignment="Center" Foreground="#555B63"/>
-          <TextBox x:Name="SearchTextBox" Width="150" Watermark="Texto existente"/>
-          <TextBox x:Name="ReplaceTextBox" Width="150" Watermark="Substituir por"/>
-          <Button Content="Aplicar alteração" Click="ReplaceText_Click" Padding="10,5"/>
+          <TextBox x:Name="SearchTextBox" Width="170" PlaceholderText="Texto existente"/>
+          <TextBox x:Name="ReplaceTextBox" Width="170" PlaceholderText="Substituir por"/>
+          <Button Content="Substituir tudo" Click="ReplaceText_Click" Padding="12,6"/>
+          <TextBlock Text="Dica: dê dois cliques no texto para editar ou em uma área vazia para inserir."
+                     VerticalAlignment="Center" Foreground="#666D77" Margin="8,0,0,0"/>
         </StackPanel>
       </ScrollViewer>
     </Border>
 
-    <Border Grid.Row="2" Background="#F8F9FB" BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,5">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-          <TextBlock Text="Novo texto:" VerticalAlignment="Center" Foreground="#555B63"/>
-          <TextBox x:Name="NewTextBox" Width="190" Watermark="Digite o texto"/>
-          <TextBlock Text="Pág." VerticalAlignment="Center"/>
-          <TextBox x:Name="PageNumberTextBox" Width="42" Text="1"/>
-          <TextBlock Text="X" VerticalAlignment="Center"/>
-          <TextBox x:Name="XPositionTextBox" Width="52" Text="72"/>
-          <TextBlock Text="Y" VerticalAlignment="Center"/>
-          <TextBox x:Name="YPositionTextBox" Width="52" Text="720"/>
-          <TextBox x:Name="FontNameTextBox" Width="105" Watermark="Fonte (opcional)"/>
-          <TextBox x:Name="FontSizeTextBox" Width="48" Watermark="Tam. (opcional)"/>
-          <CheckBox x:Name="IsBoldCheckBox" Content="Negrito" VerticalAlignment="Center"/>
-          <TextBox x:Name="TextColorTextBox" Width="78" Watermark="Texto #RRGGBB"/>
-          <TextBox x:Name="HighlightColorTextBox" Width="86" Watermark="Realce #RRGGBB"/>
-          <Button Content="Inserir texto" Click="AddText_Click" Padding="10,5"/>
-        </StackPanel>
-      </ScrollViewer>
-    </Border>
-
-    <Border Grid.Row="3" Background="#D9DCE0" Padding="12">
+    <Border Grid.Row="2" Background="#D9DCE0" Padding="12">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
         <StackPanel x:Name="EditorPagesPanel" Spacing="18" HorizontalAlignment="Center"/>
       </ScrollViewer>
     </Border>
-    <Border Grid.Row="4" Background="#E7E9ED" Padding="12,4">
+
+    <Border Grid.Row="3" Background="#E7E9ED" Padding="12,4">
       <TextBlock x:Name="EditorStatusText"
                  Text="O documento está aberto em uma cópia temporária. O original permanece preservado."
                  FontSize="11" Foreground="#555B63" VerticalAlignment="Center"/>
