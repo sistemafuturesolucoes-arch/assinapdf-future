@@ -3,11 +3,16 @@ using Aspose.Pdf;
 using Aspose.Pdf.Text;
 using AssinaPDF.MacPrototype;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace AssinaPDF.CrossPlatform.Tests;
 
 public sealed class PdfTextFormattingTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public PdfTextFormattingTests(ITestOutputHelper output) => _output = output;
+
     [Fact]
     public void ApplyRichTextFormatting_PersistsCombinedStyleAfterSaveAndReload()
     {
@@ -183,6 +188,11 @@ public sealed class PdfTextFormattingTests
             beforeSaveOffset = end;
         }
         Assert.Equal(text.Length, beforeSaveOffset);
+        _output.WriteLine($"Fragmento antes de salvar: FontSize={target.TextState.FontSize:0.##}; FontName={target.TextState.FontName}; FontSizeTouched={ReadInternalFlag(target.TextState, "FontSizeTouched")}; FontStyleTouched={ReadInternalFlag(target.TextState, "FontStyleTouched")}");
+        foreach (var item in beforeSaveOffsets)
+        {
+            _output.WriteLine($"ANTES [{item.Start},{item.End}): {DescribeSegment(item.Segment)}");
+        }
         AssertRun(beforeSaveOffsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(beforeSaveOffsets, 5, 6, 10, bold: false, italic: false);
         AssertRun(beforeSaveOffsets, 6, 11, 12, bold: false, italic: true);
@@ -286,12 +296,20 @@ public sealed class PdfTextFormattingTests
         Assert.InRange(Math.Abs(actual.B - blue), 0, 2);
     }
 
+    private static bool ReadInternalFlag(TextState state, string propertyName)
+    {
+        var property = typeof(TextState).GetProperty(
+            propertyName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        return property?.GetValue(state) is true;
+    }
+
     private static string DescribeSegment(TextSegment segment)
     {
         var state = segment.TextState;
         var position = segment.Position is { } p ? $"({p.XIndent:0.##},{p.YIndent:0.##})" : "null";
         return $"Texto='{segment.Text}', FontName='{state.FontName}', BaseFont='{state.Font?.BaseFont}', " +
                $"Size={state.FontSize:0.##}, Bold={state.IsBold}, Italic={state.IsItalic}, " +
-               $"Foreground={state.ForegroundColor}, Background={state.BackgroundColor}, Position={position}";
+               $"Foreground={state.ForegroundColor}, Background={state.BackgroundColor}, FontSizeTouched={ReadInternalFlag(state, "FontSizeTouched")}, FontStyleTouched={ReadInternalFlag(state, "FontStyleTouched")}, Position={position}";
     }
 }
