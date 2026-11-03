@@ -514,28 +514,44 @@ public partial class EditorWindow : Window
         if (orderedRuns.Length == 0)
             return;
 
-        // IMPORTANTE: TextFragment é um agregado do Aspose. Alterar seu TextState
-        // depois de dividir os segmentos pode reuni-los e apagar estilos individuais.
-        // Primeiro aplicamos um estilo-base ao fragmento e SÓ DEPOIS isolamos cada
-        // intervalo para aplicar os estilos próprios de cada trecho.
-        ApplyRunStyle(fragment.TextState, orderedRuns[0]);
+        // Não altere fragment.TextState aqui: TextFragment é um agregado e
+        // qualquer mudança nesse estado pode reunir os segmentos e aplicar o
+        // estilo de um único Run ao fragmento inteiro.
+        // Primeiro isolamos TODOS os intervalos, mantendo os offsets originais;
+        // somente depois alteramos o TextState de cada TextSegment.
+        var isolatedRuns = new List<(EditedTextRun Run, IReadOnlyList<TextSegment> Segments)>();
+        int previousEnd = 0;
 
         foreach (var run in orderedRuns)
         {
-            var isolatedSegments = fragment.IsolateTextSegments(run.Start, run.Length);
-            bool foundSegment = false;
-
-            foreach (TextSegment segment in isolatedSegments)
+            if (run.Start < 0 || run.Length <= 0 ||
+                run.Start + run.Length > fragment.Text.Length)
             {
-                foundSegment = true;
-                ApplyRunStyle(segment.TextState, run);
+                throw new InvalidOperationException(
+                    $"Intervalo de formatação inválido (posição {run.Start}, tamanho {run.Length}, texto com {fragment.Text.Length} caracteres).");
             }
 
-            if (!foundSegment)
+            if (run.Start < previousEnd)
+            {
+                throw new InvalidOperationException(
+                    "O editor retornou intervalos de formatação sobrepostos; a alteração foi cancelada para evitar aplicar estilos ao trecho errado.");
+            }
+
+            var isolatedSegments = fragment.IsolateTextSegments(run.Start, run.Length);
+            if (isolatedSegments.Count == 0)
             {
                 throw new InvalidOperationException(
                     $"Não foi possível localizar o trecho formatado no PDF (posição {run.Start}, tamanho {run.Length}).");
             }
+
+            isolatedRuns.Add((run, isolatedSegments.ToArray()));
+            previousEnd = run.Start + run.Length;
+        }
+
+        foreach (var isolatedRun in isolatedRuns)
+        {
+            foreach (TextSegment segment in isolatedRun.Segments)
+                ApplyRunStyle(segment.TextState, isolatedRun.Run);
         }
     }
 
@@ -547,37 +563,36 @@ public partial class EditorWindow : Window
         if (run.FontSize > 0)
             state.FontSize = (float)run.FontSize;
 
-        // Gravar o estilo da face explicitamente. Em PDFs existentes, apenas
-        // alternar IsBold/IsItalic pode manter a referência à face regular original.
-        // FontStyle + FontRepository selecionam a face real Bold/Italic da família.
-        var requestedFontStyle =
-            (run.IsBold ? FontStyles.Bold : (FontStyles)0) |
-            (run.IsItalic ? FontStyles.Italic : (FontStyles)0);
+        // FontStyles do Aspose.PDF FOSS possui valores Regular, Bold e Italic
+        // (não é uma combinação de flags). Para negrito + itálico selecionamos a
+        // face Bold e aplicamos IsItalic separadamente.
+        FontStyles faceStyle = run.IsBold
+            ? FontStyles.Bold
+            : run.IsItalic
+                ? FontStyles.Italic
+                : FontStyles.Regular;
 
-        state.FontStyle = requestedFontStyle;
+        string fontFamily = !string.IsNullOrWhiteSpace(run.FontFamily)
+            ? run.FontFamily
+            : state.FontName ?? string.Empty;
 
-        if (requestedFontStyle != (FontStyles)0)
+        if (!string.IsNullOrWhiteSpace(fontFamily))
         {
-            string fontFamily = !string.IsNullOrWhiteSpace(run.FontFamily)
-                ? run.FontFamily
-                : state.FontName ?? string.Empty;
-
-            if (!string.IsNullOrWhiteSpace(fontFamily))
+            try
             {
-                try
-                {
-                    state.Font = FontRepository.FindFont(fontFamily, requestedFontStyle);
-                }
-                catch
-                {
-                    // Algumas fontes incorporadas/subsetadas não existem no sistema.
-                    // Mantém o estilo explícito no TextState e deixa a biblioteca
-                    // resolver a face disponível ao gravar o documento.
-                    state.FontStyle = requestedFontStyle;
-                }
+                state.Font = FontRepository.FindFont(fontFamily, faceStyle);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
+                    $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : faceStyle.ToString())}. " +
+                    "Instale essa fonte ou escolha outra antes de aplicar a edição.",
+                    ex);
             }
         }
 
+        state.FontStyle = faceStyle;
         state.IsBold = run.IsBold;
         state.IsItalic = run.IsItalic;
 
