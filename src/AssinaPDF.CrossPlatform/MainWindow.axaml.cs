@@ -987,7 +987,10 @@ public partial class MainWindow : Window
         };
 
         propertiesButton.Click += async (_, _) =>
+        {
+            dialog.Close();
             await ShowValidationReportAsync("Propriedades da assinatura", technicalReport);
+        };
         closeButton.Click += (_, _) => dialog.Close();
         await dialog.ShowDialog(this);
     }
