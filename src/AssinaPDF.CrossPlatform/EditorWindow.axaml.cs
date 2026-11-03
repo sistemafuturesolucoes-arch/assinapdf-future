@@ -203,20 +203,20 @@ public partial class EditorWindow : Window
                 AcceptsReturn = true,
                 TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 MinHeight = 76,
-                Watermark = originalText == null
+                PlaceholderText = originalText == null
                     ? "Digite o texto que deseja inserir"
                     : "Edite o texto selecionado"
             };
             var fontBox = new TextBox
             {
                 Width = 170,
-                Watermark = "Fonte (ex.: Arial)"
+                PlaceholderText = "Fonte (ex.: Arial)"
             };
             var sizeBox = new TextBox
             {
                 Width = 76,
                 Text = "12",
-                Watermark = "Tamanho"
+                PlaceholderText = "Tamanho"
             };
             var boldCheck = new CheckBox
             {
@@ -227,12 +227,12 @@ public partial class EditorWindow : Window
             var textColorBox = new TextBox
             {
                 Width = 112,
-                Watermark = "Fonte #000000"
+                PlaceholderText = "Fonte #000000"
             };
             var highlightBox = new TextBox
             {
                 Width = 112,
-                Watermark = "Marcação #FFFF00"
+                PlaceholderText = "Marcação #FFFF00"
             };
             var alignmentBox = new ComboBox
             {
