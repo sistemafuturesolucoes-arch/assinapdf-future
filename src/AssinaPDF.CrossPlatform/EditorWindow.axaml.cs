@@ -471,8 +471,9 @@ public partial class EditorWindow : Window
                         expectedText, StringComparison.Ordinal))
                         return false;
 
-                    if (!VerifyRichTextFormatting(
-                        savedDocument, pageIndex, replacementText, editedRuns, out string formattingFailure))
+                    string? formattingFailure = VerifyRichTextFormatting(
+                        savedDocument, pageIndex, replacementText, editedRuns);
+                    if (formattingFailure != null)
                         throw new InvalidOperationException("Diagnóstico da formatação: " + formattingFailure);
 
                     return true;
@@ -568,19 +569,13 @@ public partial class EditorWindow : Window
         }
     }
 
-    private static bool VerifyRichTextFormatting(
+    private static string? VerifyRichTextFormatting(
         Document document,
         int pageIndex,
         string expectedText,
-        IReadOnlyList<EditedTextRun> expectedRuns,
-        out string failureReason)
+        IReadOnlyList<EditedTextRun> expectedRuns)
     {
-        failureReason = string.Empty;
-        bool Fail(string reason)
-        {
-            failureReason = reason;
-            return false;
-        }
+        string Fail(string reason) => reason;
 
         if (pageIndex < 0 || pageIndex >= document.Pages.Count)
             return Fail($"página inválida ({pageIndex + 1}).");
@@ -654,7 +649,7 @@ public partial class EditorWindow : Window
             }
         }
 
-        return true;
+        return null;
     }
 
     private void ReplaceText_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
