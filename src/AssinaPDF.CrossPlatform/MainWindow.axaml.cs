@@ -221,7 +221,15 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
-        OpenPdf_Click(sender, e);
+        // A navegação para assinatura apenas abre a área de trabalho.
+        // O usuário escolhe o documento ao clicar em "Abrir PDF".
+        DashboardView.IsVisible = false;
+        WorkspaceView.IsVisible = true;
+        DashboardStatusText.Text = "Área de assinatura aberta.";
+        StatusText.Text = _pdfDocument == null
+            ? "Clique em Abrir PDF para selecionar o documento que deseja assinar."
+            : $"Documento carregado: {System.IO.Path.GetFileName(_currentPdfPath)}";
+        UpdateActionButtons();
     }
 
     private void DashboardValidate_Click(
