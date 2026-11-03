@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Input;
+using AvaloniaImage = Avalonia.Controls.Image;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Aspose.Pdf;
@@ -95,7 +96,7 @@ public partial class EditorWindow : Window
                             Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(75, 80, 89)),
                             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
                         },
-                        new Image
+                        new AvaloniaImage
                         {
                             Source = bitmap,
                             Stretch = Avalonia.Media.Stretch.Uniform,
@@ -104,7 +105,9 @@ public partial class EditorWindow : Window
                     }
                 }
             };
-            var pageImage = ((StackPanel)page.Child!).Children.OfType<Image>().Single();
+            if (page.Child is not StackPanel pageContent)
+                throw new InvalidOperationException("Não foi possível preparar a visualização da página.");
+            var pageImage = pageContent.Children.OfType<AvaloniaImage>().Single();
             pageImage.PointerPressed += PageImage_PointerPressed;
             EditorPagesPanel.Children.Add(page);
         }
@@ -138,7 +141,7 @@ public partial class EditorWindow : Window
 
     private async void PageImage_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (e.ClickCount != 2 || sender is not Image image ||
+        if (e.ClickCount != 2 || sender is not AvaloniaImage image ||
             image.Tag is not PagePreviewInfo pageInfo)
             return;
 
@@ -172,6 +175,8 @@ public partial class EditorWindow : Window
                 foreach (TextFragment fragment in absorber.TextFragments)
                 {
                     var bounds = fragment.Rectangle;
+                    if (bounds == null)
+                        continue;
                     double dx = x < bounds.LLX ? bounds.LLX - x :
                         x > bounds.URX ? x - bounds.URX : 0;
                     double dy = y < bounds.LLY ? bounds.LLY - y :
@@ -202,7 +207,7 @@ public partial class EditorWindow : Window
                 AcceptsReturn = false,
                 TextWrapping = Avalonia.Media.TextWrapping.NoWrap,
                 MinWidth = 380,
-                Watermark = "Edite o texto selecionado"
+                PlaceholderText = "Edite o texto selecionado"
             };
             var applyButton = new Button
             {
@@ -263,6 +268,10 @@ public partial class EditorWindow : Window
                 return;
             }
 
+            var selectedBounds = originalBounds;
+            if (selectedBounds == null)
+                return;
+
             ApplyPdfEdit(document =>
             {
                 var pageAbsorber = new TextFragmentAbsorber();
@@ -273,10 +282,12 @@ public partial class EditorWindow : Window
                 foreach (TextFragment fragment in pageAbsorber.TextFragments)
                 {
                     var bounds = fragment.Rectangle;
+                    if (bounds == null)
+                        continue;
                     double cx = (bounds.LLX + bounds.URX) / 2;
                     double cy = (bounds.LLY + bounds.URY) / 2;
-                    double ox = (originalBounds.LLX + originalBounds.URX) / 2;
-                    double oy = (originalBounds.LLY + originalBounds.URY) / 2;
+                    double ox = (selectedBounds.LLX + selectedBounds.URX) / 2;
+                    double oy = (selectedBounds.LLY + selectedBounds.URY) / 2;
                     double distance = Math.Sqrt(
                         Math.Pow(cx - ox, 2) + Math.Pow(cy - oy, 2));
 
