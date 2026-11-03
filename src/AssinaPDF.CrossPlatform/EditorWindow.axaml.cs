@@ -520,7 +520,7 @@ public partial class EditorWindow : Window
         }
     }
 
-    private sealed record EditedTextRun(
+    internal sealed record EditedTextRun(
         int Start,
         int Length,
         string? FontFamily,
@@ -537,7 +537,7 @@ public partial class EditorWindow : Window
         return null;
     }
 
-    private static void ApplyRichTextFormatting(
+    internal static void ApplyRichTextFormatting(
         TextFragment fragment,
         IReadOnlyList<EditedTextRun> runs,
         string? originalFontName,
@@ -551,18 +551,16 @@ public partial class EditorWindow : Window
         if (orderedRuns.Length == 0)
             return;
 
-        // Não altere fragment.TextState aqui: TextFragment é um agregado e
-        // qualquer mudança nesse estado pode reunir os segmentos e aplicar o
-        // estilo de um único Run ao fragmento inteiro.
-        // Primeiro isolamos TODOS os intervalos, mantendo os offsets originais;
-        // somente depois alteramos o TextState de cada TextSegment.
-        var isolatedRuns = new List<(EditedTextRun Run, IReadOnlyList<TextSegment> Segments)>();
+        // IsolateTextSegments rebuilds the fragment's segment collection. Therefore,
+        // do not keep TextSegment references returned by one call while isolating the
+        // next range: those references can become detached from the final collection.
+        // First isolate every range, then re-read the FINAL collection and map each
+        // physical segment back to its logical editor run by character offsets.
         int previousEnd = 0;
-
         foreach (var run in orderedRuns)
         {
-            if (run.Start < 0 || run.Length <= 0 ||
-                run.Start + run.Length > fragment.Text.Length)
+            int runEnd = checked(run.Start + run.Length);
+            if (run.Start < 0 || run.Length <= 0 || runEnd > fragment.Text.Length)
             {
                 throw new InvalidOperationException(
                     $"Intervalo de formatação inválido (posição {run.Start}, tamanho {run.Length}, texto com {fragment.Text.Length} caracteres).");
@@ -574,53 +572,87 @@ public partial class EditorWindow : Window
                     "O editor retornou intervalos de formatação sobrepostos; a alteração foi cancelada para evitar aplicar estilos ao trecho errado.");
             }
 
-            var isolatedSegments = fragment.IsolateTextSegments(run.Start, run.Length);
-            if (isolatedSegments.Count == 0)
+            var isolated = fragment.IsolateTextSegments(run.Start, run.Length);
+            if (isolated.Count == 0)
             {
                 throw new InvalidOperationException(
                     $"Não foi possível localizar o trecho formatado no PDF (posição {run.Start}, tamanho {run.Length}).");
             }
 
-            isolatedRuns.Add((run, isolatedSegments.ToArray()));
-            previousEnd = run.Start + run.Length;
+            previousEnd = runEnd;
         }
 
-        foreach (var isolatedRun in isolatedRuns)
+        var appliedRuns = new bool[orderedRuns.Length];
+        int offset = 0;
+        foreach (TextSegment segment in fragment.Segments)
         {
-            foreach (TextSegment segment in isolatedRun.Segments)
-                ApplyRunStyle(segment.TextState, isolatedRun.Run, originalFontName, originalFontEmbedded);
+            int segmentLength = segment.Text?.Length ?? 0;
+            if (segmentLength == 0)
+                continue;
+
+            int segmentEnd = checked(offset + segmentLength);
+            int runIndex = Array.FindIndex(orderedRuns, run =>
+                offset >= run.Start && segmentEnd <= run.Start + run.Length);
+
+            if (runIndex < 0)
+            {
+                throw new InvalidOperationException(
+                    $"O segmento PDF [{offset}, {segmentEnd}) não corresponde integralmente a um trecho formatado do editor. A edição foi cancelada para evitar estilos incorretos.");
+            }
+
+            ApplyRunStyle(
+                segment,
+                orderedRuns[runIndex],
+                originalFontName,
+                originalFontEmbedded);
+            appliedRuns[runIndex] = true;
+            offset = segmentEnd;
+        }
+
+        if (offset != fragment.Text.Length)
+        {
+            throw new InvalidOperationException(
+                $"A segmentação PDF retornou {offset} caracteres, mas o texto possui {fragment.Text.Length}.");
+        }
+
+        for (int i = 0; i < appliedRuns.Length; i++)
+        {
+            if (!appliedRuns[i])
+            {
+                throw new InvalidOperationException(
+                    $"Nenhum segmento PDF foi associado ao trecho formatado na posição {orderedRuns[i].Start}.");
+            }
         }
     }
 
     private static void ApplyRunStyle(
-        Aspose.Pdf.Text.TextState state,
+        TextSegment segment,
         EditedTextRun run,
         string? originalFontName,
         bool originalFontEmbedded)
     {
-        string currentFontFamily = state.FontName ?? string.Empty;
-        string comparisonFamily = originalFontName ?? currentFontFamily;
-        bool fontFamilyChanged =
-            !string.IsNullOrWhiteSpace(run.FontFamily) &&
-            !string.Equals(comparisonFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
-
-        // TextSegment.TextState is a state object attached to the PDF content model.
-        // Build the desired values separately and transfer them with ApplyChangesFrom,
-        // which preserves the owner's internal link while copying formatting values.
+        // TextSegment.TextState is a read/write property. Work on a detached state
+        // snapshot and assign it back to the segment so the PDF content model receives
+        // the complete style even when a getter returns a snapshot rather than a live
+        // owner-bound state object.
         var desired = new Aspose.Pdf.Text.TextState();
-        desired.ApplyChangesFrom(state);
+        desired.ApplyChangesFrom(segment.TextState);
 
         if (run.FontSize > 0)
             desired.FontSize = (float)run.FontSize;
 
-        // A PDF's embedded CID subset may have no separate bold/italic face. When
-        // the user requests emphasis, resolve a real face for the selected family
-        // (CID resource labels are presented as Helvetica in the editor).
+        string currentFontFamily = segment.TextState.FontName ?? string.Empty;
+        bool fontFamilyChanged =
+            !string.IsNullOrWhiteSpace(run.FontFamily) &&
+            !string.Equals(currentFontFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
+
         if (fontFamilyChanged || run.IsBold || run.IsItalic)
         {
             string fontFamily = fontFamilyChanged && !string.IsNullOrWhiteSpace(run.FontFamily)
                 ? run.FontFamily
-                : originalFontName ?? currentFontFamily;
+                : !string.IsNullOrWhiteSpace(originalFontName)
+                    ? originalFontName
+                    : currentFontFamily;
 
             if (!string.IsNullOrWhiteSpace(fontFamily))
             {
@@ -643,9 +675,6 @@ public partial class EditorWindow : Window
             }
         }
 
-        // In Aspose.PDF FOSS FontStyles is a flags enum; Bold | Italic is valid.
-        // IsBold/IsItalic are also set explicitly so both semantic flags and the
-        // concrete font face are persisted consistently.
         desired.FontStyle =
             (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
             (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
@@ -668,7 +697,7 @@ public partial class EditorWindow : Window
                 background.B / 255d);
         }
 
-        state.ApplyChangesFrom(desired);
+        segment.TextState = desired;
     }
 
     private static string? VerifyRichTextFormatting(
