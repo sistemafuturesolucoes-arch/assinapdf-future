@@ -38,7 +38,7 @@ Na raiz do repositório, após publicar o aplicativo:
 ```powershell
 dotnet publish ./src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o publish/win-x64
 
-dotnet build ./installer-crossplatform/AssinaPDF.CrossPlatform.wixproj -c Release -p:Platform=x64 -p:PublishDir="$PWD/publish/win-x64/"
+dotnet build ./installer-crossplatform/AssinaPDF.CrossPlatform.wixproj -c Release -p:InstallerPlatform=x64 -p:PublishDir="$PWD/publish/win-x64/"
 ```
 
 O ícone Windows é gerado a partir do PNG oficial antes da publicação:
