@@ -163,6 +163,7 @@ public sealed class PdfTextFormattingTests
         }
 
         Assert.Equal(text.Length, offset);
+        Assert.All(offsets, item => Assert.NotNull(item.Segment.Position));
         AssertRun(offsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(offsets, 5, 6, 10, bold: false, italic: false);
         AssertRun(offsets, 6, 11, 12, bold: false, italic: true);
