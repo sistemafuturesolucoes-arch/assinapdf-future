@@ -38,6 +38,21 @@ public sealed class PdfTextFormattingTests
             "Helvetica",
             originalFontEmbedded: false);
 
+        var inMemoryCombinedSegments = target.Segments.Cast<TextSegment>().ToArray();
+        Assert.NotEmpty(inMemoryCombinedSegments);
+        foreach (var segment in inMemoryCombinedSegments)
+        {
+            string details = DescribeSegment(segment);
+            Assert.True(Math.Abs(segment.TextState.FontSize - 20) <= 0.01,
+                $"Antes de salvar, tamanho incorreto: {details}");
+            Assert.True(segment.TextState.IsBold && segment.TextState.IsItalic,
+                $"Antes de salvar, estilo incorreto: {details}");
+            AssertColor(segment.TextState.ForegroundColor, 255, 0, 0, details);
+            AssertColor(segment.TextState.BackgroundColor, 255, 255, 0, details);
+        }
+        AssertColor(target.TextState.BackgroundColor, 255, 255, 0,
+            "Estado do fragmento antes de salvar: " + target.Text);
+
         using var output = new MemoryStream();
         editable.Save(output);
         output.Position = 0;
@@ -85,6 +100,21 @@ public sealed class PdfTextFormattingTests
             },
             "Helvetica",
             originalFontEmbedded: false);
+
+        var inMemorySingleSegments = target.Segments.Cast<TextSegment>().ToArray();
+        Assert.NotEmpty(inMemorySingleSegments);
+        foreach (var segment in inMemorySingleSegments)
+        {
+            string details = DescribeSegment(segment);
+            Assert.True(Math.Abs(segment.TextState.FontSize - 20) <= 0.01,
+                $"Antes de salvar, tamanho incorreto: {details}");
+            Assert.True(segment.TextState.IsBold && segment.TextState.IsItalic,
+                $"Antes de salvar, estilo incorreto: {details}");
+            AssertColor(segment.TextState.ForegroundColor, 255, 0, 0, details);
+            AssertColor(segment.TextState.BackgroundColor, 255, 255, 0, details);
+        }
+        AssertColor(target.TextState.BackgroundColor, 255, 255, 0,
+            "Estado do fragmento antes de salvar: " + target.Text);
 
         using var output = new MemoryStream();
         document.Save(output);
@@ -143,6 +173,22 @@ public sealed class PdfTextFormattingTests
             },
             "Helvetica",
             originalFontEmbedded: false);
+
+        var beforeSaveOffsets = new List<(int Start, int End, TextSegment Segment)>();
+        int beforeSaveOffset = 0;
+        foreach (TextSegment segment in target.Segments)
+        {
+            int end = beforeSaveOffset + (segment.Text?.Length ?? 0);
+            beforeSaveOffsets.Add((beforeSaveOffset, end, segment));
+            beforeSaveOffset = end;
+        }
+        Assert.Equal(text.Length, beforeSaveOffset);
+        AssertRun(beforeSaveOffsets, 0, 5, 20, bold: true, italic: false);
+        AssertRun(beforeSaveOffsets, 5, 6, 10, bold: false, italic: false);
+        AssertRun(beforeSaveOffsets, 6, 11, 12, bold: false, italic: true);
+        AssertRunColors(beforeSaveOffsets, 0, 5, Colors.Red, Colors.Yellow);
+        AssertRunColors(beforeSaveOffsets, 5, 6, Colors.Black, null);
+        AssertRunColors(beforeSaveOffsets, 6, 11, Colors.Blue, null);
 
         using var output = new MemoryStream();
         editable.Save(output);
