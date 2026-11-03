@@ -207,33 +207,89 @@ public partial class EditorWindow : Window
                     ? "Digite o texto que deseja inserir"
                     : "Edite o texto selecionado"
             };
-            var fontBox = new TextBox
+            var installedFonts = Avalonia.Media.FontManager.Current
+                .GetInstalledFontFamilyNames()
+                .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+            var fontBox = new ComboBox
             {
-                Width = 170,
-                PlaceholderText = "Fonte (ex.: Arial)"
+                Width = 210,
+                ItemsSource = installedFonts,
+                PlaceholderText = "Fontes instaladas",
+                SelectedItem = installedFonts.FirstOrDefault(name =>
+                    string.Equals(name, "Arial", StringComparison.OrdinalIgnoreCase))
             };
-            var sizeBox = new TextBox
+            var sizeBox = new ComboBox
             {
-                Width = 76,
-                Text = originalText == null ? "12" : string.Empty,
-                PlaceholderText = "Tamanho (vazio mantém)"
+                Width = 90,
+                ItemsSource = new[] { "6", "7", "8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72" },
+                SelectedItem = originalText == null ? "12" : null,
+                PlaceholderText = "Tamanho"
             };
-            var boldCheck = new CheckBox
+            bool boldEnabled = false;
+            int boldStart = -1;
+            int boldLength = 0;
+            var boldButton = new Button
             {
-                Content = "Negrito",
-                IsChecked = originalText == null ? false : originalBold,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                Content = "B",
+                FontWeight = Avalonia.Media.FontWeight.Bold,
+                FontSize = 17,
+                Width = 42,
+                Height = 34,
+                ToolTip = "Selecione uma parte do texto e clique para aplicar negrito"
             };
-            var textColorBox = new TextBox
+            boldButton.Click += (_, _) =>
             {
-                Width = 112,
-                PlaceholderText = "Fonte #000000"
+                boldStart = textBox.SelectionStart;
+                boldLength = Math.Max(0, textBox.SelectionEnd - textBox.SelectionStart);
+                if (boldLength <= 0)
+                {
+                    EditorStatusText.Text = "Selecione primeiro o trecho do texto que deseja colocar em negrito.";
+                    boldEnabled = false;
+                    return;
+                }
+                boldEnabled = !boldEnabled;
+                boldButton.Background = boldEnabled
+                    ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(210, 220, 240))
+                    : Avalonia.Media.Brushes.Transparent;
             };
-            var highlightBox = new TextBox
+
+            string textColor = "";
+            string highlightColor = "";
+            var paletteColors = new[]
             {
-                Width = 112,
-                PlaceholderText = "Marcação #FFFF00"
+                "#000000", "#404040", "#808080", "#C00000", "#FF0000", "#ED7D31",
+                "#FFC000", "#FFFF00", "#70AD47", "#00B050", "#00B0F0", "#0070C0",
+                "#002060", "#7030A0", "#FF00FF", "#FFFFFF"
             };
+            var textPalette = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
+            var highlightPalette = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
+            foreach (string hex in paletteColors)
+            {
+                var textSwatch = new Button
+                {
+                    Width = 25, Height = 25, Margin = new Thickness(2),
+                    Padding = new Thickness(0),
+                    Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex)),
+                    BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(150, 150, 150)),
+                    BorderThickness = new Thickness(1),
+                    ToolTip = hex
+                };
+                textSwatch.Click += (_, _) => textColor = hex;
+                textPalette.Children.Add(textSwatch);
+
+                var highlightSwatch = new Button
+                {
+                    Width = 25, Height = 25, Margin = new Thickness(2),
+                    Padding = new Thickness(0),
+                    Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex)),
+                    BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(150, 150, 150)),
+                    BorderThickness = new Thickness(1),
+                    ToolTip = hex
+                };
+                highlightSwatch.Click += (_, _) => highlightColor = hex;
+                highlightPalette.Children.Add(highlightSwatch);
+            }
             var alignmentBox = new ComboBox
             {
                 Width = 160,
@@ -275,14 +331,12 @@ public partial class EditorWindow : Window
                         {
                             Orientation = Avalonia.Layout.Orientation.Horizontal,
                             Spacing = 10,
-                            Children = { fontBox, sizeBox, boldCheck }
+                            Children = { fontBox, sizeBox, boldButton }
                         },
-                        new StackPanel
-                        {
-                            Orientation = Avalonia.Layout.Orientation.Horizontal,
-                            Spacing = 10,
-                            Children = { textColorBox, highlightBox }
-                        },
+                        new TextBlock { Text = "Cor da fonte:" },
+                        textPalette,
+                        new TextBlock { Text = "Cor de marcação:" },
+                        highlightPalette,
                         new StackPanel
                         {
                             Orientation = Avalonia.Layout.Orientation.Horizontal,
@@ -340,10 +394,8 @@ public partial class EditorWindow : Window
                 return;
             }
 
-            string fontName = fontBox.Text?.Trim() ?? string.Empty;
-            string fontSizeText = sizeBox.Text?.Trim() ?? string.Empty;
-            string textColor = textColorBox.Text?.Trim() ?? string.Empty;
-            string highlightColor = highlightBox.Text?.Trim() ?? string.Empty;
+            string fontName = fontBox.SelectedItem?.ToString() ?? string.Empty;
+            string fontSizeText = sizeBox.SelectedItem?.ToString() ?? string.Empty;
             string alignment = alignmentBox.SelectedItem?.ToString() ?? "Esquerda";
 
             if (!string.IsNullOrWhiteSpace(fontSizeText) &&
@@ -386,8 +438,20 @@ public partial class EditorWindow : Window
                         throw new InvalidOperationException("O texto selecionado não foi localizado novamente no PDF.");
 
                     target.Text = replacement;
-                    ApplyDialogFormatting(target, fontName, fontSizeText, boldCheck.IsChecked == true,
+                    ApplyDialogFormatting(target, fontName, fontSizeText,
                         textColor, highlightColor, alignment);
+
+                    if (boldEnabled && boldStart >= 0 && boldLength > 0 &&
+                        boldStart + boldLength <= replacement.Length)
+                    {
+                        string selectedText = replacement.Substring(boldStart, boldLength);
+                        target.IsolateTextSegments(boldStart, boldLength);
+                        foreach (TextSegment segment in target.Segments)
+                        {
+                            if (string.Equals(segment.Text, selectedText, StringComparison.Ordinal))
+                                segment.TextState.IsBold = true;
+                        }
+                    }
                 }
                 else
                 {
@@ -395,7 +459,7 @@ public partial class EditorWindow : Window
                     {
                         Position = new Position(x, y)
                     };
-                    ApplyDialogFormatting(fragment, fontName, fontSizeText, boldCheck.IsChecked == true,
+                    ApplyDialogFormatting(fragment, fontName, fontSizeText,
                         textColor, highlightColor, alignment);
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(fragment);
                 }
@@ -413,7 +477,6 @@ public partial class EditorWindow : Window
         TextFragment fragment,
         string fontName,
         string fontSizeText,
-        bool isBold,
         string textColor,
         string highlightColor,
         string alignment)
@@ -423,8 +486,6 @@ public partial class EditorWindow : Window
 
         if (float.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float size) && size > 0)
             fragment.TextState.FontSize = size;
-
-        fragment.TextState.IsBold = isBold;
 
         if (TryParseHexColor(textColor, out var foreground))
             fragment.TextState.ForegroundColor = foreground;
