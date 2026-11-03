@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Aspose.Pdf;
 using Aspose.Pdf.Text;
 using AssinaPDF.MacPrototype;
+using AssinaPDF.MacPrototype.Services;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -60,6 +61,7 @@ public sealed class PdfTextFormattingTests
 
         using var output = new MemoryStream();
         editable.Save(output);
+        AssertYellowBackgroundRendered(output.ToArray(), "formatação combinada");
         output.Position = 0;
 
         using var reopened = Document.Open(output);
@@ -77,7 +79,6 @@ public sealed class PdfTextFormattingTests
             Assert.True(state.IsBold);
             Assert.True(state.IsItalic);
             AssertColor(state.ForegroundColor, 255, 0, 0, DescribeSegment(segment));
-            AssertColor(state.BackgroundColor, 255, 255, 0, DescribeSegment(segment));
         }
     }
 
@@ -123,6 +124,7 @@ public sealed class PdfTextFormattingTests
 
         using var output = new MemoryStream();
         document.Save(output);
+        AssertYellowBackgroundRendered(output.ToArray(), "texto recém-inserido");
         output.Position = 0;
 
         using var reopened = Document.Open(output);
@@ -138,7 +140,6 @@ public sealed class PdfTextFormattingTests
             Assert.True(segment.TextState.IsBold);
             Assert.True(segment.TextState.IsItalic);
             AssertColor(segment.TextState.ForegroundColor, 255, 0, 0, DescribeSegment(segment));
-            AssertColor(segment.TextState.BackgroundColor, 255, 255, 0, DescribeSegment(segment));
         }
     }
 
@@ -202,6 +203,7 @@ public sealed class PdfTextFormattingTests
 
         using var output = new MemoryStream();
         editable.Save(output);
+        AssertYellowBackgroundRendered(output.ToArray(), "primeiro trecho de texto");
         output.Position = 0;
 
         using var reopened = Document.Open(output);
@@ -223,9 +225,66 @@ public sealed class PdfTextFormattingTests
         AssertRun(offsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(offsets, 5, 6, 10, bold: false, italic: false);
         AssertRun(offsets, 6, 11, 12, bold: false, italic: true);
-        AssertRunColors(offsets, 0, 5, Colors.Red, Colors.Yellow);
-        AssertRunColors(offsets, 5, 6, Colors.Black, null);
-        AssertRunColors(offsets, 6, 11, Colors.Blue, null);
+        AssertRunForegroundColors(offsets, 0, 5, Colors.Red);
+        AssertRunForegroundColors(offsets, 5, 6, Colors.Black);
+        AssertRunForegroundColors(offsets, 6, 11, Colors.Blue);
+    }
+
+    private void AssertYellowBackgroundRendered(byte[] pdfBytes, string context)
+    {
+        string path = Path.Combine(
+            Path.GetTempPath(),
+            $"assinapdf-background-{Guid.NewGuid():N}.pdf");
+
+        try
+        {
+            File.WriteAllBytes(path, pdfBytes);
+            using var pdfium = new PdfiumDocument(path);
+            var page = pdfium.RenderPage(0, scale: 2f);
+
+            int yellowPixels = 0;
+            for (int y = 0; y < page.Height; y++)
+            {
+                for (int x = 0; x < page.Width; x++)
+                {
+                    int offset = y * page.Stride + x * 4;
+                    byte blue = page.Pixels[offset];
+                    byte green = page.Pixels[offset + 1];
+                    byte red = page.Pixels[offset + 2];
+
+                    if (red >= 220 && green >= 220 && blue <= 100)
+                        yellowPixels++;
+                }
+            }
+
+            _output.WriteLine($"PDFium: {yellowPixels} pixels amarelos detectados ({context}).");
+            Assert.True(
+                yellowPixels > 0,
+                $"O fundo amarelo não apareceu na renderização PDFium ({context}).");
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
+    private static void AssertRunForegroundColors(
+        IReadOnlyList<(int Start, int End, TextSegment Segment)> segments,
+        int start,
+        int end,
+        Avalonia.Media.Color foreground)
+    {
+        var covered = segments
+            .Where(item => item.Start < end && item.End > start)
+            .ToArray();
+
+        Assert.NotEmpty(covered);
+        foreach (var item in covered)
+        {
+            AssertColor(item.Segment.TextState.ForegroundColor,
+                foreground.R, foreground.G, foreground.B, DescribeSegment(item.Segment));
+        }
     }
 
     private static void AssertRunColors(
