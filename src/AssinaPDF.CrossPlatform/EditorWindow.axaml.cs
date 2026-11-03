@@ -215,8 +215,8 @@ public partial class EditorWindow : Window
             var sizeBox = new TextBox
             {
                 Width = 76,
-                Text = "12",
-                PlaceholderText = "Tamanho"
+                Text = originalText == null ? "12" : string.Empty,
+                PlaceholderText = "Tamanho (vazio mantém)"
             };
             var boldCheck = new CheckBox
             {
