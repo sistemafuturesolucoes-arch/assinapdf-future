@@ -160,6 +160,15 @@ public partial class MainWindow : Window
 
                 var oldDocument = _pdfDocument;
                 var oldBitmaps = _pageBitmaps.ToArray();
+                try
+                {
+                    _signatureWidgets = PdfSignatureWidgetReader.Read(path);
+                }
+                catch (Exception signatureReadError)
+                {
+                    _signatureWidgets = Array.Empty<SignatureWidgetInfo>();
+                    Debug.WriteLine($"Não foi possível ler os campos visuais de assinatura: {signatureReadError}");
+                }
 
                 _pdfDocument = newDocument;
                 _renderScale = 1.5f;
