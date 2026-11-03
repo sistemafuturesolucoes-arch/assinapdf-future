@@ -180,7 +180,7 @@ public sealed class PdfiumDocument : IDisposable
                     width,
                     height,
                     0,
-                    0);
+                    1);
 
                 IntPtr buffer = PdfiumNative.BitmapGetBuffer(bitmap);
                 int stride = PdfiumNative.BitmapGetStride(bitmap);
