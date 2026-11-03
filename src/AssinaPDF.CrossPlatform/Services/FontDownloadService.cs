@@ -15,7 +15,7 @@ using Aspose.Pdf.Text;
 namespace AssinaPDF.MacPrototype.Services;
 
 /// <summary>
-/// Downloads openly licensed Google Fonts into the application's private cache.
+/// Downloads openly licensed desktop font files into the application's private cache.
 /// Fonts are never installed into the operating system.
 /// </summary>
 internal static class FontDownloadService
@@ -73,9 +73,34 @@ internal static class FontDownloadService
             if (IsAvailable(family))
                 return true;
 
-            await DownloadGoogleFontAsync(family);
-            FontRepository.LoadFonts();
-            return IsAvailable(family);
+            var failures = new List<string>();
+            try
+            {
+                await DownloadFontsourceAsync(family);
+                FontRepository.LoadFonts();
+                if (IsAvailable(family))
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                failures.Add("Fontsource: " + ex.Message);
+            }
+
+            try
+            {
+                await DownloadGoogleFontAsync(family);
+                FontRepository.LoadFonts();
+                if (IsAvailable(family))
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                failures.Add("Google Fonts: " + ex.Message);
+            }
+
+            throw new InvalidOperationException(
+                $"Não foi possível localizar uma versão compatível da fonte '{family}'. " +
+                string.Join(" | ", failures));
         }
         finally
         {
@@ -86,9 +111,14 @@ internal static class FontDownloadService
     private static string CleanFamilyName(string? value)
     {
         string family = (value ?? string.Empty).Trim();
-        int subsetSeparator = family.IndexOf('+');
-        if (subsetSeparator >= 0 && subsetSeparator < 8)
-            family = family[(subsetSeparator + 1)..];
+
+        // PDF subset prefixes are exactly six uppercase ASCII letters plus '+'
+        // (for example ABCDEF+Arial). Never strip names such as CIDFONT+F2.
+        int separator = family.IndexOf('+');
+        if (separator == 6 && family[..6].All(character =>
+                character is >= 'A' and <= 'Z'))
+            family = family[7..];
+
         return family.Trim();
     }
 
@@ -101,6 +131,96 @@ internal static class FontDownloadService
         _fontFolderRegistered = true;
     }
 
+    private static async Task DownloadFontsourceAsync(string family)
+    {
+        string searchUrl = "https://api.fontsource.org/v1/fonts?family=" +
+                           Uri.EscapeDataString(family);
+        using var searchResponse = await Http.GetAsync(searchUrl);
+        searchResponse.EnsureSuccessStatusCode();
+        using var searchStream = await searchResponse.Content.ReadAsStreamAsync();
+        using var searchJson = await JsonDocument.ParseAsync(searchStream);
+
+        JsonElement match = searchJson.RootElement.EnumerateArray()
+            .FirstOrDefault(item =>
+                item.TryGetProperty("family", out var name) &&
+                string.Equals(name.GetString(), family, StringComparison.OrdinalIgnoreCase));
+
+        if (match.ValueKind != JsonValueKind.Object ||
+            !match.TryGetProperty("id", out var idElement))
+            throw new InvalidOperationException("família não encontrada no catálogo.");
+
+        string id = idElement.GetString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(id) ||
+            id.Any(character => !char.IsLetterOrDigit(character) && character != '-'))
+            throw new InvalidDataException("identificador de fonte inválido.");
+
+        // Check the package's declared licence before retrieving any font binary.
+        string packageUrl = $"https://registry.npmjs.org/@fontsource%2f{id}/latest";
+        using var packageResponse = await Http.GetAsync(packageUrl);
+        packageResponse.EnsureSuccessStatusCode();
+        using var packageStream = await packageResponse.Content.ReadAsStreamAsync();
+        using var packageJson = await JsonDocument.ParseAsync(packageStream);
+        string license = packageJson.RootElement.TryGetProperty("license", out var licenseElement)
+            ? licenseElement.ValueKind == JsonValueKind.String
+                ? licenseElement.GetString() ?? string.Empty
+                : licenseElement.ToString()
+            : string.Empty;
+
+        string normalizedLicense = license.Replace(" ", string.Empty).ToUpperInvariant();
+        if (normalizedLicense is not ("OFL-1.1" or "APACHE-2.0" or "MIT" or "UFL-1.0"))
+            throw new InvalidOperationException(
+                $"licença '{license}' não está na lista de licenças abertas permitidas.");
+
+        string detailUrl = $"https://api.fontsource.org/v1/fonts/{Uri.EscapeDataString(id)}";
+        using var detailResponse = await Http.GetAsync(detailUrl);
+        detailResponse.EnsureSuccessStatusCode();
+        using var detailStream = await detailResponse.Content.ReadAsStreamAsync();
+        using var detailJson = await JsonDocument.ParseAsync(detailStream);
+
+        var ttfUrls = new List<string>();
+        CollectTtfUrls(detailJson.RootElement, string.Empty, ttfUrls);
+        var preferred = ttfUrls
+            .Where(url => url.Contains("latin", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(url => url.Contains("400-normal", StringComparison.OrdinalIgnoreCase))
+            .ThenBy(url => url, StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
+
+        if (preferred.Length == 0)
+            throw new InvalidOperationException(
+                "o catálogo não forneceu arquivos TTF para caracteres latinos; WOFF/WOFF2 não são aceitos pelo mecanismo PDF.");
+
+        await DownloadFontFilesAsync(preferred, id);
+    }
+
+    private static void CollectTtfUrls(JsonElement element, string path, List<string> urls)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, "ttf", StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.String)
+                {
+                    string? url = property.Value.GetString();
+                    if (Uri.TryCreate(url, UriKind.Absolute, out var parsed) &&
+                        parsed.Scheme == Uri.UriSchemeHttps)
+                        urls.Add(url!);
+                }
+                else
+                {
+                    CollectTtfUrls(property.Value, path + "/" + property.Name, urls);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+                CollectTtfUrls(item, path, urls);
+        }
+    }
+
     private static async Task DownloadGoogleFontAsync(string family)
     {
         string slug = new string(family
@@ -109,13 +229,12 @@ internal static class FontDownloadService
             .ToArray());
 
         if (slug.Length == 0 || slug.Length > 80)
-            throw new InvalidOperationException("O nome da fonte não é válido para pesquisa online.");
+            throw new InvalidOperationException("nome de fonte inválido para pesquisa.");
 
         string apiUrl = $"https://api.github.com/repos/google/fonts/contents/ofl/{Uri.EscapeDataString(slug)}";
         using var response = await Http.GetAsync(apiUrl);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(
-                $"A fonte '{family}' não foi encontrada no catálogo Google Fonts (HTTP {(int)response.StatusCode}).");
+            throw new InvalidOperationException($"catálogo respondeu HTTP {(int)response.StatusCode}.");
 
         using var stream = await response.Content.ReadAsStreamAsync();
         using var json = await JsonDocument.ParseAsync(stream);
@@ -126,8 +245,7 @@ internal static class FontDownloadService
             string.Equals(name.GetString(), "OFL.txt", StringComparison.OrdinalIgnoreCase));
 
         if (!hasOpenFontLicense)
-            throw new InvalidOperationException(
-                $"A fonte '{family}' não apresentou licença OFL no catálogo. Por segurança, o download foi bloqueado.");
+            throw new InvalidOperationException("não foi encontrada licença OFL para esta família.");
 
         var fontEntries = entries.Where(item =>
             item.TryGetProperty("name", out var name) &&
@@ -165,37 +283,46 @@ internal static class FontDownloadService
         }
 
         if (fontEntries.Count == 0)
-            throw new InvalidOperationException(
-                $"O catálogo não disponibilizou uma fonte TrueType compatível para '{family}'.");
+            throw new InvalidOperationException("nenhum arquivo TTF compatível foi disponibilizado.");
 
-        // Download only a small set of faces; the application cache is shared by Windows and macOS.
-        foreach (var entry in fontEntries.Take(8))
+        var urls = fontEntries.Take(8)
+            .Select(entry => entry.GetProperty("download_url").GetString()!)
+            .ToArray();
+        await DownloadFontFilesAsync(urls, slug);
+    }
+
+    private static async Task DownloadFontFilesAsync(IEnumerable<string> urls, string prefix)
+    {
+        foreach (string downloadUrl in urls)
         {
-            string fileName = entry.GetProperty("name").GetString()!;
-            string downloadUrl = entry.GetProperty("download_url").GetString()!;
+            if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) ||
+                uri.Scheme != Uri.UriSchemeHttps)
+                continue;
+
+            string fileName = Path.GetFileName(uri.AbsolutePath);
             string safeName = string.Concat(fileName.Select(character =>
                 char.IsLetterOrDigit(character) || character is '.' or '-' or '_' ? character : '_'));
-            string destination = Path.Combine(CacheDirectory, slug + "-" + safeName);
+            string destination = Path.Combine(CacheDirectory, prefix + "-" + safeName);
 
             if (File.Exists(destination) && new FileInfo(destination).Length > 1024)
                 continue;
 
-            using var fontResponse = await Http.GetAsync(
-                downloadUrl, HttpCompletionOption.ResponseHeadersRead);
-            fontResponse.EnsureSuccessStatusCode();
+            using var response = await Http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
 
-            if (fontResponse.Content.Headers.ContentLength is > 20_000_000)
-                throw new InvalidOperationException("O arquivo da fonte excede o limite de segurança de 20 MB.");
+            if (response.Content.Headers.ContentLength is > 20_000_000)
+                throw new InvalidOperationException("arquivo de fonte excede o limite de 20 MB.");
 
-            await using var input = await fontResponse.Content.ReadAsStreamAsync();
+            await using var input = await response.Content.ReadAsStreamAsync();
             await using var output = new FileStream(
                 destination, FileMode.Create, FileAccess.Write, FileShare.None);
             await input.CopyToAsync(output);
+
             if (output.Length < 1024 || output.Length > 20_000_000)
             {
                 output.Close();
                 File.Delete(destination);
-                throw new InvalidDataException("O arquivo baixado não parece ser uma fonte TrueType válida.");
+                throw new InvalidDataException("o arquivo baixado não parece ser uma fonte TTF válida.");
             }
         }
     }
@@ -205,8 +332,8 @@ internal static class FontDownloadService
         var dialog = new Window
         {
             Title = "Fonte não encontrada",
-            Width = 460,
-            Height = 220,
+            Width = 480,
+            Height = 230,
             MinWidth = 420,
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
@@ -214,7 +341,7 @@ internal static class FontDownloadService
 
         var message = new TextBlock
         {
-            Text = $"A fonte '{family}' não está disponível neste computador. Deseja buscar e baixar uma versão com licença aberta no catálogo Google Fonts? O arquivo ficará somente na pasta interna do AssinaPDF; nenhuma fonte será instalada no Windows ou macOS.",
+            Text = $"A fonte '{family}' não está disponível neste computador. Deseja buscar uma versão com licença aberta nos catálogos Fontsource e Google Fonts? O arquivo ficará somente na pasta interna do AssinaPDF; nenhuma fonte será instalada no Windows ou macOS.",
             TextWrapping = TextWrapping.Wrap,
             FontSize = 13
         };
