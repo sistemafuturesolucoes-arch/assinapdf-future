@@ -2,10 +2,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.SignaturePositioningWindow"
         Title="AssinaPDF - Posicionar assinaturas"
-        Width="1040"
-        Height="760"
-        MinWidth="760"
-        MinHeight="560"
+        Width="900"
+        Height="650"
+        MinWidth="740"
+        MinHeight="520"
         WindowStartupLocation="CenterOwner"
         Background="#F0F1F5">
 
@@ -71,7 +71,9 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
               <Grid x:Name="PdfPageSurface"
-                    PointerPressed="PdfPageSurface_PointerPressed">
+                    PointerPressed="PdfPageSurface_PointerPressed"
+                    PointerMoved="PdfPageSurface_PointerMoved"
+                    PointerReleased="PdfPageSurface_PointerReleased">
                 <Image x:Name="PdfPageImage"
                        Stretch="Uniform"
                        HorizontalAlignment="Center"
@@ -96,7 +98,7 @@
       <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
         <TextBlock Grid.Column="0"
                    x:Name="PositionStatusText"
-                   Text="Clique no PDF para adicionar uma posição."
+                   Text="Clique e arraste para desenhar a área da assinatura."
                    VerticalAlignment="Center"
                    Foreground="#454951"
                    TextTrimming="CharacterEllipsis"/>
