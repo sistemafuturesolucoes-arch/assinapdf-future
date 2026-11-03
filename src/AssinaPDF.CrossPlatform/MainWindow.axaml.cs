@@ -797,8 +797,6 @@ public partial class MainWindow : Window
             FontFamily = new FontFamily("Consolas"),
             FontSize = 13,
             Padding = new Thickness(16),
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
         };
 
         var closeButton = new Button
