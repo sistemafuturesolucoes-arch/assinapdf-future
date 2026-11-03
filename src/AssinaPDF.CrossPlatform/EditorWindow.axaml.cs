@@ -741,13 +741,11 @@ public partial class EditorWindow : Window
         string? originalFontName,
         bool originalFontEmbedded)
     {
-        // Keep the original TextState instance: it carries the fragment/segment
-        // ownership used by Aspose while saving the PDF.
-        var desired = new Aspose.Pdf.Text.TextState();
-        desired.ApplyChangesFrom(state);
-
+        // Apply directly to the state owned by the final TextSegment/TextFragment.
+        // A detached TextState followed by ApplyChangesFrom loses FontStyleTouched
+        // and can route colour/font side effects through the wrong owner.
         if (run.FontSize > 0)
-            desired.FontSize = (float)run.FontSize;
+            state.FontSize = (float)run.FontSize;
 
         string currentFontFamily = state.FontName ?? string.Empty;
         string normalizedCurrentFamily = NormalizePdfFontFamily(currentFontFamily);
@@ -771,7 +769,10 @@ public partial class EditorWindow : Window
 
                 try
                 {
-                    desired.Font = FontRepository.FindFont(fontFamily, requestedStyle);
+                    string faceName = GetPdfFontFaceName(fontFamily, run.IsBold, run.IsItalic);
+                    state.Font = IsStandard14Family(fontFamily)
+                        ? FontRepository.FindFont(faceName)
+                        : FontRepository.FindFont(fontFamily, requestedStyle);
                 }
                 catch (Exception ex)
                 {
@@ -781,35 +782,85 @@ public partial class EditorWindow : Window
                         "Escolha outra família de fonte antes de aplicar a edição.",
                         ex);
                 }
+
+                // Set FontStyle on the owned state (not on a detached clone). For
+                // absorbed text this also lets Aspose attempt a source-font swap;
+                // for TextBuilder-owned text it records the flags for serialization.
+                state.FontStyle = requestedStyle;
             }
         }
+        else
+        {
+            state.FontStyle =
+                (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
+                (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
+        }
 
-        desired.FontStyle =
-            (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
-            (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
-        desired.IsBold = run.IsBold;
-        desired.IsItalic = run.IsItalic;
-
+        // Assign colours directly to the final owned state. The setters retain the
+        // values consumed by the PDF writer; on absorbed text they also perform the
+        // content-stream update using the restored segment geometry.
         if (run.Foreground is { } foreground)
         {
-            desired.ForegroundColor = Aspose.Pdf.Color.FromRgb(
+            state.ForegroundColor = Aspose.Pdf.Color.FromRgb(
                 foreground.R / 255d,
                 foreground.G / 255d,
                 foreground.B / 255d);
         }
 
-        if (run.Background is { } background)
-        {
-            desired.BackgroundColor = Aspose.Pdf.Color.FromRgb(
+        state.BackgroundColor = run.Background is { } background
+            ? Aspose.Pdf.Color.FromRgb(
                 background.R / 255d,
                 background.G / 255d,
-                background.B / 255d);
+                background.B / 255d)
+            : null;
+    }
+
+    private static bool IsStandard14Family(string family)
+    {
+        string normalized = NormalizePdfFontFamily(family);
+        return normalized.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("Arial", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("Courier", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("Courier New", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("Times", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("Times-Roman", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("Times New Roman", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("Symbol", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("ZapfDingbats", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetPdfFontFaceName(string family, bool bold, bool italic)
+    {
+        string normalized = NormalizePdfFontFamily(family);
+        bool isHelvetica = normalized.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) ||
+                           normalized.Equals("Arial", StringComparison.OrdinalIgnoreCase);
+        bool isCourier = normalized.Equals("Courier", StringComparison.OrdinalIgnoreCase) ||
+                         normalized.Equals("Courier New", StringComparison.OrdinalIgnoreCase);
+        bool isTimes = normalized.Equals("Times", StringComparison.OrdinalIgnoreCase) ||
+                       normalized.Equals("Times-Roman", StringComparison.OrdinalIgnoreCase) ||
+                       normalized.Equals("Times New Roman", StringComparison.OrdinalIgnoreCase);
+
+        if (isHelvetica || isCourier)
+        {
+            string baseName = isHelvetica ? "Helvetica" : "Courier";
+            if (bold && italic) return baseName + "-BoldOblique";
+            if (bold) return baseName + "-Bold";
+            if (italic) return baseName + "-Oblique";
+            return baseName;
         }
 
-        // Keep the TextState instance obtained from the segment: Aspose links this
-        // instance to the PDF content operator. Replacing it with a detached TextState
-        // can compile successfully while the serialized PDF keeps the original values.
-        state.ApplyChangesFrom(desired);
+        if (isTimes)
+        {
+            if (bold && italic) return "Times-BoldItalic";
+            if (bold) return "Times-Bold";
+            if (italic) return "Times-Italic";
+            return "Times-Roman";
+        }
+
+        if (bold && italic) return normalized + "-BoldItalic";
+        if (bold) return normalized + "-Bold";
+        if (italic) return normalized + "-Italic";
+        return normalized;
     }
 
     private static string? VerifyRichTextFormatting(
