@@ -103,7 +103,7 @@ jobs:
           $publishDir = Join-Path $env:GITHUB_WORKSPACE 'publish/win-x64'
           dotnet build ./installer-crossplatform/AssinaPDF.CrossPlatform.wixproj `
             -c Release `
-            -p:Platform=x64 `
+            -p:InstallerPlatform=x64 `
             -p:PublishDir="$publishDir/"
 
           $msi = Get-ChildItem ./installer-crossplatform/bin -Filter 'AssinaPDF-CrossPlatform-Setup-x64.msi' -Recurse |
