@@ -50,7 +50,7 @@
           <TextBlock Text="Y" VerticalAlignment="Center"/>
           <TextBox x:Name="YPositionTextBox" Width="52" Text="720"/>
           <TextBox x:Name="FontNameTextBox" Width="105" Watermark="Fonte (opcional)"/>
-          <TextBox x:Name="FontSizeTextBox" Width="48" Text="12" Watermark="Tam."/>
+          <TextBox x:Name="FontSizeTextBox" Width="48" Watermark="Tam. (opcional)"/>
           <CheckBox x:Name="IsBoldCheckBox" Content="Negrito" VerticalAlignment="Center"/>
           <TextBox x:Name="TextColorTextBox" Width="78" Watermark="Texto #RRGGBB"/>
           <TextBox x:Name="HighlightColorTextBox" Width="86" Watermark="Realce #RRGGBB"/>
