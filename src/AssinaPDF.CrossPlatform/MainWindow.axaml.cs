@@ -236,7 +236,16 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
-        OpenPdf_Click(sender, e);
+        // A validação tem sua própria entrada na área de trabalho.
+        // O usuário escolhe o PDF pelo botão Abrir PDF e inicia a análise
+        // somente quando clicar em Validar assinatura.
+        DashboardView.IsVisible = false;
+        WorkspaceView.IsVisible = true;
+        DashboardStatusText.Text = "Área de validação aberta.";
+        StatusText.Text = _pdfDocument == null
+            ? "Clique em Abrir PDF para selecionar o documento que deseja validar."
+            : $"Documento carregado: {System.IO.Path.GetFileName(_currentPdfPath)}. Clique em Validar assinatura para analisar.";
+        UpdateActionButtons();
     }
 
     private void DashboardEdit_Click(
@@ -693,49 +702,78 @@ public partial class MainWindow : Window
         {
             StatusText.Text = "Validando assinaturas digitais...";
 
+            // Mantém a mesma configuração de validação criptográfica usada
+            // pelo projeto Windows anterior. A consulta de revogação e a
+            // confiança nas raízes do sistema ficam separadas desta etapa.
             var options = new ValidationOptions
             {
-                CheckRevocation = true,
-                TrustSystemRoots = true
+                CheckRevocation = false,
+                TrustSystemRoots = false
             };
 
             var validator = new PdfSignatureValidator(options);
 
-            using var stream = File.OpenRead(_currentPdfPath);
+            await using var stream = new FileStream(
+                _currentPdfPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize: 81920,
+                useAsync: true);
             var results = await validator.ValidateAsync(stream);
 
             if (results.Count == 0)
             {
-                StatusText.Text = "Nenhuma assinatura digital foi encontrada neste PDF.";
+                StatusText.Text = "Nenhuma assinatura digital reconhecida neste PDF.";
+                await ShowValidationReportAsync(
+                    "Validação de assinatura",
+                    "Nenhuma assinatura digital compatível foi encontrada neste documento.\n\nIsso não significa necessariamente que o PDF seja inválido; ele pode simplesmente não estar assinado.");
                 return;
             }
 
             var report = new StringBuilder();
-            report.AppendLine($"Assinaturas encontradas: {results.Count}");
+            report.AppendLine($"RESULTADO DA VALIDAÇÃO — {results.Count} assinatura(s) encontrada(s)");
+            report.AppendLine(new string('=', 68));
             report.AppendLine();
 
-            foreach (var result in results)
+            for (int i = 0; i < results.Count; i++)
             {
-                report.AppendLine($"Assinatura: {result.FieldName}");
+                var result = results[i];
+                report.AppendLine($"ASSINATURA {i + 1}");
+                report.AppendLine(new string('-', 68));
+                report.AppendLine($"Campo: {result.FieldName}");
                 report.AppendLine($"Titular: {result.SignerName}");
-                report.AppendLine($"Data: {result.SigningTime}");
-                report.AppendLine($"Integridade: {(result.IsIntegrityValid ? "OK" : "FALHOU")}");
-                report.AppendLine($"Assinatura criptográfica: {(result.IsSignatureValid ? "VÁLIDA" : "INVÁLIDA")}");
-                report.AppendLine($"Cadeia de confiança: {(result.IsCertificateChainValid ? "CONFIÁVEL" : "NÃO CONFIRMADA")}");
-                report.AppendLine($"Revogação: {(result.IsNotRevoked ? "Não revogado/não identificada revogação" : "Não confirmada")}");
-                report.AppendLine($"Origem da consulta: {result.RevocationSource}");
-                report.AppendLine($"Resultado geral: {(result.IsValid ? "VÁLIDA" : "NÃO VALIDADA")}");
+                report.AppendLine($"Data da assinatura: {result.SigningTime}");
+                report.AppendLine($"Integridade do documento: {(result.IsIntegrityValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Assinatura criptográfica: {(result.IsSignatureValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Cadeia de confiança: {(result.IsCertificateChainValid ? "CONFIÁVEL" : "NÃO CONFIRMADA NESTA ETAPA")}");
+                report.AppendLine($"Revogação: {(result.IsNotRevoked ? "Nenhuma revogação reportada" : "Não confirmada")}");
+                report.AppendLine($"Fonte de revogação: {result.RevocationSource}");
+                report.AppendLine($"Resultado informado pela biblioteca: {(result.IsValid ? "VÁLIDA" : "NÃO VALIDADA")}");
 
-                foreach (var error in result.Errors)
-                    report.AppendLine($"Erro: {error}");
+                if (result.Errors.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("ERROS:");
+                    foreach (var error in result.Errors)
+                        report.AppendLine($" • {error}");
+                }
 
-                foreach (var warning in result.Warnings)
-                    report.AppendLine($"Aviso: {warning}");
+                if (result.Warnings.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("AVISOS:");
+                    foreach (var warning in result.Warnings)
+                        report.AppendLine($" • {warning}");
+                }
 
                 report.AppendLine();
             }
 
-            StatusText.Text = report.ToString();
+            report.AppendLine(new string('=', 68));
+            report.AppendLine("Limites desta etapa: cadeia de confiança, revogação e carimbo do tempo não são atestados por esta verificação criptográfica. Para uma conclusão oficial ICP-Brasil, utilize também o serviço oficial de validação.");
+            StatusText.Text = $"Validação concluída: {results.Count} assinatura(s) encontrada(s).";
+            await ShowValidationReportAsync("Detalhes técnicos das assinaturas", report.ToString());
         }
         catch (Exception ex)
         {
@@ -746,6 +784,61 @@ public partial class MainWindow : Window
             _operationInProgress = false;
             UpdateActionButtons();
         }
+    }
+
+    private async Task ShowValidationReportAsync(string title, string report)
+    {
+        var reportText = new TextBox
+        {
+            Text = report,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 13,
+            Padding = new Thickness(16),
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+        };
+
+        var closeButton = new Button
+        {
+            Content = "Fechar",
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            MinWidth = 100,
+            Margin = new Thickness(0, 12, 0, 0)
+        };
+
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 820,
+            Height = 650,
+            MinWidth = 620,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(18),
+                Spacing = 8,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = title,
+                        FontSize = 19,
+                        FontWeight = FontWeight.SemiBold,
+                        Margin = new Thickness(0, 0, 0, 6)
+                    },
+                    reportText,
+                    closeButton
+                }
+            }
+        };
+
+        closeButton.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
     }
 
     private async void SignPdf_Click(
