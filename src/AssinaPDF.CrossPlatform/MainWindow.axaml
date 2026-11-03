@@ -163,7 +163,7 @@
                           PointerPressed="PdfScrollViewer_PointerPressed"
                           PointerMoved="PdfScrollViewer_PointerMoved"
                           PointerReleased="PdfScrollViewer_PointerReleased"
-                          PointerWheelChanged="PdfScrollViewer_PointerWheelChanged">
+>
               <StackPanel x:Name="PdfPagesPanel"
                           Spacing="18"
                           HorizontalAlignment="Center"
