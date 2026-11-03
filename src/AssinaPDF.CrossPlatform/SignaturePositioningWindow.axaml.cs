@@ -23,6 +23,9 @@ public partial class SignaturePositioningWindow : Window
     private int _pageIndex;
     private float _pageWidthPoints;
     private float _pageHeightPoints;
+    private Point _dragStart;
+    private Point _dragCurrent;
+    private bool _isDragging;
 
     public IReadOnlyList<SignaturePlacement> SelectedPlacements { get; private set; }
         = Array.Empty<SignaturePlacement>();
@@ -267,69 +270,122 @@ public partial class SignaturePositioningWindow : Window
             !e.GetCurrentPoint(PdfPageSurface).Properties.IsLeftButtonPressed)
             return;
 
-        var bounds = PdfPageImage.Bounds;
         var point = e.GetPosition(PdfPageImage);
+        var bounds = PdfPageImage.Bounds;
 
-        if (bounds.Width <= 0 ||
-            bounds.Height <= 0 ||
-            point.X < 0 ||
-            point.Y < 0 ||
-            point.X > bounds.Width ||
-            point.Y > bounds.Height)
+        if (bounds.Width <= 0 || bounds.Height <= 0 ||
+            point.X < 0 || point.Y < 0 ||
+            point.X > bounds.Width || point.Y > bounds.Height)
             return;
 
-        double normalizedX = Math.Clamp(point.X / bounds.Width, 0, 1);
-        double normalizedY = Math.Clamp(point.Y / bounds.Height, 0, 1);
+        _dragStart = point;
+        _dragCurrent = point;
+        _isDragging = true;
+        e.Pointer.Capture(PdfPageSurface);
+        RefreshMarkers();
+        DrawTemporarySelection();
+        PositionStatusText.Text = "Arraste para definir a largura e a altura da assinatura.";
+        e.Handled = true;
+    }
+
+    private void PdfPageSurface_PointerMoved(
+        object? sender,
+        PointerEventArgs e)
+    {
+        if (!_isDragging)
+            return;
+
+        _dragCurrent = e.GetPosition(PdfPageImage);
+        DrawTemporarySelection();
+        e.Handled = true;
+    }
+
+    private void PdfPageSurface_PointerReleased(
+        object? sender,
+        PointerReleasedEventArgs e)
+    {
+        if (!_isDragging)
+            return;
+
+        _dragCurrent = e.GetPosition(PdfPageImage);
+        _isDragging = false;
+        e.Pointer.Capture(null);
+
+        var bounds = PdfPageImage.Bounds;
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        double left = Math.Clamp(Math.Min(_dragStart.X, _dragCurrent.X), 0, bounds.Width);
+        double top = Math.Clamp(Math.Min(_dragStart.Y, _dragCurrent.Y), 0, bounds.Height);
+        double width = Math.Clamp(Math.Abs(_dragCurrent.X - _dragStart.X), 0, bounds.Width - left);
+        double height = Math.Clamp(Math.Abs(_dragCurrent.Y - _dragStart.Y), 0, bounds.Height - top);
+
+        if (width < 12 || height < 12)
+        {
+            RefreshMarkers();
+            PositionStatusText.Text = "Seleção muito pequena. Clique e arraste uma área maior.";
+            e.Handled = true;
+            return;
+        }
 
         _placements.Add(new SignaturePlacement(
             _pageIndex,
-            normalizedX,
-            normalizedY,
+            left / bounds.Width,
+            top / bounds.Height,
+            width / bounds.Width,
+            height / bounds.Height,
             _pageWidthPoints,
             _pageHeightPoints));
 
         RefreshMarkers();
-
         PositionStatusText.Text =
-            $"Posição {_placements.Count} adicionada na página {_pageIndex + 1}.";
-
+            $"Área da assinatura {_placements.Count} definida na página {_pageIndex + 1}.";
         e.Handled = true;
+    }
+
+    private void DrawTemporarySelection()
+    {
+        RefreshMarkers();
+
+        double left = Math.Min(_dragStart.X, _dragCurrent.X);
+        double top = Math.Min(_dragStart.Y, _dragCurrent.Y);
+        double width = Math.Abs(_dragCurrent.X - _dragStart.X);
+        double height = Math.Abs(_dragCurrent.Y - _dragStart.Y);
+
+        var preview = new Border
+        {
+            Width = width,
+            Height = height,
+            Background = new SolidColorBrush(Color.FromArgb(48, 124, 58, 237)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(124, 58, 237)),
+            BorderThickness = new Thickness(2),
+            IsHitTestVisible = false
+        };
+
+        Canvas.SetLeft(preview, left);
+        Canvas.SetTop(preview, top);
+        MarkerCanvas.Children.Add(preview);
     }
 
     private void RefreshMarkers()
     {
         MarkerCanvas.Children.Clear();
 
-        // Mantém a referência visual do projeto Windows antigo:
-        // cada clique cria uma caixa retangular de assinatura, numerada.
-        const double markerWidth = 120;
-        const double markerHeight = 34;
-
         for (int i = 0; i < _placements.Count; i++)
         {
             var placement = _placements[i];
-
             if (placement.PageIndex != _pageIndex)
                 continue;
 
-            double anchorX = placement.NormalizedX * MarkerCanvas.Width;
-            double anchorY = placement.NormalizedY * MarkerCanvas.Height;
-
-            // O ponto clicado representa a base da caixa, como no visualizador antigo.
-            double left = Math.Clamp(
-                anchorX - markerWidth / 2,
-                0,
-                Math.Max(0, MarkerCanvas.Width - markerWidth));
-
-            double top = Math.Clamp(
-                anchorY - markerHeight,
-                0,
-                Math.Max(0, MarkerCanvas.Height - markerHeight));
+            double width = Math.Max(12, placement.NormalizedWidth * MarkerCanvas.Width);
+            double height = Math.Max(12, placement.NormalizedHeight * MarkerCanvas.Height);
+            double left = placement.NormalizedX * MarkerCanvas.Width;
+            double top = placement.NormalizedY * MarkerCanvas.Height;
 
             var marker = new Border
             {
-                Width = markerWidth,
-                Height = markerHeight,
+                Width = width,
+                Height = height,
                 CornerRadius = new CornerRadius(3),
                 Background = new SolidColorBrush(Color.FromArgb(38, 124, 58, 237)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(124, 58, 237)),
