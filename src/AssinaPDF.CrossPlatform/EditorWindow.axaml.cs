@@ -174,6 +174,7 @@ public partial class EditorWindow : Window
             string? originalText = null;
             Aspose.Pdf.Rectangle? originalBounds = null;
             string? originalFontName = null;
+            bool originalFontEmbedded = false;
             double originalFontSize = 12;
             bool originalBold = false;
             bool originalItalic = false;
@@ -203,7 +204,19 @@ public partial class EditorWindow : Window
                     {
                         bestDistance = distance;
                         originalText = fragment.Text;
-                        originalFontName = fragment.TextState.FontName;
+                        var sourceFont = fragment.TextState.Font;
+                        originalFontEmbedded = sourceFont?.IsEmbedded == true;
+                        string decodedFontName = sourceFont?.DecodedFontName ??
+                                                  sourceFont?.BaseFont ??
+                                                  fragment.TextState.FontName ??
+                                                  string.Empty;
+                        originalFontName = NormalizePdfFontFamily(decodedFontName);
+                        // CIDFONT+F2 and similar resource labels are PDF internals, not family names.
+                        // Keep the embedded font in the PDF and show a standard editing fallback.
+                        if (string.IsNullOrWhiteSpace(originalFontName) ||
+                            originalFontName.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
+                            originalFontName.Length <= 2)
+                            originalFontName = "Helvetica";
                         originalFontSize = fragment.TextState.FontSize > 0
                             ? fragment.TextState.FontSize
                             : 12;
@@ -404,7 +417,7 @@ public partial class EditorWindow : Window
             var requiredFonts = editedRuns
                 .Where(run => !string.IsNullOrWhiteSpace(run.FontFamily) &&
                     (!string.Equals(run.FontFamily, originalFontName, StringComparison.OrdinalIgnoreCase) ||
-                     run.IsBold || run.IsItalic))
+                     (!originalFontEmbedded && (run.IsBold || run.IsItalic))))
                 .Select(run => run.FontFamily!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -465,7 +478,7 @@ public partial class EditorWindow : Window
                     };
                 }
 
-                ApplyRichTextFormatting(target, editedRuns);
+                ApplyRichTextFormatting(target, editedRuns, originalFontName, originalFontEmbedded);
                 target.HorizontalAlignment = alignment switch
                 {
                     Avalonia.Media.TextAlignment.Center => Aspose.Pdf.HorizontalAlignment.Center,
@@ -493,7 +506,8 @@ public partial class EditorWindow : Window
                         return false;
 
                     string? formattingFailure = VerifyRichTextFormatting(
-                        savedDocument, pageIndex, replacementText, editedRuns);
+                        savedDocument, pageIndex, replacementText, editedRuns,
+                        originalFontName, originalFontEmbedded);
                     if (formattingFailure != null)
                         throw new InvalidOperationException("Diagnóstico da formatação: " + formattingFailure);
 
@@ -525,7 +539,9 @@ public partial class EditorWindow : Window
 
     private static void ApplyRichTextFormatting(
         TextFragment fragment,
-        IReadOnlyList<EditedTextRun> runs)
+        IReadOnlyList<EditedTextRun> runs,
+        string? originalFontName,
+        bool originalFontEmbedded)
     {
         var orderedRuns = runs
             .Where(item => item.Length > 0)
@@ -572,16 +588,21 @@ public partial class EditorWindow : Window
         foreach (var isolatedRun in isolatedRuns)
         {
             foreach (TextSegment segment in isolatedRun.Segments)
-                ApplyRunStyle(segment.TextState, isolatedRun.Run);
+                ApplyRunStyle(segment.TextState, isolatedRun.Run, originalFontName, originalFontEmbedded);
         }
     }
 
-    private static void ApplyRunStyle(Aspose.Pdf.Text.TextState state, EditedTextRun run)
+    private static void ApplyRunStyle(
+        Aspose.Pdf.Text.TextState state,
+        EditedTextRun run,
+        string? originalFontName,
+        bool originalFontEmbedded)
     {
         string currentFontFamily = state.FontName ?? string.Empty;
+        string comparisonFamily = originalFontName ?? currentFontFamily;
         bool fontFamilyChanged =
             !string.IsNullOrWhiteSpace(run.FontFamily) &&
-            !string.Equals(currentFontFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
+            !string.Equals(comparisonFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
 
         if (fontFamilyChanged)
             state.FontName = run.FontFamily;
@@ -601,11 +622,15 @@ public partial class EditorWindow : Window
         // Preserve a fonte original incorporada/subsetada quando o usuário não
         // mudou a família nem pediu uma face estilizada. Só resolva uma fonte do
         // sistema quando realmente for necessário trocar família ou variante.
-        if (fontFamilyChanged || run.IsBold || run.IsItalic)
+        // When the original PDF carries an embedded subset, keep its font program.
+        // A PDF resource label such as CIDFONT+F2 must never be looked up online.
+        // Style flags are still written to the selected run; a newly selected family
+        // is resolved normally and embedded into the output PDF.
+        if (fontFamilyChanged || ((run.IsBold || run.IsItalic) && !originalFontEmbedded))
         {
-            string fontFamily = !string.IsNullOrWhiteSpace(run.FontFamily)
+            string fontFamily = fontFamilyChanged && !string.IsNullOrWhiteSpace(run.FontFamily)
                 ? run.FontFamily
-                : currentFontFamily;
+                : originalFontName ?? currentFontFamily;
 
             if (!string.IsNullOrWhiteSpace(fontFamily))
             {
@@ -651,7 +676,9 @@ public partial class EditorWindow : Window
         Document document,
         int pageIndex,
         string expectedText,
-        IReadOnlyList<EditedTextRun> expectedRuns)
+        IReadOnlyList<EditedTextRun> expectedRuns,
+        string? originalFontName,
+        bool originalFontEmbedded)
     {
         string Fail(string reason) => reason;
 
@@ -702,6 +729,8 @@ public partial class EditorWindow : Window
                     return Fail($"itálico divergente na posição {run.Start}: esperado {run.IsItalic}, salvo {state.IsItalic}.");
 
                 if (!string.IsNullOrWhiteSpace(run.FontFamily) &&
+                    !(originalFontEmbedded && string.Equals(
+                        run.FontFamily, originalFontName, StringComparison.OrdinalIgnoreCase)) &&
                     !string.Equals(state.FontName, run.FontFamily, StringComparison.OrdinalIgnoreCase))
                     return Fail($"fonte divergente na posição {run.Start}: esperada '{run.FontFamily}', salva '{state.FontName}'.");
 
@@ -790,6 +819,16 @@ public partial class EditorWindow : Window
 
     private static string NormalizePdfText(string? value) =>
         new string((value ?? string.Empty).Where(character => !char.IsWhiteSpace(character)).ToArray());
+
+    private static string NormalizePdfFontFamily(string? value)
+    {
+        string family = (value ?? string.Empty).Trim();
+        int separator = family.IndexOf('+');
+        if (separator == 6 && family[..6].All(character =>
+                character is >= 'A' and <= 'Z'))
+            family = family[7..];
+        return family.Trim();
+    }
 
     private void ApplyPdfEdit(
         Action<Document> edit,
