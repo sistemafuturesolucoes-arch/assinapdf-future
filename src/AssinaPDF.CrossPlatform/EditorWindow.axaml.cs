@@ -14,6 +14,14 @@ using Avalonia.Platform.Storage;
 using Aspose.Pdf;
 using Aspose.Pdf.Text;
 using AssinaPDF.MacPrototype.Services;
+using AvaloniaRichEditor.Controls;
+using AvaloniaRichEditor.Documents;
+using RichEditorControl = AvaloniaRichEditor.Controls.RichEditor;
+using RichEditorToolbar = AvaloniaRichEditor.Controls.RichEditorToolbar;
+using RichToolbarLevel = AvaloniaRichEditor.Controls.ToolbarLevel;
+using RichFlowDocument = AvaloniaRichEditor.Documents.FlowDocument;
+using RichParagraph = AvaloniaRichEditor.Documents.Paragraph;
+using RichRun = AvaloniaRichEditor.Documents.Run;
 
 namespace AssinaPDF.MacPrototype;
 
@@ -165,7 +173,12 @@ public partial class EditorWindow : Window
         {
             string? originalText = null;
             Aspose.Pdf.Rectangle? originalBounds = null;
+            string? originalFontName = null;
+            double originalFontSize = 12;
             bool originalBold = false;
+            bool originalItalic = false;
+            Avalonia.Media.Color? originalForeground = null;
+            Avalonia.Media.Color? originalBackground = null;
 
             using (var document = Document.Open(_workingCopyPath))
             {
@@ -190,229 +203,208 @@ public partial class EditorWindow : Window
                     {
                         bestDistance = distance;
                         originalText = fragment.Text;
+                        originalFontName = fragment.TextState.FontName;
+                        originalFontSize = fragment.TextState.FontSize > 0
+                            ? fragment.TextState.FontSize
+                            : 12;
                         originalBold = fragment.TextState.IsBold;
+                        originalItalic = fragment.TextState.IsItalic;
+
+                        if (fragment.TextState.ForegroundColor is { } foreground)
+                            originalForeground = Avalonia.Media.Color.FromRgb(
+                                foreground.R, foreground.G, foreground.B);
+                        if (fragment.TextState.BackgroundColor is { } background)
+                            originalBackground = Avalonia.Media.Color.FromRgb(
+                                background.R, background.G, background.B);
+
                         originalBounds = new Aspose.Pdf.Rectangle(
                             bounds.LLX, bounds.LLY, bounds.URX, bounds.URY);
                     }
                 }
             }
 
-            var textBox = new TextBox
-            {
-                Text = originalText ?? string.Empty,
-                AcceptsReturn = true,
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                MinHeight = 76,
-                PlaceholderText = originalText == null
-                    ? "Digite o texto que deseja inserir"
-                    : "Edite o texto selecionado"
-            };
             var installedFonts = Avalonia.Media.FontManager.Current.SystemFonts
                 .Select(fontFamily => fontFamily.Name)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.CurrentCultureIgnoreCase)
                 .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
-            var fontBox = new ComboBox
+
+            var richDocument = new RichFlowDocument();
+            var initialParagraph = new RichParagraph();
+            initialParagraph.Inlines.Add(new RichRun
             {
-                Width = 210,
-                ItemsSource = installedFonts,
-                PlaceholderText = "Fontes instaladas",
-                SelectedItem = installedFonts.FirstOrDefault(name =>
-                    string.Equals(name, "Arial", StringComparison.OrdinalIgnoreCase))
+                Text = originalText ?? string.Empty,
+                FontFamily = originalFontName,
+                FontSize = originalFontSize,
+                FontWeight = originalBold
+                    ? Avalonia.Media.FontWeight.Bold
+                    : Avalonia.Media.FontWeight.Normal,
+                FontStyle = originalItalic
+                    ? Avalonia.Media.FontStyle.Italic
+                    : Avalonia.Media.FontStyle.Normal,
+                Foreground = new Avalonia.Media.SolidColorBrush(
+                    originalForeground ?? Avalonia.Media.Colors.Black),
+                Background = originalBackground.HasValue
+                    ? new Avalonia.Media.SolidColorBrush(originalBackground.Value)
+                    : null
+            });
+            richDocument.Blocks.Add(initialParagraph);
+
+            var richEditor = new RichEditorControl
+            {
+                Document = richDocument,
+                FontFamilyChoices = installedFonts,
+                DefaultFontSize = originalFontSize,
+                DefaultForeground = Avalonia.Media.Brushes.Black,
+                AllowImages = false,
+                AllowTables = false,
+                AllowRichPaste = false,
+                AllowFindReplace = false,
+                MinHeight = 250,
+                ShowPageBoundaries = false
             };
-            var sizeBox = new ComboBox
+
+            var toolbar = new RichEditorToolbar
             {
-                Width = 90,
-                ItemsSource = new[] { "6", "7", "8", "9", "10", "11", "12", "14", "16", "18", "20", "22", "24", "26", "28", "36", "48", "72" },
-                SelectedItem = originalText == null ? "12" : null,
-                PlaceholderText = "Tamanho"
+                Target = richEditor,
+                ToolbarLevel = RichToolbarLevel.Normal
             };
-            bool boldEnabled = false;
-            int boldStart = -1;
-            int boldLength = 0;
-            var boldButton = new Button
+
+            var editorSurface = new Border
             {
-                Content = "B",
-                FontWeight = Avalonia.Media.FontWeight.Bold,
-                FontSize = 17,
-                Width = 42,
-                Height = 34,
-            };
-            boldButton.Click += (_, _) =>
-            {
-                boldStart = textBox.SelectionStart;
-                boldLength = Math.Max(0, textBox.SelectionEnd - textBox.SelectionStart);
-                if (boldLength <= 0)
+                Background = Avalonia.Media.Brushes.White,
+                BorderBrush = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(205, 209, 216)),
+                BorderThickness = new Thickness(1),
+                Child = new ScrollViewer
                 {
-                    EditorStatusText.Text = "Selecione primeiro o trecho do texto que deseja colocar em negrito.";
-                    boldEnabled = false;
-                    return;
+                    Content = richEditor,
+                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
                 }
-                boldEnabled = !boldEnabled;
-                boldButton.Background = boldEnabled
-                    ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(210, 220, 240))
-                    : Avalonia.Media.Brushes.Transparent;
             };
 
-            string textColor = "";
-            string highlightColor = "";
-            var paletteColors = new[]
+            var actionPanel = new StackPanel
             {
-                "#000000", "#404040", "#808080", "#C00000", "#FF0000", "#ED7D31",
-                "#FFC000", "#FFFF00", "#70AD47", "#00B050", "#00B0F0", "#0070C0",
-                "#002060", "#7030A0", "#FF00FF", "#FFFFFF"
-            };
-            var textPalette = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
-            var highlightPalette = new WrapPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
-            foreach (string hex in paletteColors)
-            {
-                var textSwatch = new Button
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                Spacing = 8,
+                Children =
                 {
-                    Width = 25, Height = 25, Margin = new Thickness(2),
-                    Padding = new Thickness(0),
-                    Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex)),
-                    BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(150, 150, 150)),
-                    BorderThickness = new Thickness(1),
-                };
-                textSwatch.Click += (_, _) => textColor = hex;
-                textPalette.Children.Add(textSwatch);
-
-                var highlightSwatch = new Button
-                {
-                    Width = 25, Height = 25, Margin = new Thickness(2),
-                    Padding = new Thickness(0),
-                    Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex)),
-                    BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(150, 150, 150)),
-                    BorderThickness = new Thickness(1),
-                };
-                highlightSwatch.Click += (_, _) => highlightColor = hex;
-                highlightPalette.Children.Add(highlightSwatch);
-            }
-            var alignmentBox = new ComboBox
-            {
-                Width = 160,
-                ItemsSource = new[] { "Esquerda", "Centralizado", "Direita" },
-                SelectedIndex = 0
+                    new Button
+                    {
+                        Content = "Cancelar",
+                        MinWidth = 100,
+                        Padding = new Thickness(12, 8)
+                    },
+                    new Button
+                    {
+                        Content = originalText == null ? "Inserir texto" : "Aplicar alteração",
+                        MinWidth = 140,
+                        Padding = new Thickness(12, 8)
+                    }
+                }
             };
 
             var dialog = new Window
             {
                 Title = originalText == null ? "Inserir texto no PDF" : "Editar texto do PDF",
-                Width = 650,
-                Height = 500,
-                MinWidth = 560,
+                Width = 760,
+                Height = 640,
+                MinWidth = 620,
+                MinHeight = 520,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 CanResize = true,
                 Content = new StackPanel
                 {
-                    Margin = new Thickness(20),
-                    Spacing = 12,
+                    Margin = new Thickness(18),
+                    Spacing = 10,
                     Children =
                     {
                         new TextBlock
                         {
                             Text = originalText == null
                                 ? $"Novo texto na página {pageIndex + 1}"
-                                : "Texto selecionado",
+                                : "Edite o texto e aplique a formatação diretamente neste campo",
                             FontSize = 14,
                             FontWeight = Avalonia.Media.FontWeight.SemiBold
                         },
-                        textBox,
+                        toolbar,
+                        editorSurface,
                         new TextBlock
                         {
-                            Text = "Formatação",
-                            FontSize = 13,
-                            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-                            Margin = new Thickness(0, 4, 0, 0)
+                            Text = "Selecione uma palavra ou trecho e use a barra de formatação. As alterações ficam nesta janela até você confirmar.",
+                            FontSize = 11,
+                            Foreground = new Avalonia.Media.SolidColorBrush(
+                                Avalonia.Media.Color.FromRgb(95, 101, 111)),
+                            TextWrapping = Avalonia.Media.TextWrapping.Wrap
                         },
-                        new StackPanel
-                        {
-                            Orientation = Avalonia.Layout.Orientation.Horizontal,
-                            Spacing = 10,
-                            Children = { fontBox, sizeBox, boldButton }
-                        },
-                        new TextBlock { Text = "Cor da fonte:" },
-                        textPalette,
-                        new TextBlock { Text = "Cor de marcação:" },
-                        highlightPalette,
-                        new StackPanel
-                        {
-                            Orientation = Avalonia.Layout.Orientation.Horizontal,
-                            Spacing = 10,
-                            Children =
-                            {
-                                new TextBlock
-                                {
-                                    Text = "Alinhamento:",
-                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-                                },
-                                alignmentBox
-                            }
-                        },
-                        new StackPanel
-                        {
-                            Orientation = Avalonia.Layout.Orientation.Horizontal,
-                            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                            Spacing = 8,
-                            Children =
-                            {
-                                new Button
-                                {
-                                    Content = "Cancelar",
-                                    MinWidth = 100,
-                                    Padding = new Thickness(12, 8),
-                                    Command = null
-                                },
-                                new Button
-                                {
-                                    Content = originalText == null ? "Inserir texto" : "Aplicar alteração",
-                                    MinWidth = 140,
-                                    Padding = new Thickness(12, 8)
-                                }
-                            }
-                        }
+                        actionPanel
                     }
                 }
             };
 
-            var actionPanel = (StackPanel)((StackPanel)dialog.Content!).Children[^1];
             var cancelButton = (Button)actionPanel.Children[0];
             var applyButton = (Button)actionPanel.Children[1];
             applyButton.Click += (_, _) => dialog.Close(true);
             cancelButton.Click += (_, _) => dialog.Close(false);
+            dialog.Opened += (_, _) => richEditor.Focus();
 
             bool accepted = await dialog.ShowDialog<bool>(this);
             if (!accepted)
                 return;
 
-            string replacement = textBox.Text ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(replacement))
+            var editedRuns = new List<EditedTextRun>();
+            var replacementBuilder = new System.Text.StringBuilder();
+            var editedParagraphs = richEditor.Document?.Blocks
+                .OfType<RichParagraph>()
+                .ToList() ?? new List<RichParagraph>();
+
+            for (int paragraphIndex = 0; paragraphIndex < editedParagraphs.Count; paragraphIndex++)
+            {
+                if (paragraphIndex > 0)
+                    replacementBuilder.Append('\n');
+
+                foreach (var inline in editedParagraphs[paragraphIndex].Inlines)
+                {
+                    if (inline is not RichRun run || string.IsNullOrEmpty(run.Text))
+                        continue;
+
+                    int runStart = replacementBuilder.Length;
+                    replacementBuilder.Append(run.Text);
+
+                    editedRuns.Add(new EditedTextRun(
+                        runStart,
+                        run.Text.Length,
+                        run.FontFamily,
+                        run.FontSize,
+                        run.FontWeight == Avalonia.Media.FontWeight.Bold,
+                        run.FontStyle == Avalonia.Media.FontStyle.Italic,
+                        GetAvaloniaSolidColor(run.Foreground),
+                        GetAvaloniaSolidColor(run.Background)));
+                }
+            }
+
+            string replacementText = replacementBuilder.ToString();
+            if (string.IsNullOrWhiteSpace(replacementText))
             {
                 EditorStatusText.Text = "Digite algum texto antes de aplicar.";
                 return;
             }
 
-            string fontName = fontBox.SelectedItem?.ToString() ?? string.Empty;
-            string fontSizeText = sizeBox.SelectedItem?.ToString() ?? string.Empty;
-            string alignment = alignmentBox.SelectedItem?.ToString() ?? "Esquerda";
-
-            if (!string.IsNullOrWhiteSpace(fontSizeText) &&
-                (!float.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedSize) ||
-                 parsedSize <= 0))
-            {
-                EditorStatusText.Text = "Informe um tamanho de fonte válido, maior que zero.";
-                return;
-            }
+            var alignment = editedParagraphs.FirstOrDefault()?.TextAlignment
+                ?? Avalonia.Media.TextAlignment.Left;
 
             ApplyPdfEdit(document =>
             {
+                TextFragment target;
                 if (originalBounds != null && originalText != null)
                 {
                     var pageAbsorber = new TextFragmentAbsorber();
                     document.Pages[pageIndex + 1].Accept(pageAbsorber);
 
-                    TextFragment? target = null;
+                    target = null!;
                     double closest = double.MaxValue;
                     foreach (TextFragment fragment in pageAbsorber.TextFragments)
                     {
@@ -436,32 +428,26 @@ public partial class EditorWindow : Window
                     if (target == null || closest > 8.0)
                         throw new InvalidOperationException("O texto selecionado não foi localizado novamente no PDF.");
 
-                    target.Text = replacement;
-                    ApplyDialogFormatting(target, fontName, fontSizeText,
-                        textColor, highlightColor, alignment);
-
-                    if (boldEnabled && boldStart >= 0 && boldLength > 0 &&
-                        boldStart + boldLength <= replacement.Length)
-                    {
-                        string selectedText = replacement.Substring(boldStart, boldLength);
-                        target.IsolateTextSegments(boldStart, boldLength);
-                        foreach (TextSegment segment in target.Segments)
-                        {
-                            if (string.Equals(segment.Text, selectedText, StringComparison.Ordinal))
-                                segment.TextState.IsBold = true;
-                        }
-                    }
+                    target.Text = replacementText;
                 }
                 else
                 {
-                    var fragment = new TextFragment(replacement)
+                    target = new TextFragment(replacementText)
                     {
                         Position = new Position(x, y)
                     };
-                    ApplyDialogFormatting(fragment, fontName, fontSizeText,
-                        textColor, highlightColor, alignment);
-                    new TextBuilder(document.Pages[pageIndex + 1]).AppendText(fragment);
                 }
+
+                ApplyRichTextFormatting(target, editedRuns);
+                target.HorizontalAlignment = alignment switch
+                {
+                    Avalonia.Media.TextAlignment.Center => Aspose.Pdf.HorizontalAlignment.Center,
+                    Avalonia.Media.TextAlignment.Right => Aspose.Pdf.HorizontalAlignment.Right,
+                    _ => Aspose.Pdf.HorizontalAlignment.Left
+                };
+
+                if (originalText == null)
+                    new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
             }, originalText == null
                 ? $"Texto inserido na página {pageIndex + 1}."
                 : "Texto e formatação atualizados.");
@@ -472,32 +458,64 @@ public partial class EditorWindow : Window
         }
     }
 
-    private static void ApplyDialogFormatting(
-        TextFragment fragment,
-        string fontName,
-        string fontSizeText,
-        string textColor,
-        string highlightColor,
-        string alignment)
+    private sealed record EditedTextRun(
+        int Start,
+        int Length,
+        string? FontFamily,
+        double FontSize,
+        bool IsBold,
+        bool IsItalic,
+        Avalonia.Media.Color? Foreground,
+        Avalonia.Media.Color? Background);
+
+    private static Avalonia.Media.Color? GetAvaloniaSolidColor(Avalonia.Media.IBrush? brush)
     {
-        if (!string.IsNullOrWhiteSpace(fontName))
-            fragment.TextState.FontName = fontName;
+        if (brush is Avalonia.Media.ISolidColorBrush solid)
+            return solid.Color;
+        return null;
+    }
 
-        if (float.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out float size) && size > 0)
-            fragment.TextState.FontSize = size;
-
-        if (TryParseHexColor(textColor, out var foreground))
-            fragment.TextState.ForegroundColor = foreground;
-
-        if (TryParseHexColor(highlightColor, out var background))
-            fragment.TextState.BackgroundColor = background;
-
-        fragment.HorizontalAlignment = alignment switch
+    private static void ApplyRichTextFormatting(
+        TextFragment fragment,
+        IReadOnlyList<EditedTextRun> runs)
+    {
+        foreach (var run in runs.OrderBy(item => item.Start))
         {
-            "Centralizado" => Aspose.Pdf.HorizontalAlignment.Center,
-            "Direita" => Aspose.Pdf.HorizontalAlignment.Right,
-            _ => Aspose.Pdf.HorizontalAlignment.Left
-        };
+            if (run.Length > 0)
+                fragment.IsolateTextSegments(run.Start, run.Length);
+        }
+
+        int currentOffset = 0;
+        foreach (TextSegment segment in fragment.Segments)
+        {
+            int segmentLength = segment.Text?.Length ?? 0;
+            var style = runs.FirstOrDefault(run =>
+                currentOffset >= run.Start &&
+                currentOffset + segmentLength <= run.Start + run.Length);
+
+            if (style != null)
+            {
+                if (!string.IsNullOrWhiteSpace(style.FontFamily))
+                    segment.TextState.FontName = style.FontFamily;
+
+                if (style.FontSize > 0)
+                    segment.TextState.FontSize = (float)style.FontSize;
+
+                segment.TextState.IsBold = style.IsBold;
+                segment.TextState.IsItalic = style.IsItalic;
+
+                if (style.Foreground is { } foreground)
+                    segment.TextState.ForegroundColor = Aspose.Pdf.Color.FromRgb(
+                        foreground.R / 255d, foreground.G / 255d, foreground.B / 255d);
+
+                segment.TextState.BackgroundColor = style.Background is { } background
+                    ? Aspose.Pdf.Color.FromRgb(
+                        background.R / 255d, background.G / 255d, background.B / 255d)
+                    : null;
+            }
+
+            currentOffset += segmentLength;
+        }
     }
 
     private void ReplaceText_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
