@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.MainWindow"
-        Title="AssinaPDF | Future SoluÃ§Ãµes"
+        Title="AssinaPDF | Future Soluções"
         Width="1280" Height="850"
         MinWidth="980" MinHeight="680"
         WindowStartupLocation="CenterScreen"
@@ -10,7 +10,7 @@
 
   <Grid RowDefinitions="82,42,58,34,*,42">
 
-    <!-- CABEÃ‡ALHO -->
+    <!-- CABEÇALHO -->
     <Border Grid.Row="0" Background="#E6E8EB" Padding="22,10">
       <Grid ColumnDefinitions="260,*">
         <Image x:Name="FutureLogo"
@@ -29,13 +29,13 @@
       </Grid>
     </Border>
 
-    <!-- SERVIÃ‡OS -->
+    <!-- SERVIÇOS -->
     <Grid Grid.Row="1"
           ColumnDefinitions="*,*,*"
           Background="#F2F3F5">
 
       <Button Grid.Column="0"
-              Content="Certificado Digital Â· EmissÃ£o e renovaÃ§Ã£o"
+              Content="Certificado Digital · Emissão e renovação"
               Background="#E8EAED"
               Foreground="#34383E"
               BorderThickness="0"
@@ -53,7 +53,7 @@
               Click="OpenPromoLink_Click"/>
 
       <Button Grid.Column="2"
-              Content="Sistema de Notas Â· EmissÃ£o fiscal em nuvem"
+              Content="Sistema de Notas · Emissão fiscal em nuvem"
               Background="#E8EAED"
               Foreground="#34383E"
               BorderThickness="0"
@@ -126,105 +126,68 @@
                  TextTrimming="CharacterEllipsis"/>
     </Border>
 
-    <!-- VISUALIZADOR PDF -->
-    <Border Grid.Row="4" Background="#D9DCE0"
-            Margin="0">
-
-      <Grid RowDefinitions="*,48">
-
-        <!-- ÃREA DE VISUALIZAÃ‡ÃƒO -->
-        <Border Grid.Row="0"
-                Background="#AEB3BA"
-                Margin="12,12,12,0"
+    <!-- VISUALIZADOR PDF COM MINIATURAS E ROLAGEM CONTÍNUA -->
+    <Border Grid.Row="4" Background="#D9DCE0">
+      <Grid ColumnDefinitions="164,*">
+        <Border Grid.Column="0"
+                Background="#E7E9EC"
                 BorderBrush="#C9CDD2"
-                BorderThickness="1">
-
-          <Grid>
-
-            <ScrollViewer x:Name="PdfScrollViewer"
-                          HorizontalScrollBarVisibility="Auto"
+                BorderThickness="0,0,1,0">
+          <Grid RowDefinitions="Auto,*">
+            <TextBlock Grid.Row="0"
+                       Text="PÁGINAS"
+                       FontSize="11"
+                       FontWeight="Bold"
+                       Foreground="#555B63"
+                       Margin="12,12,8,8"/>
+            <ScrollViewer Grid.Row="1"
                           VerticalScrollBarVisibility="Auto"
-                          IsVisible="False">
-
-              <Border Background="White"
-                      Padding="12"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Top">
-
-                <Grid><Image x:Name="PdfPageImage"
-                       Stretch="Uniform"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Top"/><Canvas x:Name="SignatureMarkerCanvas" IsHitTestVisible="False"/></Grid>
-              </Border>
-
+                          HorizontalScrollBarVisibility="Disabled">
+              <StackPanel x:Name="HomeThumbnailsPanel"
+                          Spacing="8"
+                          Margin="8,0,8,10"/>
             </ScrollViewer>
-
-            <!-- MENSAGEM INICIAL -->
-            <StackPanel x:Name="ViewerPlaceholder"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="12">
-
-              <TextBlock Text="AssinaPDF"
-                         FontSize="28"
-                         FontWeight="SemiBold"
-                         Foreground="#555B63"
-                         HorizontalAlignment="Center"/>
-
-              <TextBlock Text="Abra um documento PDF para visualizar."
-                         FontSize="15"
-                         Foreground="#777D85"
-                         HorizontalAlignment="Center"/>
-
-              <TextBlock Text="VisualizaÃ§Ã£o fornecida pelo motor PDFium."
-                         FontSize="12"
-                         Foreground="#888E96"
-                         HorizontalAlignment="Center"/>
-            </StackPanel>
-
-            <!-- WHATSAPP -->
-            <Button Content="ðŸ’¬ WhatsApp"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Bottom"
-                    Margin="0,0,18,18"
-                    Padding="18,10"
-                    Background="#20A65A"
-                    Foreground="White"
-                    CornerRadius="18"/>
           </Grid>
         </Border>
 
-        <!-- NAVEGAÃ‡ÃƒO DE PÃGINAS -->
-        <Border Grid.Row="1"
-                Background="#E0E3E7"
-                Padding="12,5">
+        <Border Grid.Column="1"
+                Background="#AEB3BA"
+                Margin="10"
+                BorderBrush="#C9CDD2"
+                BorderThickness="1">
+          <ScrollViewer x:Name="PdfScrollViewer"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto"
+                        IsVisible="False"
+                        PointerPressed="PdfScrollViewer_PointerPressed"
+                        PointerMoved="PdfScrollViewer_PointerMoved"
+                        PointerReleased="PdfScrollViewer_PointerReleased"
+                        PointerWheelChanged="PdfScrollViewer_PointerWheelChanged">
+            <StackPanel x:Name="PdfPagesPanel"
+                        Spacing="18"
+                        HorizontalAlignment="Center"
+                        Margin="18"/>
+          </ScrollViewer>
 
-          <StackPanel Orientation="Horizontal"
+          <StackPanel x:Name="ViewerPlaceholder"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Center"
-                      Spacing="14">
-
-            <Button x:Name="PreviousPageButton"
-                    Content="â—€ Anterior"
-                    Padding="14,6"
-                    IsEnabled="False"
-                    Click="PreviousPage_Click"/>
-
-            <TextBlock x:Name="PageIndicator"
-                       Text="PÃ¡gina 0 de 0"
-                       Foreground="#34383E"
+                      Spacing="12">
+            <TextBlock Text="AssinaPDF"
+                       FontSize="28"
                        FontWeight="SemiBold"
-                       VerticalAlignment="Center"/>
-
-            <Button x:Name="NextPageButton"
-                    Content="PrÃ³xima â–¶"
-                    Padding="14,6"
-                    IsEnabled="False"
-                    Click="NextPage_Click"/>
-
+                       Foreground="#555B63"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Abra um documento PDF para visualizar."
+                       FontSize="15"
+                       Foreground="#777D85"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Visualização fornecida pelo motor PDFium."
+                       FontSize="12"
+                       Foreground="#888E96"
+                       HorizontalAlignment="Center"/>
           </StackPanel>
         </Border>
-
       </Grid>
     </Border>
 
@@ -240,7 +203,7 @@
                    TextTrimming="CharacterEllipsis"/>
 
         <TextBlock Grid.Column="1"
-                   Text="Future SoluÃ§Ãµes"
+                   Text="Future Soluções"
                    Foreground="#555B63"
                    VerticalAlignment="Center"
                    Margin="12,0,0,0"/>
