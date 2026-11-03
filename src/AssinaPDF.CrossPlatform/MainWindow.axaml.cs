@@ -458,6 +458,18 @@ public partial class MainWindow : Window
             var size = _pageBitmaps[i].PixelSize;
             _pageImages[i].Width = size.Width * scale;
             _pageImages[i].Height = size.Height * scale;
+            _signatureOverlays[i].Width = size.Width * scale;
+            _signatureOverlays[i].Height = size.Height * scale;
+            foreach (var child in _signatureOverlays[i].Children)
+            {
+                if (child is not Button marker || marker.Tag is not SignatureWidgetInfo widget)
+                    continue;
+
+                Canvas.SetLeft(marker, widget.NormalizedX * _signatureOverlays[i].Width);
+                Canvas.SetTop(marker, widget.NormalizedY * _signatureOverlays[i].Height);
+                marker.Width = Math.Max(54, widget.NormalizedWidth * _signatureOverlays[i].Width);
+                marker.Height = Math.Max(26, widget.NormalizedHeight * _signatureOverlays[i].Height);
+            }
             _pageCards[i].Width = size.Width * scale + 30;
         }
 
