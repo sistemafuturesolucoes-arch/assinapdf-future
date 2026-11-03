@@ -744,9 +744,6 @@ public partial class EditorWindow : Window
         // Apply directly to the state owned by the final TextSegment/TextFragment.
         // A detached TextState followed by ApplyChangesFrom loses FontStyleTouched
         // and can route colour/font side effects through the wrong owner.
-        if (run.FontSize > 0)
-            state.FontSize = (float)run.FontSize;
-
         string currentFontFamily = state.FontName ?? string.Empty;
         // Every editor run must carry an explicit face, including regular runs.
         // An isolated TextSegment can still inherit the fragment's face when its
@@ -806,6 +803,12 @@ public partial class EditorWindow : Window
                 background.G / 255d,
                 background.B / 255d)
             : null;
+
+        // Font/FontStyle setters can rewrite the source Tf operator for absorbed
+        // text. Apply the requested size AFTER those setters so their font swap
+        // cannot leave the segment using the fragment's previous size.
+        if (run.FontSize > 0)
+            state.FontSize = (float)run.FontSize;
     }
 
     private static bool IsStandard14Family(string family)
