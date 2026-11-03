@@ -487,40 +487,52 @@ public partial class EditorWindow : Window
     {
         foreach (var run in runs.OrderBy(item => item.Start))
         {
-            if (run.Length > 0)
-                fragment.IsolateTextSegments(run.Start, run.Length);
-        }
+            if (run.Length <= 0)
+                continue;
 
-        int currentOffset = 0;
-        foreach (TextSegment segment in fragment.Segments)
-        {
-            int segmentLength = segment.Text?.Length ?? 0;
-            var style = runs.FirstOrDefault(run =>
-                currentOffset >= run.Start &&
-                currentOffset + segmentLength <= run.Start + run.Length);
+            // Aspose retorna exatamente os segmentos isolados para este intervalo.
+            // Aplicar o estilo diretamente neles evita depender de offsets recalculados
+            // depois que a coleção de segmentos é dividida.
+            var isolatedSegments = fragment.IsolateTextSegments(run.Start, run.Length);
+            bool foundSegment = false;
 
-            if (style != null)
+            foreach (TextSegment segment in isolatedSegments)
             {
-                if (!string.IsNullOrWhiteSpace(style.FontFamily))
-                    segment.TextState.FontName = style.FontFamily;
+                foundSegment = true;
 
-                if (style.FontSize > 0)
-                    segment.TextState.FontSize = (float)style.FontSize;
+                if (!string.IsNullOrWhiteSpace(run.FontFamily))
+                    segment.TextState.FontName = run.FontFamily;
 
-                segment.TextState.IsBold = style.IsBold;
-                segment.TextState.IsItalic = style.IsItalic;
+                if (run.FontSize > 0)
+                    segment.TextState.FontSize = (float)run.FontSize;
 
-                if (style.Foreground is { } foreground)
+                segment.TextState.IsBold = run.IsBold;
+                segment.TextState.IsItalic = run.IsItalic;
+
+                if (run.Foreground is { } foreground)
+                {
                     segment.TextState.ForegroundColor = Aspose.Pdf.Color.FromRgb(
-                        foreground.R / 255d, foreground.G / 255d, foreground.B / 255d);
+                        foreground.R / 255d,
+                        foreground.G / 255d,
+                        foreground.B / 255d);
+                }
 
-                segment.TextState.BackgroundColor = style.Background is { } background
-                    ? Aspose.Pdf.Color.FromRgb(
-                        background.R / 255d, background.G / 255d, background.B / 255d)
-                    : null;
+                // BackgroundColor não deve receber null: em documentos sem realce
+                // isso pode causar falha no setter do Aspose durante a gravação.
+                if (run.Background is { } background)
+                {
+                    segment.TextState.BackgroundColor = Aspose.Pdf.Color.FromRgb(
+                        background.R / 255d,
+                        background.G / 255d,
+                        background.B / 255d);
+                }
             }
 
-            currentOffset += segmentLength;
+            if (!foundSegment)
+            {
+                throw new InvalidOperationException(
+                    $"Não foi possível localizar o trecho formatado no PDF (posição {run.Start}, tamanho {run.Length}).");
+            }
         }
     }
 
