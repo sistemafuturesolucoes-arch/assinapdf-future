@@ -236,7 +236,6 @@ public partial class EditorWindow : Window
                 FontSize = 17,
                 Width = 42,
                 Height = 34,
-                ToolTip = "Selecione uma parte do texto e clique para aplicar negrito"
             };
             boldButton.Click += (_, _) =>
             {
@@ -273,7 +272,6 @@ public partial class EditorWindow : Window
                     Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex)),
                     BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(150, 150, 150)),
                     BorderThickness = new Thickness(1),
-                    ToolTip = hex
                 };
                 textSwatch.Click += (_, _) => textColor = hex;
                 textPalette.Children.Add(textSwatch);
@@ -285,7 +283,6 @@ public partial class EditorWindow : Window
                     Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(hex)),
                     BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(150, 150, 150)),
                     BorderThickness = new Thickness(1),
-                    ToolTip = hex
                 };
                 highlightSwatch.Click += (_, _) => highlightColor = hex;
                 highlightPalette.Children.Add(highlightSwatch);
@@ -301,7 +298,7 @@ public partial class EditorWindow : Window
             {
                 Title = originalText == null ? "Inserir texto no PDF" : "Editar texto do PDF",
                 Width = 650,
-                Height = 390,
+                Height = 500,
                 MinWidth = 560,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 CanResize = true,
