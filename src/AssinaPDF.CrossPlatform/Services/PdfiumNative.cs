@@ -102,6 +102,51 @@ internal static class PdfiumNative
 
     [DllImport(
         LibraryName,
+        EntryPoint = "FPDFDOC_InitFormFillEnvironment",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern IntPtr InitFormFillEnvironment(
+        IntPtr document,
+        IntPtr formFillInfo);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDFDOC_ExitFormFillEnvironment",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void ExitFormFillEnvironment(IntPtr formHandle);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FORM_OnAfterLoadPage",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void FormOnAfterLoadPage(
+        IntPtr page,
+        IntPtr formHandle);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FORM_OnBeforeClosePage",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void FormOnBeforeClosePage(
+        IntPtr page,
+        IntPtr formHandle);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_FFLDraw",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void FormFillDraw(
+        IntPtr formHandle,
+        IntPtr bitmap,
+        IntPtr page,
+        int startX,
+        int startY,
+        int sizeX,
+        int sizeY,
+        int rotate,
+        int flags);
+
+    [DllImport(
+        LibraryName,
         EntryPoint = "FPDF_InitLibrary",
         CallingConvention = NativeCallingConvention)]
     internal static extern void InitLibrary();
