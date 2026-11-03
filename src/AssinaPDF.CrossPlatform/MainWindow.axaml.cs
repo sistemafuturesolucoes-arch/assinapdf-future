@@ -20,6 +20,8 @@ using SimpleSign.PAdES;
 using SimpleSign.PAdES.Signing;
 using SimpleSign.Core.Extensions;
 using SimpleSign.Core.Signing;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.IO;
 
 namespace AssinaPDF.MacPrototype;
 
@@ -30,14 +32,17 @@ public partial class MainWindow : Window
 
     private Bitmap? _futureLogo;
     private PdfiumDocument? _pdfDocument;
-    private WriteableBitmap? _currentPageBitmap;
+    private readonly List<WriteableBitmap> _pageBitmaps = new();
+    private readonly List<Image> _pageImages = new();
+    private readonly List<Border> _pageCards = new();
     private string? _currentPdfPath;
 
     private bool _loadingCertificates;
     private bool _operationInProgress;
-    private int _currentPageIndex = -1;
-    private float _currentPageWidthPoints;
-    private float _currentPageHeightPoints;
+    private bool _isPanning;
+    private Point _panStart;
+    private Vector _panStartOffset;
+    private double _zoom = 1.0;
 
     private readonly List<SignaturePlacement> _signaturePlacements = new();
 
@@ -46,6 +51,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LoadFutureLogo();
+        PdfScrollViewer.SizeChanged += (_, _) => ApplyZoom();
+        KeyDown += MainWindow_KeyDown;
 
         Closed += (_, _) =>
         {
@@ -53,8 +60,9 @@ public partial class MainWindow : Window
             _pdfDocument?.Dispose();
             _pdfDocument = null;
 
-            _currentPageBitmap?.Dispose();
-            _currentPageBitmap = null;
+            foreach (var bitmap in _pageBitmaps)
+                bitmap.Dispose();
+            _pageBitmaps.Clear();
 
             _futureLogo?.Dispose();
             _futureLogo = null;
@@ -127,48 +135,49 @@ public partial class MainWindow : Window
                 return;
 
             string path = files[0].Path.LocalPath;
-
-            StatusText.Text = "Abrindo e renderizando PDF...";
+            StatusText.Text = "Abrindo e renderizando todas as páginas do PDF...";
 
             var newDocument = new PdfiumDocument(path);
-            WriteableBitmap? newBitmap = null;
+            var newBitmaps = new List<WriteableBitmap>();
 
             try
             {
-                var renderedPage = newDocument.RenderPage(0);
-                newBitmap = CreateBitmap(renderedPage);
+                for (int i = 0; i < newDocument.PageCount; i++)
+                {
+                    var renderedPage = newDocument.RenderPage(i, 0.9f);
+                    newBitmaps.Add(CreateBitmap(renderedPage));
+                }
 
                 var oldDocument = _pdfDocument;
-                var oldBitmap = _currentPageBitmap;
+                var oldBitmaps = _pageBitmaps.ToArray();
 
                 _pdfDocument = newDocument;
                 _currentPdfPath = path;
-                _currentPageBitmap = newBitmap;
-                _currentPageIndex = 0;
-                _currentPageWidthPoints = renderedPage.PageWidthPoints;
-                _currentPageHeightPoints = renderedPage.PageHeightPoints;
-
-                PdfPageImage.Source = newBitmap;
-                PdfPageImage.Width = renderedPage.Width;
-                PdfPageImage.Height = renderedPage.Height;
                 _signaturePlacements.Clear();
+
+                _pageBitmaps.Clear();
+                _pageBitmaps.AddRange(newBitmaps);
+                BuildHomePageViewer();
+
                 PdfScrollViewer.IsVisible = true;
                 ViewerPlaceholder.IsVisible = false;
-
                 SelectedFileText.Text = files[0].Name;
 
-                UpdatePageControls();
+                oldDocument?.Dispose();
+                foreach (var bitmap in oldBitmaps)
+                    bitmap.Dispose();
+
+                _zoom = 1.0;
+                ApplyZoom();
                 UpdateActionButtons();
 
-                oldDocument?.Dispose();
-                oldBitmap?.Dispose();
-
                 StatusText.Text =
-                    $"PDF aberto com sucesso. {newDocument.PageCount} página(s).";
+                    $"PDF aberto com sucesso. {newDocument.PageCount} página(s) disponíveis na visualização contínua.";
             }
             catch
             {
-                newBitmap?.Dispose();
+                foreach (var bitmap in newBitmaps)
+                    bitmap.Dispose();
                 newDocument.Dispose();
                 throw;
             }
@@ -216,77 +225,240 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowPage(int pageIndex)
+    private void BuildHomePageViewer()
     {
-        if (_pdfDocument == null)
+        PdfPagesPanel.Children.Clear();
+        HomeThumbnailsPanel.Children.Clear();
+        _pageImages.Clear();
+        _pageCards.Clear();
+
+        for (int i = 0; i < _pageBitmaps.Count; i++)
+        {
+            int pageIndex = i;
+            var bitmap = _pageBitmaps[i];
+
+            var image = new Image
+            {
+                Source = bitmap,
+                Stretch = Stretch.Uniform,
+                IsHitTestVisible = false
+            };
+
+            var pageLabel = new TextBlock
+            {
+                Text = $"Página {pageIndex + 1}",
+                FontSize = 12,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(70, 70, 80)),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var pageContent = new StackPanel { Spacing = 4 };
+            pageContent.Children.Add(pageLabel);
+            pageContent.Children.Add(image);
+
+            var pageCard = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(195, 198, 205)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(14),
+                CornerRadius = new CornerRadius(3),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Child = pageContent
+            };
+
+            PdfPagesPanel.Children.Add(pageCard);
+            _pageImages.Add(image);
+            _pageCards.Add(pageCard);
+
+            var thumbnailImage = new Image
+            {
+                Source = bitmap,
+                Width = 112,
+                Height = 138,
+                Stretch = Stretch.Uniform,
+                IsHitTestVisible = false
+            };
+
+            var thumbnailContent = new StackPanel { Spacing = 4 };
+            thumbnailContent.Children.Add(thumbnailImage);
+            thumbnailContent.Children.Add(new TextBlock
+            {
+                Text = $"Página {pageIndex + 1}",
+                FontSize = 11,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(65, 65, 75))
+            });
+
+            var thumbnailButton = new Button
+            {
+                Content = thumbnailContent,
+                Padding = new Thickness(5),
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(205, 205, 215)),
+                BorderThickness = new Thickness(1),
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                Tag = pageIndex
+            };
+
+            thumbnailButton.Click += (_, _) => pageCard.BringIntoView();
+
+            var contextMenu = new ContextMenu();
+            var exportItem = new MenuItem { Header = "Exportar esta página..." };
+            exportItem.Click += async (_, _) => await ExportPageAsync(pageIndex);
+            contextMenu.Items.Add(exportItem);
+            thumbnailButton.ContextMenu = contextMenu;
+
+            HomeThumbnailsPanel.Children.Add(thumbnailButton);
+        }
+    }
+
+    private void ApplyZoom()
+    {
+        if (_pageImages.Count == 0 || PdfScrollViewer.Bounds.Width <= 0 ||
+            PdfScrollViewer.Bounds.Height <= 0)
             return;
 
-        if (pageIndex < 0 || pageIndex >= _pdfDocument.PageCount)
+        double maxWidth = _pageBitmaps.Max(bitmap => bitmap.PixelSize.Width);
+        double maxHeight = _pageBitmaps.Max(bitmap => bitmap.PixelSize.Height);
+        double availableWidth = Math.Max(120, PdfScrollViewer.Bounds.Width - 90);
+        double availableHeight = Math.Max(120, PdfScrollViewer.Bounds.Height - 90);
+        double fitScale = Math.Min(availableWidth / maxWidth, availableHeight / maxHeight);
+        double scale = fitScale * _zoom;
+
+        for (int i = 0; i < _pageImages.Count; i++)
+        {
+            var size = _pageBitmaps[i].PixelSize;
+            _pageImages[i].Width = size.Width * scale;
+            _pageImages[i].Height = size.Height * scale;
+            _pageCards[i].Width = size.Width * scale + 30;
+        }
+
+        PdfScrollViewer.Cursor = new Cursor(
+            _zoom > 1.001 ? StandardCursorType.Hand : StandardCursorType.Arrow);
+    }
+
+    private void ChangeZoom(double factor)
+    {
+        _zoom = Math.Clamp(_zoom * factor, 0.5, 5.0);
+        ApplyZoom();
+    }
+
+    private void MainWindow_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+            return;
+
+        if (e.Key == Key.Add || e.Key == Key.OemPlus)
+        {
+            ChangeZoom(1.15);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Subtract || e.Key == Key.OemMinus)
+        {
+            ChangeZoom(1.0 / 1.15);
+            e.Handled = true;
+        }
+    }
+
+    private void PdfScrollViewer_PointerWheelChanged(
+        object? sender,
+        PointerWheelEventArgs e)
+    {
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+            return;
+
+        ChangeZoom(e.Delta.Y > 0 ? 1.15 : 1.0 / 1.15);
+        e.Handled = true;
+    }
+
+    private void PdfScrollViewer_PointerPressed(
+        object? sender,
+        PointerPressedEventArgs e)
+    {
+        if (_zoom <= 1.001 ||
+            !e.GetCurrentPoint(PdfScrollViewer).Properties.IsLeftButtonPressed)
+            return;
+
+        _isPanning = true;
+        _panStart = e.GetPosition(PdfScrollViewer);
+        _panStartOffset = PdfScrollViewer.Offset;
+        PdfScrollViewer.Cursor = new Cursor(StandardCursorType.SizeAll);
+        e.Pointer.Capture(PdfScrollViewer);
+        e.Handled = true;
+    }
+
+    private void PdfScrollViewer_PointerMoved(
+        object? sender,
+        PointerEventArgs e)
+    {
+        if (!_isPanning)
+            return;
+
+        var current = e.GetPosition(PdfScrollViewer);
+        var delta = current - _panStart;
+        PdfScrollViewer.Offset = new Vector(
+            Math.Max(0, _panStartOffset.X - delta.X),
+            Math.Max(0, _panStartOffset.Y - delta.Y));
+        e.Handled = true;
+    }
+
+    private void PdfScrollViewer_PointerReleased(
+        object? sender,
+        PointerReleasedEventArgs e)
+    {
+        if (!_isPanning)
+            return;
+
+        _isPanning = false;
+        e.Pointer.Capture(null);
+        PdfScrollViewer.Cursor = new Cursor(StandardCursorType.Hand);
+        e.Handled = true;
+    }
+
+    private async Task ExportPageAsync(int pageIndex)
+    {
+        if (string.IsNullOrWhiteSpace(_currentPdfPath) ||
+            _pdfDocument == null ||
+            pageIndex < 0 ||
+            pageIndex >= _pdfDocument.PageCount)
             return;
 
         try
         {
-            StatusText.Text = "Renderizando página...";
+            var saveFile = await StorageProvider.SaveFilePickerAsync(
+                new FilePickerSaveOptions
+                {
+                    Title = "Exportar página como PDF",
+                    SuggestedFileName = $"pagina-{pageIndex + 1}.pdf",
+                    DefaultExtension = "pdf",
+                    FileTypeChoices = new[]
+                    {
+                        new FilePickerFileType("Documento PDF")
+                        {
+                            Patterns = new[] { "*.pdf" }
+                        }
+                    }
+                });
 
-            var renderedPage = _pdfDocument.RenderPage(pageIndex);
-            var newBitmap = CreateBitmap(renderedPage);
+            if (saveFile == null)
+                return;
 
-            var oldBitmap = _currentPageBitmap;
+            using var source = PdfReader.Open(
+                _currentPdfPath,
+                PdfDocumentOpenMode.Import);
+            using var output = new PdfSharp.Pdf.PdfDocument();
+            output.AddPage(source.Pages[pageIndex]);
+            output.Save(saveFile.Path.LocalPath);
 
-            _currentPageBitmap = newBitmap;
-            _currentPageIndex = pageIndex;
-            _currentPageWidthPoints = renderedPage.PageWidthPoints;
-            _currentPageHeightPoints = renderedPage.PageHeightPoints;
-
-            PdfPageImage.Source = newBitmap;
-            PdfPageImage.Width = renderedPage.Width;
-            PdfPageImage.Height = renderedPage.Height;
-            PdfScrollViewer.Offset = new Vector(0, 0);
-            oldBitmap?.Dispose();
-
-            UpdatePageControls();
-
-            StatusText.Text =
-                $"Página {pageIndex + 1} de {_pdfDocument.PageCount}.";
+            StatusText.Text = $"Página {pageIndex + 1} exportada: {saveFile.Path.LocalPath}";
         }
         catch (Exception ex)
         {
-            StatusText.Text =
-                $"Erro ao renderizar página: {ex.Message}";
+            StatusText.Text = $"Não foi possível exportar a página: {ex.Message}";
         }
-    }
-
-    private void PreviousPage_Click(
-        object? sender,
-        Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        ShowPage(_currentPageIndex - 1);
-    }
-
-    private void NextPage_Click(
-        object? sender,
-        Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        ShowPage(_currentPageIndex + 1);
-    }
-
-    private void UpdatePageControls()
-    {
-        if (_pdfDocument == null || _currentPageIndex < 0)
-        {
-            PageIndicator.Text = "Página 0 de 0";
-            PreviousPageButton.IsEnabled = false;
-            NextPageButton.IsEnabled = false;
-            return;
-        }
-
-        PageIndicator.Text =
-            $"Página {_currentPageIndex + 1} de {_pdfDocument.PageCount}";
-
-        PreviousPageButton.IsEnabled = _currentPageIndex > 0;
-
-        NextPageButton.IsEnabled =
-            _currentPageIndex < _pdfDocument.PageCount - 1;
     }
 
     private void RefreshCertificates_Click(
@@ -538,7 +710,11 @@ public partial class MainWindow : Window
                     placement.NormalizedX < 0 ||
                     placement.NormalizedX > 1 ||
                     placement.NormalizedY < 0 ||
-                    placement.NormalizedY > 1)
+                    placement.NormalizedY > 1 ||
+                    placement.NormalizedWidth <= 0 ||
+                    placement.NormalizedHeight <= 0 ||
+                    placement.NormalizedX + placement.NormalizedWidth > 1.000001 ||
+                    placement.NormalizedY + placement.NormalizedHeight > 1.000001)
                 {
                     throw new InvalidOperationException(
                         $"A posição {i + 1} contém coordenadas inválidas.");
@@ -548,7 +724,8 @@ public partial class MainWindow : Window
                     placement.NormalizedX * placement.PageWidthPoints);
 
                 float pdfY = (float)(
-                    (1.0 - placement.NormalizedY) * placement.PageHeightPoints);
+                    (1.0 - placement.NormalizedY - placement.NormalizedHeight) *
+                    placement.PageHeightPoints);
 
                 StatusText.Text =
                     $"Aplicando assinatura {i + 1} de {placements.Length}...";
