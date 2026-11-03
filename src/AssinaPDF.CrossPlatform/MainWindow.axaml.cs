@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private PdfiumDocument? _pdfDocument;
     private readonly List<WriteableBitmap> _pageBitmaps = new();
     private readonly List<Image> _pageImages = new();
+    private readonly List<Image> _thumbnailImages = new();
     private readonly List<Border> _pageCards = new();
     private string? _currentPdfPath;
 
@@ -236,6 +237,7 @@ public partial class MainWindow : Window
         PdfPagesPanel.Children.Clear();
         HomeThumbnailsPanel.Children.Clear();
         _pageImages.Clear();
+        _thumbnailImages.Clear();
         _pageCards.Clear();
 
         for (int i = 0; i < _pageBitmaps.Count; i++)
@@ -287,6 +289,8 @@ public partial class MainWindow : Window
                 Stretch = Stretch.Uniform,
                 IsHitTestVisible = false
             };
+
+            _thumbnailImages.Add(thumbnailImage);
 
             var thumbnailContent = new StackPanel { Spacing = 4 };
             thumbnailContent.Children.Add(thumbnailImage);
@@ -382,6 +386,7 @@ public partial class MainWindow : Window
                 var previous = _pageBitmaps[i];
                 _pageBitmaps[i] = replacements[i];
                 _pageImages[i].Source = replacements[i];
+                _thumbnailImages[i].Source = replacements[i];
                 previous.Dispose();
             }
 
