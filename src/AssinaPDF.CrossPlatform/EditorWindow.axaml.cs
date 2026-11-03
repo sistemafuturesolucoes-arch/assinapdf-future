@@ -623,7 +623,7 @@ public partial class EditorWindow : Window
             }
 
             ApplyRunStyle(
-                segment,
+                segment.TextState,
                 orderedRuns[runIndex],
                 originalFontName,
                 originalFontEmbedded);
