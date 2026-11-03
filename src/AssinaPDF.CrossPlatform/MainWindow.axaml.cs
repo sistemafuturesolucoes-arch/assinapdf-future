@@ -36,6 +36,8 @@ public partial class MainWindow : Window
     private readonly List<Image> _pageImages = new();
     private readonly List<Image> _thumbnailImages = new();
     private readonly List<Border> _pageCards = new();
+    private readonly List<Canvas> _signatureOverlays = new();
+    private IReadOnlyList<SignatureWidgetInfo> _signatureWidgets = Array.Empty<SignatureWidgetInfo>();
     private string? _currentPdfPath;
 
     private bool _loadingCertificates;
