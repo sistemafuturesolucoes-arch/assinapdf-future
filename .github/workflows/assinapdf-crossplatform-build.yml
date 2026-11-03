@@ -1,15 +1,7 @@
-
 name: AssinaPDF CrossPlatform Build
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/AssinaPDF.CrossPlatform/**'
-      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
-      - '.github/workflows/assinapdf-crossplatform-build.yml'
 
 permissions:
   contents: read
@@ -42,14 +34,17 @@ jobs:
           - platform: windows-x64
             runner: windows-2025
             rid: win-x64
+            self_contained: true
 
           - platform: macos-intel
             runner: macos-26-intel
             rid: osx-x64
+            self_contained: false
 
           - platform: macos-apple-silicon
             runner: macos-26
             rid: osx-arm64
+            self_contained: false
 
     runs-on: ${{ matrix.runner }}
 
@@ -62,16 +57,72 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publicar aplicação
-        run: >
-          dotnet publish
-          ./src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj
-          -c Release
-          -r ${{ matrix.rid }}
-          --self-contained false
-          -o publish/${{ matrix.rid }}
+      - name: Configurar Python para gerar o ícone Windows
+        if: matrix.rid == 'win-x64'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Disponibilizar pacote
+      - name: Gerar ícone Windows a partir da logo PNG oficial
+        if: matrix.rid == 'win-x64'
+        run: |
+          python -m pip install --disable-pip-version-check Pillow
+          python scripts/generate_windows_icon.py
+
+      - name: Publicar aplicação
+        shell: pwsh
+        run: |
+          dotnet publish ./src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained ${{ matrix.self_contained }} `
+            -p:PublishSingleFile=false `
+            -p:DebugSymbols=false `
+            -p:DebugType=None `
+            -o "publish/${{ matrix.rid }}"
+
+      - name: Verificar publicação Windows x64
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'publish/win-x64'
+          $exe = Join-Path $publishDir 'AssinaPDF.MacPrototype.exe'
+          $logo = Join-Path $publishDir 'logo-future.png'
+          if (-not (Test-Path $exe)) { throw "Executável principal não foi publicado: $exe" }
+          if (-not (Test-Path $logo)) { throw "Logo oficial não foi incluída na publicação." }
+          $pdfium = Get-ChildItem $publishDir -Filter 'pdfium.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $pdfium) { throw "pdfium.dll não foi encontrada na publicação Windows x64." }
+          Write-Host "Executável: $exe"
+          Write-Host "PDFium: $($pdfium.FullName)"
+          Write-Host "Arquivos publicados: $((Get-ChildItem $publishDir -Recurse -File | Measure-Object).Count)"
+
+      - name: Construir instalador MSI Windows x64
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'publish/win-x64'
+          dotnet build ./installer-crossplatform/AssinaPDF.CrossPlatform.wixproj `
+            -c Release `
+            -p:Platform=x64 `
+            -p:PublishDir="$publishDir/"
+
+          $msi = Get-ChildItem ./installer-crossplatform/bin -Filter 'AssinaPDF-CrossPlatform-Setup-x64.msi' -Recurse |
+            Select-Object -First 1
+          if (-not $msi) { throw "O MSI Windows x64 não foi gerado." }
+          Write-Host "Instalador gerado: $($msi.FullName)"
+          Write-Host "Tamanho: $([math]::Round($msi.Length / 1MB, 2)) MB"
+
+      - name: Disponibilizar instalador Windows x64
+        if: matrix.rid == 'win-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssinaPDF-Windows-x64-Installer
+          path: installer-crossplatform/bin/**/AssinaPDF-CrossPlatform-Setup-x64.msi
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Disponibilizar publicação macOS
+        if: startsWith(matrix.rid, 'osx-')
         uses: actions/upload-artifact@v4
         with:
           name: AssinaPDF-${{ matrix.rid }}
