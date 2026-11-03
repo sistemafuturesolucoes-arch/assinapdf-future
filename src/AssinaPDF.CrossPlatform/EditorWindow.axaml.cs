@@ -547,6 +547,37 @@ public partial class EditorWindow : Window
         if (run.FontSize > 0)
             state.FontSize = (float)run.FontSize;
 
+        // Gravar o estilo da face explicitamente. Em PDFs existentes, apenas
+        // alternar IsBold/IsItalic pode manter a referência à face regular original.
+        // FontStyle + FontRepository selecionam a face real Bold/Italic da família.
+        var requestedFontStyle =
+            (run.IsBold ? FontStyles.Bold : (FontStyles)0) |
+            (run.IsItalic ? FontStyles.Italic : (FontStyles)0);
+
+        state.FontStyle = requestedFontStyle;
+
+        if (requestedFontStyle != (FontStyles)0)
+        {
+            string fontFamily = !string.IsNullOrWhiteSpace(run.FontFamily)
+                ? run.FontFamily
+                : state.FontName ?? string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(fontFamily))
+            {
+                try
+                {
+                    state.Font = FontRepository.FindFont(fontFamily, requestedFontStyle);
+                }
+                catch
+                {
+                    // Algumas fontes incorporadas/subsetadas não existem no sistema.
+                    // Mantém o estilo explícito no TextState e deixa a biblioteca
+                    // resolver a face disponível ao gravar o documento.
+                    state.FontStyle = requestedFontStyle;
+                }
+            }
+        }
+
         state.IsBold = run.IsBold;
         state.IsItalic = run.IsItalic;
 
