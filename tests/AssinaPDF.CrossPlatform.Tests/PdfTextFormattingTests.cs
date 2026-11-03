@@ -56,8 +56,8 @@ public sealed class PdfTextFormattingTests
             Assert.InRange(Math.Abs(state.FontSize - 20), 0, 0.01);
             Assert.True(state.IsBold);
             Assert.True(state.IsItalic);
-            AssertColor(state.ForegroundColor, 255, 0, 0);
-            AssertColor(state.BackgroundColor, 255, 255, 0);
+            AssertColor(state.ForegroundColor, 255, 0, 0, DescribeSegment(segment));
+            AssertColor(state.BackgroundColor, 255, 255, 0, DescribeSegment(segment));
         }
     }
 
@@ -102,8 +102,8 @@ public sealed class PdfTextFormattingTests
             Assert.InRange(Math.Abs(segment.TextState.FontSize - 20), 0, 0.01);
             Assert.True(segment.TextState.IsBold);
             Assert.True(segment.TextState.IsItalic);
-            AssertColor(segment.TextState.ForegroundColor, 255, 0, 0);
-            AssertColor(segment.TextState.BackgroundColor, 255, 255, 0);
+            AssertColor(segment.TextState.ForegroundColor, 255, 0, 0, DescribeSegment(segment));
+            AssertColor(segment.TextState.BackgroundColor, 255, 255, 0, DescribeSegment(segment));
         }
     }
 
@@ -187,11 +187,11 @@ public sealed class PdfTextFormattingTests
         foreach (var item in covered)
         {
             AssertColor(item.Segment.TextState.ForegroundColor,
-                foreground.R, foreground.G, foreground.B);
+                foreground.R, foreground.G, foreground.B, DescribeSegment(item.Segment));
             if (background is { } expectedBackground)
             {
                 AssertColor(item.Segment.TextState.BackgroundColor,
-                    expectedBackground.R, expectedBackground.G, expectedBackground.B);
+                    expectedBackground.R, expectedBackground.G, expectedBackground.B, DescribeSegment(item.Segment));
             }
             else
             {
@@ -216,9 +216,13 @@ public sealed class PdfTextFormattingTests
         foreach (var item in covered)
         {
             Assert.True(item.Start >= start && item.End <= end);
-            Assert.InRange(Math.Abs(item.Segment.TextState.FontSize - size), 0, 0.01);
-            Assert.Equal(bold, item.Segment.TextState.IsBold);
-            Assert.Equal(italic, item.Segment.TextState.IsItalic);
+            string details = DescribeSegment(item.Segment);
+            Assert.True(Math.Abs(item.Segment.TextState.FontSize - size) <= 0.01,
+                $"Tamanho esperado {size}; segmento [{item.Start},{item.End}): {details}");
+            Assert.True(item.Segment.TextState.IsBold == bold,
+                $"Negrito esperado {bold}; segmento [{item.Start},{item.End}): {details}");
+            Assert.True(item.Segment.TextState.IsItalic == italic,
+                $"Itálico esperado {italic}; segmento [{item.Start},{item.End}): {details}");
         }
     }
 
@@ -226,11 +230,22 @@ public sealed class PdfTextFormattingTests
         Aspose.Pdf.Color? actual,
         byte red,
         byte green,
-        byte blue)
+        byte blue,
+        string context = "")
     {
-        Assert.NotNull(actual);
+        Assert.True(actual is not null,
+            $"Cor esperada RGB({red},{green},{blue}), mas veio null. {context}");
         Assert.InRange(Math.Abs(actual!.R - red), 0, 2);
         Assert.InRange(Math.Abs(actual.G - green), 0, 2);
         Assert.InRange(Math.Abs(actual.B - blue), 0, 2);
+    }
+
+    private static string DescribeSegment(TextSegment segment)
+    {
+        var state = segment.TextState;
+        var position = segment.Position is { } p ? $"({p.XIndent:0.##},{p.YIndent:0.##})" : "null";
+        return $"Texto='{segment.Text}', FontName='{state.FontName}', BaseFont='{state.Font?.BaseFont}', " +
+               $"Size={state.FontSize:0.##}, Bold={state.IsBold}, Italic={state.IsItalic}, " +
+               $"Foreground={state.ForegroundColor}, Background={state.BackgroundColor}, Position={position}";
     }
 }
