@@ -24,6 +24,7 @@
     <PackageReference Include="bblanchon.PDFium.Win32" Version="158.0.8125" />
 
     <PackageReference Include="SimpleSign.PAdES" Version="0.9.2" />
+    <PackageReference Include="PDFsharp" Version="6.2.2" />
   </ItemGroup>
 
   <ItemGroup>
