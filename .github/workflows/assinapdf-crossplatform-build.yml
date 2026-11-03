@@ -1,0 +1,80 @@
+
+name: AssinaPDF CrossPlatform Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/AssinaPDF.CrossPlatform/**'
+      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
+      - '.github/workflows/assinapdf-crossplatform-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Testes automatizados
+    runs-on: windows-2025
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Executar testes
+        run: dotnet test ./tests/AssinaPDF.CrossPlatform.Tests/AssinaPDF.CrossPlatform.Tests.csproj -c Release
+
+  publish:
+    name: Publicar ${{ matrix.platform }}
+    needs: tests
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-2025
+            rid: win-x64
+
+          - platform: macos-intel
+            runner: macos-26-intel
+            rid: osx-x64
+
+          - platform: macos-apple-silicon
+            runner: macos-26
+            rid: osx-arm64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publicar aplicação
+        run: >
+          dotnet publish
+          ./src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained false
+          -o publish/${{ matrix.rid }}
+
+      - name: Disponibilizar pacote
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssinaPDF-${{ matrix.rid }}
+          path: publish/${{ matrix.rid }}/
+          if-no-files-found: error
+          retention-days: 14

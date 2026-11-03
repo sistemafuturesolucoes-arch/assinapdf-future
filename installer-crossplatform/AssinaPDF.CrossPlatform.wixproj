@@ -1,0 +1,10 @@
+
+<Project Sdk="WixToolset.Sdk/5.0.1">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Platform>x64</Platform>
+    <DefineConstants>PublishDir=$(PublishDir)</DefineConstants>
+    <OutputName>AssinaPDF-CrossPlatform-Setup-x64</OutputName>
+  </PropertyGroup>
+</Project>

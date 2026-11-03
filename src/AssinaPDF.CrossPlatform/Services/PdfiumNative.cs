@@ -1,0 +1,204 @@
+
+using System;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
+
+namespace AssinaPDF.MacPrototype.Services;
+
+internal static class PdfiumNative
+{
+    private const string LibraryName = "pdfium";
+
+    private const CallingConvention NativeCallingConvention =
+        CallingConvention.Winapi;
+
+    internal const int BitmapBgra = 4;
+
+    internal static readonly object SyncRoot = new();
+
+    static PdfiumNative()
+    {
+        NativeLibrary.SetDllImportResolver(
+            typeof(PdfiumNative).Assembly,
+            ResolveLibrary);
+    }
+
+    private static IntPtr ResolveLibrary(
+        string libraryName,
+        Assembly assembly,
+        DllImportSearchPath? searchPath)
+    {
+        if (libraryName != LibraryName)
+            return IntPtr.Zero;
+
+        if (OperatingSystem.IsWindows())
+        {
+            if (NativeLibrary.TryLoad(
+                "pdfium.dll",
+                assembly,
+                searchPath,
+                out IntPtr windowsLibrary))
+            {
+                return windowsLibrary;
+            }
+
+            throw new DllNotFoundException(
+                "Não foi possível localizar pdfium.dll.");
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            string architecture = RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.X64 => "osx-x64",
+                Architecture.Arm64 => "osx-arm64",
+                _ => throw new PlatformNotSupportedException(
+                    "Arquitetura do macOS não suportada pelo PDFium.")
+            };
+
+            string[] possiblePaths =
+            {
+                Path.Combine(
+                    AppContext.BaseDirectory,
+                    "libpdfium.dylib"),
+
+                Path.Combine(
+                    AppContext.BaseDirectory,
+                    "runtimes",
+                    architecture,
+                    "native",
+                    "libpdfium.dylib")
+            };
+
+            foreach (string libraryPath in possiblePaths)
+            {
+                if (File.Exists(libraryPath) &&
+                    NativeLibrary.TryLoad(
+                        libraryPath,
+                        out IntPtr macLibrary))
+                {
+                    return macLibrary;
+                }
+            }
+
+            if (NativeLibrary.TryLoad(
+                "libpdfium.dylib",
+                assembly,
+                searchPath,
+                out IntPtr fallbackLibrary))
+            {
+                return fallbackLibrary;
+            }
+
+            throw new DllNotFoundException(
+                $"Não foi possível localizar o PDFium para {architecture}. " +
+                $"Diretório da aplicação: {AppContext.BaseDirectory}");
+        }
+
+        throw new PlatformNotSupportedException(
+            "Sistema operacional não suportado pelo PDFium.");
+    }
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_InitLibrary",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void InitLibrary();
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_LoadMemDocument64",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern IntPtr LoadMemDocument64(
+        IntPtr dataBuffer,
+        nuint size,
+        IntPtr password);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_GetLastError",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern uint GetLastError();
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_GetPageCount",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern int GetPageCount(IntPtr document);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_LoadPage",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern IntPtr LoadPage(
+        IntPtr document,
+        int pageIndex);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_GetPageWidthF",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern float GetPageWidth(IntPtr page);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_GetPageHeightF",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern float GetPageHeight(IntPtr page);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDFBitmap_CreateEx",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern IntPtr BitmapCreateEx(
+        int width,
+        int height,
+        int format,
+        IntPtr firstScan,
+        int stride);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_RenderPageBitmap",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void RenderPageBitmap(
+        IntPtr bitmap,
+        IntPtr page,
+        int startX,
+        int startY,
+        int sizeX,
+        int sizeY,
+        int rotate,
+        int flags);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDFBitmap_GetBuffer",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern IntPtr BitmapGetBuffer(IntPtr bitmap);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDFBitmap_GetStride",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern int BitmapGetStride(IntPtr bitmap);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDFBitmap_Destroy",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void BitmapDestroy(IntPtr bitmap);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_ClosePage",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void ClosePage(IntPtr page);
+
+    [DllImport(
+        LibraryName,
+        EntryPoint = "FPDF_CloseDocument",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void CloseDocument(IntPtr document);
+}

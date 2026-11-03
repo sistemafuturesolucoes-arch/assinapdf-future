@@ -1,0 +1,251 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.MainWindow"
+        Title="AssinaPDF | Future SoluÃ§Ãµes"
+        Width="1280" Height="850"
+        MinWidth="980" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
+        Background="#F2F3F5">
+
+  <Grid RowDefinitions="82,42,58,34,*,42">
+
+    <!-- CABEÃ‡ALHO -->
+    <Border Grid.Row="0" Background="#E6E8EB" Padding="22,10">
+      <Grid ColumnDefinitions="260,*">
+        <Image x:Name="FutureLogo"
+               Grid.Column="0"
+               Width="220" Height="60"
+               HorizontalAlignment="Left"
+               VerticalAlignment="Center"
+               Stretch="Uniform"/>
+
+        <TextBlock Grid.Column="1"
+                   Text="Assinatura digital de documentos PDF"
+                   FontSize="17"
+                   Foreground="#454951"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Right"/>
+      </Grid>
+    </Border>
+
+    <!-- SERVIÃ‡OS -->
+    <Grid Grid.Row="1"
+          ColumnDefinitions="*,*,*"
+          Background="#F2F3F5">
+
+      <Button Grid.Column="0"
+              Content="Certificado Digital Â· EmissÃ£o e renovaÃ§Ã£o"
+              Background="#E8EAED"
+              Foreground="#34383E"
+              BorderThickness="0"
+              CornerRadius="0"
+              Margin="1"
+              Click="OpenPromoLink_Click"/>
+
+      <Button Grid.Column="1"
+              Content="SPC Brasil Â· Consultas para empresas"
+              Background="#E8EAED"
+              Foreground="#34383E"
+              BorderThickness="0"
+              CornerRadius="0"
+              Margin="1"
+              Click="OpenPromoLink_Click"/>
+
+      <Button Grid.Column="2"
+              Content="Sistema de Notas Â· EmissÃ£o fiscal em nuvem"
+              Background="#E8EAED"
+              Foreground="#34383E"
+              BorderThickness="0"
+              CornerRadius="0"
+              Margin="1"
+              Click="OpenPromoLink_Click"/>
+    </Grid>
+
+    <!-- FERRAMENTAS -->
+    <Border Grid.Row="2" Background="#E0E3E7" Padding="12,7">
+      <StackPanel Orientation="Horizontal"
+                  Spacing="9"
+                  VerticalAlignment="Center">
+
+        <Button Content="Abrir PDF"
+                Padding="16,8"
+                Background="#5C626C"
+                Foreground="White"
+                Click="OpenPdf_Click"/>
+
+        <Button x:Name="SignButton"
+                Content="Assinar PDF"
+                Click="SignPdf_Click"
+                Padding="16,8"
+                Background="#5C626C"
+                Foreground="White"
+                IsEnabled="False"/>
+
+        <Button x:Name="ValidateButton"
+                Content="Validar assinatura"
+                Click="ValidatePdf_Click"
+                Padding="16,8"
+                Background="#5C626C"
+                Foreground="White"
+                IsEnabled="False"/>
+
+        <TextBlock Text="Certificado do sistema:"
+                   VerticalAlignment="Center"
+                   Foreground="#34383E"
+                   Margin="12,0,0,0"/>
+
+        <ComboBox x:Name="CertificatePicker"
+                  Width="310"
+                  MinHeight="34"
+                  VerticalAlignment="Center"
+                  PlaceholderText="Selecione um certificado"
+                  SelectionChanged="CertificatePicker_SelectionChanged"/>
+
+        <Button Content="Atualizar certificados"
+                Padding="12,8"
+                Background="#5C626C"
+                Foreground="White"
+                Click="RefreshCertificates_Click"/>
+
+        <TextBox x:Name="SigningReasonTextBox"
+                 Width="250"
+                 VerticalAlignment="Center"
+                 Watermark="Motivo da assinatura (opcional)"/>
+
+      </StackPanel>
+    </Border>
+    <!-- DOCUMENTO -->
+    <Border Grid.Row="3" Background="#F8F9FA"
+            Padding="14,5">
+
+      <TextBlock x:Name="SelectedFileText"
+                 Text="Nenhum documento selecionado."
+                 Foreground="#555B63"
+                 VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis"/>
+    </Border>
+
+    <!-- VISUALIZADOR PDF -->
+    <Border Grid.Row="4" Background="#D9DCE0"
+            Margin="0">
+
+      <Grid RowDefinitions="*,48">
+
+        <!-- ÃREA DE VISUALIZAÃ‡ÃƒO -->
+        <Border Grid.Row="0"
+                Background="#AEB3BA"
+                Margin="12,12,12,0"
+                BorderBrush="#C9CDD2"
+                BorderThickness="1">
+
+          <Grid>
+
+            <ScrollViewer x:Name="PdfScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          IsVisible="False">
+
+              <Border Background="White"
+                      Padding="12"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top">
+
+                <Grid><Image x:Name="PdfPageImage"
+                       Stretch="Uniform"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Top"/><Canvas x:Name="SignatureMarkerCanvas" IsHitTestVisible="False"/></Grid>
+              </Border>
+
+            </ScrollViewer>
+
+            <!-- MENSAGEM INICIAL -->
+            <StackPanel x:Name="ViewerPlaceholder"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12">
+
+              <TextBlock Text="AssinaPDF"
+                         FontSize="28"
+                         FontWeight="SemiBold"
+                         Foreground="#555B63"
+                         HorizontalAlignment="Center"/>
+
+              <TextBlock Text="Abra um documento PDF para visualizar."
+                         FontSize="15"
+                         Foreground="#777D85"
+                         HorizontalAlignment="Center"/>
+
+              <TextBlock Text="VisualizaÃ§Ã£o fornecida pelo motor PDFium."
+                         FontSize="12"
+                         Foreground="#888E96"
+                         HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- WHATSAPP -->
+            <Button Content="ðŸ’¬ WhatsApp"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,18,18"
+                    Padding="18,10"
+                    Background="#20A65A"
+                    Foreground="White"
+                    CornerRadius="18"/>
+          </Grid>
+        </Border>
+
+        <!-- NAVEGAÃ‡ÃƒO DE PÃGINAS -->
+        <Border Grid.Row="1"
+                Background="#E0E3E7"
+                Padding="12,5">
+
+          <StackPanel Orientation="Horizontal"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Spacing="14">
+
+            <Button x:Name="PreviousPageButton"
+                    Content="â—€ Anterior"
+                    Padding="14,6"
+                    IsEnabled="False"
+                    Click="PreviousPage_Click"/>
+
+            <TextBlock x:Name="PageIndicator"
+                       Text="PÃ¡gina 0 de 0"
+                       Foreground="#34383E"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center"/>
+
+            <Button x:Name="NextPageButton"
+                    Content="PrÃ³xima â–¶"
+                    Padding="14,6"
+                    IsEnabled="False"
+                    Click="NextPage_Click"/>
+
+          </StackPanel>
+        </Border>
+
+      </Grid>
+    </Border>
+
+    <!-- STATUS -->
+    <Border Grid.Row="5" Background="#E0E3E7" Padding="14,5">
+
+      <Grid ColumnDefinitions="*,Auto">
+
+        <TextBlock x:Name="StatusText"
+                   Text="Carregando certificados digitais..."
+                   Foreground="#454951"
+                   VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis"/>
+
+        <TextBlock Grid.Column="1"
+                   Text="Future SoluÃ§Ãµes"
+                   Foreground="#555B63"
+                   VerticalAlignment="Center"
+                   Margin="12,0,0,0"/>
+      </Grid>
+    </Border>
+
+  </Grid>
+</Window>
