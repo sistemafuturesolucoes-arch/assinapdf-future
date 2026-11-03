@@ -713,7 +713,10 @@ public partial class EditorWindow : Window
                 background.B / 255d);
         }
 
-        segment.TextState = desired;
+        // Keep the TextState instance obtained from the segment: Aspose links this
+        // instance to the PDF content operator. Replacing it with a detached TextState
+        // can compile successfully while the serialized PDF keeps the original values.
+        state.ApplyChangesFrom(desired);
     }
 
     private static string? VerifyRichTextFormatting(
