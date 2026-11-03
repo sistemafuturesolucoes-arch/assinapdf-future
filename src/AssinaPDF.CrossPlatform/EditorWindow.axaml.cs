@@ -456,7 +456,20 @@ public partial class EditorWindow : Window
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
             }, originalText == null
                 ? $"Texto inserido na página {pageIndex + 1}."
-                : "Texto e formatação atualizados.");
+                : "Texto e formatação atualizados.",
+                savedDocument =>
+                {
+                    if (pageIndex + 1 > savedDocument.Pages.Count)
+                        return false;
+
+                    var verificationAbsorber = new TextFragmentAbsorber();
+                    savedDocument.Pages[pageIndex + 1].Accept(verificationAbsorber);
+                    string savedPageText = NormalizePdfText(
+                        string.Concat(verificationAbsorber.TextFragments.Select(item => item.Text)));
+                    string expectedText = NormalizePdfText(replacementText);
+                    return expectedText.Length == 0 || savedPageText.Contains(
+                        expectedText, StringComparison.Ordinal);
+                });
         }
         catch (Exception ex)
         {
@@ -559,7 +572,15 @@ public partial class EditorWindow : Window
                 {
                     fragment.Text = replacement;
                 }
-            }, $"Texto atualizado: {changed} ocorrência(s).");
+            }, "Texto atualizado.", savedDocument =>
+            {
+                var verificationAbsorber = new TextFragmentAbsorber();
+                verificationAbsorber.Visit(savedDocument);
+                string savedText = NormalizePdfText(
+                    string.Concat(verificationAbsorber.TextFragments.Select(item => item.Text)));
+                return changed == 0 || savedText.Contains(
+                    NormalizePdfText(replacement), StringComparison.Ordinal);
+            });
             if (changed == 0)
                 EditorStatusText.Text = "Nenhuma ocorrência encontrada. Verifique o texto digitado ou se o PDF contém texto selecionável.";
         }
@@ -586,7 +607,13 @@ public partial class EditorWindow : Window
         return true;
     }
 
-    private void ApplyPdfEdit(Action<Document> edit, string successMessage)
+    private static string NormalizePdfText(string? value) =>
+        new string((value ?? string.Empty).Where(character => !char.IsWhiteSpace(character)).ToArray());
+
+    private void ApplyPdfEdit(
+        Action<Document> edit,
+        string successMessage,
+        Func<Document, bool>? verifySavedDocument = null)
     {
         string outputPath = Path.Combine(_sessionDirectory, $"edit-{Guid.NewGuid():N}.pdf");
         byte[] before = File.ReadAllBytes(_workingCopyPath);
@@ -602,15 +629,31 @@ public partial class EditorWindow : Window
             if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
                 throw new IOException("A biblioteca não gerou um PDF de saída válido.");
 
+            // Reabre o arquivo efetivamente gravado antes de substituir a cópia de trabalho.
+            // Isso impede que uma gravação aparentemente concluída, mas sem a alteração,
+            // seja apresentada ao usuário como sucesso.
+            using (var savedDocument = Document.Open(outputPath))
+            {
+                if (savedDocument.Pages.Count == 0)
+                    throw new IOException("O PDF gerado não contém páginas.");
+
+                if (verifySavedDocument != null && !verifySavedDocument(savedDocument))
+                    throw new IOException(
+                        "O PDF foi gerado, mas a alteração de texto não foi encontrada no arquivo salvo. A cópia anterior foi preservada.");
+            }
+
             _document?.Dispose();
             _document = null;
-            File.Copy(outputPath, _workingCopyPath, true);
+
+            // A substituição ocorre somente depois da validação do arquivo de saída.
+            File.Move(outputPath, _workingCopyPath, true);
             PushHistory(_undoStack, before);
             _redoStack.Clear();
             LoadDocumentPreview();
 
             EditorStatusText.Text = successMessage +
-                " O original permanece intacto. Atenção: qualquer alteração pode invalidar assinaturas digitais já existentes neste PDF.";
+                " Alteração gravada e visualização atualizada. O PDF original permanece intacto. " +
+                "Atenção: qualquer alteração pode invalidar assinaturas digitais já existentes neste PDF.";
         }
         finally
         {
