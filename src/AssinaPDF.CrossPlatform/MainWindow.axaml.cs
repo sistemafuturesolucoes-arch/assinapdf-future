@@ -358,13 +358,13 @@ public partial class MainWindow : Window
             {
                 var marker = new Button
                 {
-                    Content = "Assinatura digital",
+                    Content = "",
                     Tag = widget,
                     Padding = new Thickness(3),
                     FontSize = 10,
                     FontWeight = FontWeight.SemiBold,
                     Foreground = new SolidColorBrush(Color.FromRgb(30, 77, 125)),
-                    Background = new SolidColorBrush(Color.FromArgb(42, 65, 145, 220)),
+                    Background = Brushes.Transparent,
                     BorderBrush = new SolidColorBrush(Color.FromRgb(43, 120, 197)),
                     BorderThickness = new Thickness(2),
                     CornerRadius = new CornerRadius(3)
