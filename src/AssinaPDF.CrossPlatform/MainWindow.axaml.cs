@@ -562,6 +562,10 @@ public partial class MainWindow : Window
         object? sender,
         PointerPressedEventArgs e)
     {
+        // Cliques nos marcadores de assinatura não devem iniciar o arraste da página.
+        if (e.Source is Button)
+            return;
+
         if (_zoom <= 1.001 ||
             !e.GetCurrentPoint(PdfScrollViewer).Properties.IsLeftButtonPressed)
             return;
