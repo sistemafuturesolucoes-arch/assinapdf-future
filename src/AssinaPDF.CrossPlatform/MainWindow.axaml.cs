@@ -839,6 +839,155 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task ShowSignatureWidgetAsync(SignatureWidgetInfo widget)
+    {
+        if (string.IsNullOrWhiteSpace(_currentPdfPath))
+            return;
+
+        string status;
+        string technicalReport =
+            "Não foi possível associar este campo visual a um resultado de validação.";
+
+        try
+        {
+            var validator = new PdfSignatureValidator(new ValidationOptions
+            {
+                CheckRevocation = false,
+                TrustSystemRoots = false
+            });
+
+            await using var stream = new FileStream(
+                _currentPdfPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize: 81920,
+                useAsync: true);
+
+            var results = await validator.ValidateAsync(stream);
+            var match = results.FirstOrDefault(x =>
+                string.Equals(
+                    x.FieldName,
+                    widget.FieldName,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (match == null && results.Count == 1)
+                match = results[0];
+
+            if (match == null)
+            {
+                status = "O campo visual foi localizado, mas não foi possível relacioná-lo a uma assinatura validada. A aparência, sozinha, não comprova validade.";
+                if (results.Count > 0)
+                {
+                    var general = new StringBuilder();
+                    foreach (var result in results)
+                        general.AppendLine($"Campo: {result.FieldName} | Titular: {result.SignerName} | Integridade: {result.IsIntegrityValid} | Assinatura: {result.IsSignatureValid}");
+                    technicalReport = general.ToString();
+                }
+            }
+            else
+            {
+                status = match.IsIntegrityValid && match.IsSignatureValid
+                    ? "Este documento não foi alterado após a assinatura. A integridade criptográfica e a assinatura foram confirmadas nesta verificação."
+                    : "Não foi possível confirmar que este documento permaneceu inalterado após a assinatura. Consulte as propriedades e os avisos da validação.";
+
+                var report = new StringBuilder();
+                report.AppendLine("PROPRIEDADES DA ASSINATURA");
+                report.AppendLine(new string('=', 56));
+                report.AppendLine($"Campo: {match.FieldName}");
+                report.AppendLine($"Titular: {match.SignerName}");
+                report.AppendLine($"Data da assinatura: {match.SigningTime}");
+                report.AppendLine($"Integridade do documento: {(match.IsIntegrityValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Assinatura criptográfica: {(match.IsSignatureValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Cadeia de confiança: {(match.IsCertificateChainValid ? "CONFIÁVEL" : "NÃO CONFIRMADA NESTA ETAPA")}");
+                report.AppendLine($"Revogação: {(match.IsNotRevoked ? "Nenhuma revogação reportada" : "Não confirmada")}");
+                report.AppendLine($"Fonte de revogação: {match.RevocationSource}");
+                report.AppendLine($"Resultado da biblioteca: {(match.IsValid ? "VÁLIDA" : "NÃO VALIDADA")}");
+
+                if (match.Errors.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("ERROS:");
+                    foreach (var error in match.Errors)
+                        report.AppendLine($" • {error}");
+                }
+
+                if (match.Warnings.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("AVISOS:");
+                    foreach (var warning in match.Warnings)
+                        report.AppendLine($" • {warning}");
+                }
+
+                report.AppendLine();
+                report.AppendLine("A consulta de revogação e a confiança nas raízes do sistema não foram executadas nesta etapa.");
+                technicalReport = report.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            status = $"Não foi possível validar esta assinatura: {ex.Message}";
+        }
+
+        var propertiesButton = new Button
+        {
+            Content = "Propriedades da assinatura",
+            MinWidth = 210,
+            Padding = new Thickness(14, 9)
+        };
+        var closeButton = new Button
+        {
+            Content = "Fechar",
+            MinWidth = 100,
+            Padding = new Thickness(14, 9)
+        };
+        var actions = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Spacing = 10
+        };
+        actions.Children.Add(propertiesButton);
+        actions.Children.Add(closeButton);
+
+        var dialog = new Window
+        {
+            Title = "Status da assinatura",
+            Width = 590,
+            Height = 260,
+            MinWidth = 480,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(22),
+                Spacing = 12,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"Assinatura: {widget.FieldName}  •  Página {widget.PageIndex + 1}",
+                        FontSize = 17,
+                        FontWeight = FontWeight.SemiBold
+                    },
+                    new TextBlock
+                    {
+                        Text = status,
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 14
+                    },
+                    actions
+                }
+            }
+        };
+
+        propertiesButton.Click += async (_, _) =>
+            await ShowValidationReportAsync("Propriedades da assinatura", technicalReport);
+        closeButton.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
+    }
+
     private async Task ShowValidationReportAsync(string title, string report)
     {
         var reportText = new TextBox
