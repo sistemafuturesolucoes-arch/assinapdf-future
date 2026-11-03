@@ -44,7 +44,7 @@
               Click="OpenPromoLink_Click"/>
 
       <Button Grid.Column="1"
-              Content="SPC Brasil Â· Consultas para empresas"
+              Content="SPC Brasil · Consultas para empresas"
               Background="#E8EAED"
               Foreground="#34383E"
               BorderThickness="0"
@@ -155,38 +155,40 @@
                 Margin="10"
                 BorderBrush="#C9CDD2"
                 BorderThickness="1">
-          <ScrollViewer x:Name="PdfScrollViewer"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Auto"
-                        IsVisible="False"
-                        PointerPressed="PdfScrollViewer_PointerPressed"
-                        PointerMoved="PdfScrollViewer_PointerMoved"
-                        PointerReleased="PdfScrollViewer_PointerReleased"
-                        PointerWheelChanged="PdfScrollViewer_PointerWheelChanged">
-            <StackPanel x:Name="PdfPagesPanel"
-                        Spacing="18"
-                        HorizontalAlignment="Center"
-                        Margin="18"/>
-          </ScrollViewer>
+          <Grid>
+            <ScrollViewer x:Name="PdfScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          IsVisible="False"
+                          PointerPressed="PdfScrollViewer_PointerPressed"
+                          PointerMoved="PdfScrollViewer_PointerMoved"
+                          PointerReleased="PdfScrollViewer_PointerReleased"
+                          PointerWheelChanged="PdfScrollViewer_PointerWheelChanged">
+              <StackPanel x:Name="PdfPagesPanel"
+                          Spacing="18"
+                          HorizontalAlignment="Center"
+                          Margin="18"/>
+            </ScrollViewer>
 
-          <StackPanel x:Name="ViewerPlaceholder"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Center"
-                      Spacing="12">
-            <TextBlock Text="AssinaPDF"
-                       FontSize="28"
-                       FontWeight="SemiBold"
-                       Foreground="#555B63"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="Abra um documento PDF para visualizar."
-                       FontSize="15"
-                       Foreground="#777D85"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="Visualização fornecida pelo motor PDFium."
-                       FontSize="12"
-                       Foreground="#888E96"
-                       HorizontalAlignment="Center"/>
-          </StackPanel>
+            <StackPanel x:Name="ViewerPlaceholder"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12">
+              <TextBlock Text="AssinaPDF"
+                         FontSize="28"
+                         FontWeight="SemiBold"
+                         Foreground="#555B63"
+                         HorizontalAlignment="Center"/>
+              <TextBlock Text="Abra um documento PDF para visualizar."
+                         FontSize="15"
+                         Foreground="#777D85"
+                         HorizontalAlignment="Center"/>
+              <TextBlock Text="Visualização fornecida pelo motor PDFium."
+                         FontSize="12"
+                         Foreground="#888E96"
+                         HorizontalAlignment="Center"/>
+            </StackPanel>
+          </Grid>
         </Border>
       </Grid>
     </Border>
