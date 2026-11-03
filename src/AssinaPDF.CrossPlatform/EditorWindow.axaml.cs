@@ -604,29 +604,19 @@ public partial class EditorWindow : Window
             !string.IsNullOrWhiteSpace(run.FontFamily) &&
             !string.Equals(comparisonFamily, run.FontFamily, StringComparison.OrdinalIgnoreCase);
 
-        if (fontFamilyChanged)
-            state.FontName = run.FontFamily;
+        // TextSegment.TextState is a state object attached to the PDF content model.
+        // Build the desired values separately and transfer them with ApplyChangesFrom,
+        // which preserves the owner's internal link while copying formatting values.
+        var desired = new Aspose.Pdf.Text.TextState();
+        desired.ApplyChangesFrom(state);
 
         if (run.FontSize > 0)
-            state.FontSize = (float)run.FontSize;
+            desired.FontSize = (float)run.FontSize;
 
-        // FontStyles do Aspose.PDF FOSS possui valores Regular, Bold e Italic
-        // (não é uma combinação de flags). Para negrito + itálico selecionamos a
-        // face Bold e aplicamos IsItalic separadamente.
-        FontStyles faceStyle = run.IsBold
-            ? FontStyles.Bold
-            : run.IsItalic
-                ? FontStyles.Italic
-                : FontStyles.Regular;
-
-        // Preserve a fonte original incorporada/subsetada quando o usuário não
-        // mudou a família nem pediu uma face estilizada. Só resolva uma fonte do
-        // sistema quando realmente for necessário trocar família ou variante.
-        // When the original PDF carries an embedded subset, keep its font program.
-        // A PDF resource label such as CIDFONT+F2 must never be looked up online.
-        // Style flags are still written to the selected run; a newly selected family
-        // is resolved normally and embedded into the output PDF.
-        if (fontFamilyChanged || ((run.IsBold || run.IsItalic) && !originalFontEmbedded))
+        // A PDF's embedded CID subset may have no separate bold/italic face. When
+        // the user requests emphasis, resolve a real face for the selected family
+        // (CID resource labels are presented as Helvetica in the editor).
+        if (fontFamilyChanged || run.IsBold || run.IsItalic)
         {
             string fontFamily = fontFamilyChanged && !string.IsNullOrWhiteSpace(run.FontFamily)
                 ? run.FontFamily
@@ -634,42 +624,51 @@ public partial class EditorWindow : Window
 
             if (!string.IsNullOrWhiteSpace(fontFamily))
             {
+                FontStyles requestedStyle =
+                    (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
+                    (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
+
                 try
                 {
-                    state.Font = FontRepository.FindFont(fontFamily, faceStyle);
+                    desired.Font = FontRepository.FindFont(fontFamily, requestedStyle);
                 }
                 catch (Exception ex)
                 {
                     throw new InvalidOperationException(
                         $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
-                        $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : faceStyle.ToString())}. " +
-                        "Instale essa fonte ou escolha outra antes de aplicar a edição.",
+                        $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : requestedStyle.ToString())}. " +
+                        "Escolha outra família de fonte antes de aplicar a edição.",
                         ex);
                 }
             }
         }
 
-        state.FontStyle = faceStyle;
-        state.IsBold = run.IsBold;
-        state.IsItalic = run.IsItalic;
+        // In Aspose.PDF FOSS FontStyles is a flags enum; Bold | Italic is valid.
+        // IsBold/IsItalic are also set explicitly so both semantic flags and the
+        // concrete font face are persisted consistently.
+        desired.FontStyle =
+            (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
+            (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
+        desired.IsBold = run.IsBold;
+        desired.IsItalic = run.IsItalic;
 
         if (run.Foreground is { } foreground)
         {
-            state.ForegroundColor = Aspose.Pdf.Color.FromRgb(
+            desired.ForegroundColor = Aspose.Pdf.Color.FromRgb(
                 foreground.R / 255d,
                 foreground.G / 255d,
                 foreground.B / 255d);
         }
 
-        // Não atribuir Transparent quando não há realce: o Aspose pode renderizar
-        // um retângulo branco. A ausência de BackgroundColor mantém o fundo original.
         if (run.Background is { } background)
         {
-            state.BackgroundColor = Aspose.Pdf.Color.FromRgb(
+            desired.BackgroundColor = Aspose.Pdf.Color.FromRgb(
                 background.R / 255d,
                 background.G / 255d,
                 background.B / 255d);
         }
+
+        state.ApplyChangesFrom(desired);
     }
 
     private static string? VerifyRichTextFormatting(
