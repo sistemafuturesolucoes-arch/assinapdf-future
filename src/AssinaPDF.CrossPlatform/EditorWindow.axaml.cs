@@ -399,6 +399,27 @@ public partial class EditorWindow : Window
                 return;
             }
 
+            // Antes de gravar, garanta que as fontes necessárias às novas faces/ famílias
+            // estejam disponíveis. O download exige autorização e nunca instala fontes no SO.
+            var requiredFonts = editedRuns
+                .Where(run => !string.IsNullOrWhiteSpace(run.FontFamily) &&
+                    (!string.Equals(run.FontFamily, originalFontName, StringComparison.OrdinalIgnoreCase) ||
+                     run.IsBold || run.IsItalic))
+                .Select(run => run.FontFamily!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            foreach (string fontFamily in requiredFonts)
+            {
+                bool available = await FontDownloadService.EnsureAvailableAsync(this, fontFamily);
+                if (!available)
+                {
+                    EditorStatusText.Text =
+                        $"A fonte '{fontFamily}' não está disponível. A edição foi cancelada para evitar substituir a tipografia silenciosamente.";
+                    return;
+                }
+            }
+
             var alignment = editedParagraphs.FirstOrDefault()?.TextAlignment
                 ?? Avalonia.Media.TextAlignment.Left;
 
