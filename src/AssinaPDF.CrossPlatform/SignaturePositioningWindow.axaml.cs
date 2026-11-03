@@ -300,6 +300,11 @@ public partial class SignaturePositioningWindow : Window
     {
         MarkerCanvas.Children.Clear();
 
+        // Mantém a referência visual do projeto Windows antigo:
+        // cada clique cria uma caixa retangular de assinatura, numerada.
+        const double markerWidth = 120;
+        const double markerHeight = 34;
+
         for (int i = 0; i < _placements.Count; i++)
         {
             var placement = _placements[i];
@@ -307,33 +312,47 @@ public partial class SignaturePositioningWindow : Window
             if (placement.PageIndex != _pageIndex)
                 continue;
 
-            double x = placement.NormalizedX * MarkerCanvas.Width;
-            double y = placement.NormalizedY * MarkerCanvas.Height;
+            double anchorX = placement.NormalizedX * MarkerCanvas.Width;
+            double anchorY = placement.NormalizedY * MarkerCanvas.Height;
+
+            // O ponto clicado representa a base da caixa, como no visualizador antigo.
+            double left = Math.Clamp(
+                anchorX - markerWidth / 2,
+                0,
+                Math.Max(0, MarkerCanvas.Width - markerWidth));
+
+            double top = Math.Clamp(
+                anchorY - markerHeight,
+                0,
+                Math.Max(0, MarkerCanvas.Height - markerHeight));
 
             var marker = new Border
             {
-                Width = 30,
-                Height = 30,
-                CornerRadius = new CornerRadius(15),
-                Background = new SolidColorBrush(Color.FromRgb(95, 45, 180)),
-                BorderBrush = Brushes.White,
+                Width = markerWidth,
+                Height = markerHeight,
+                CornerRadius = new CornerRadius(3),
+                Background = new SolidColorBrush(Color.FromArgb(38, 124, 58, 237)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(124, 58, 237)),
                 BorderThickness = new Thickness(2),
                 Child = new TextBlock
                 {
-                    Text = (i + 1).ToString(),
-                    Foreground = Brushes.White,
-                    FontWeight = FontWeight.Bold,
+                    Text = $"Assinatura {i + 1}",
+                    Foreground = new SolidColorBrush(Color.FromRgb(91, 33, 182)),
+                    FontSize = 11,
+                    FontWeight = FontWeight.SemiBold,
                     HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                 }
             };
 
-            Canvas.SetLeft(marker, x - 15);
-            Canvas.SetTop(marker, y - 15);
+            Canvas.SetLeft(marker, left);
+            Canvas.SetTop(marker, top);
             MarkerCanvas.Children.Add(marker);
         }
 
-        PositionCountText.Text = $"{_placements.Count} posições";
+        PositionCountText.Text = _placements.Count == 1
+            ? "1 posição"
+            : $"{_placements.Count} posições";
     }
 
     private void UpdatePageControls()
