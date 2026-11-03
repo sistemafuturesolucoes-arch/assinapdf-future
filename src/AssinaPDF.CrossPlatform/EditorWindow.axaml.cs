@@ -121,7 +121,7 @@ public partial class EditorWindow : Window
             var destination = await StorageProvider.SaveFilePickerAsync(
                 new FilePickerSaveOptions
                 {
-                    Title = "Salvar cópia editada como",
+                    Title = "Exportar cópia do PDF",
                     SuggestedFileName = $"{Path.GetFileNameWithoutExtension(_originalPath)}-copia.pdf",
                     DefaultExtension = "pdf",
                     FileTypeChoices = new[]
@@ -140,8 +140,29 @@ public partial class EditorWindow : Window
                 return;
             }
 
-            File.Copy(_workingCopyPath, targetPath, true);
-            EditorStatusText.Text = $"Cópia salva em: {targetPath}";
+            // Nunca sobrescreve um destino existente. Isso também protege o original
+            // caso o usuário selecione um caminho alternativo para o mesmo arquivo.
+            bool destinationCreated = false;
+            try
+            {
+                using var sourceStream = new FileStream(
+                    _workingCopyPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var destinationStream = new FileStream(
+                    targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                destinationCreated = true;
+                sourceStream.CopyTo(destinationStream);
+            }
+            catch
+            {
+                if (destinationCreated)
+                {
+                    try { File.Delete(targetPath); }
+                    catch { /* Limpeza best-effort do arquivo criado nesta operação. */ }
+                }
+                throw;
+            }
+
+            EditorStatusText.Text = $"Cópia exportada em: {targetPath}";
         }
         catch (Exception ex)
         {
