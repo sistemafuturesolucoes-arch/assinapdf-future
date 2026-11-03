@@ -210,6 +210,18 @@ public sealed class PdfTextFormattingTests
         output.Position = 0;
 
         using var reopened = Document.Open(output);
+        foreach (var op in reopened.Pages[1].Contents.Commands)
+        {
+            var pdfOp = op.ToPdf();
+            if (pdfOp.Contains(" Tf", StringComparison.Ordinal) ||
+                pdfOp.Contains(" Tj", StringComparison.Ordinal) ||
+                pdfOp.Contains(" TJ", StringComparison.Ordinal) ||
+                pdfOp.Contains(" Td", StringComparison.Ordinal) ||
+                pdfOp.Contains(" rg", StringComparison.Ordinal))
+            {
+                _output.WriteLine("PDF OP: " + pdfOp);
+            }
+        }
         var absorber = new TextFragmentAbsorber(text);
         reopened.Pages[1].Accept(absorber);
         var savedFragment = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
