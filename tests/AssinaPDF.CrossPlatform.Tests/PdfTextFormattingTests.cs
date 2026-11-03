@@ -166,6 +166,37 @@ public sealed class PdfTextFormattingTests
         AssertRun(offsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(offsets, 5, 6, 10, bold: false, italic: false);
         AssertRun(offsets, 6, 11, 12, bold: false, italic: true);
+        AssertRunColors(offsets, 0, 5, Colors.Red, Colors.Yellow);
+        AssertRunColors(offsets, 5, 6, Colors.Black, null);
+        AssertRunColors(offsets, 6, 11, Colors.Blue, null);
+    }
+
+    private static void AssertRunColors(
+        IReadOnlyList<(int Start, int End, TextSegment Segment)> segments,
+        int start,
+        int end,
+        Avalonia.Media.Color foreground,
+        Avalonia.Media.Color? background)
+    {
+        var covered = segments
+            .Where(item => item.Start < end && item.End > start)
+            .ToArray();
+
+        Assert.NotEmpty(covered);
+        foreach (var item in covered)
+        {
+            AssertColor(item.Segment.TextState.ForegroundColor,
+                foreground.R, foreground.G, foreground.B);
+            if (background is { } expectedBackground)
+            {
+                AssertColor(item.Segment.TextState.BackgroundColor,
+                    expectedBackground.R, expectedBackground.G, expectedBackground.B);
+            }
+            else
+            {
+                Assert.Null(item.Segment.TextState.BackgroundColor);
+            }
+        }
     }
 
     private static void AssertRun(
