@@ -646,17 +646,16 @@ public partial class EditorWindow : Window
         string? originalFontName,
         bool originalFontEmbedded)
     {
-        // TextSegment.TextState is a read/write property. Work on a detached state
-        // snapshot and assign it back to the segment so the PDF content model receives
-        // the complete style even when a getter returns a snapshot rather than a live
-        // owner-bound state object.
+        // Capture the owner-linked state from the segment. ApplyChangesFrom copies
+        // formatting values while preserving that link to the PDF content operator.
+        var state = segment.TextState;
         var desired = new Aspose.Pdf.Text.TextState();
-        desired.ApplyChangesFrom(segment.TextState);
+        desired.ApplyChangesFrom(state);
 
         if (run.FontSize > 0)
             desired.FontSize = (float)run.FontSize;
 
-        string currentFontFamily = segment.TextState.FontName ?? string.Empty;
+        string currentFontFamily = state.FontName ?? string.Empty;
         string normalizedCurrentFamily = NormalizePdfFontFamily(currentFontFamily);
         bool fontFamilyChanged =
             !string.IsNullOrWhiteSpace(run.FontFamily) &&
