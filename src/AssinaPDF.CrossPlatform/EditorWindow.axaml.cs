@@ -471,8 +471,11 @@ public partial class EditorWindow : Window
                         expectedText, StringComparison.Ordinal))
                         return false;
 
-                    return VerifyRichTextFormatting(
-                        savedDocument, pageIndex, replacementText, editedRuns);
+                    if (!VerifyRichTextFormatting(
+                        savedDocument, pageIndex, replacementText, editedRuns, out string formattingFailure))
+                        throw new InvalidOperationException("Diagnóstico da formatação: " + formattingFailure);
+
+                    return true;
                 });
         }
         catch (Exception ex)
@@ -569,10 +572,18 @@ public partial class EditorWindow : Window
         Document document,
         int pageIndex,
         string expectedText,
-        IReadOnlyList<EditedTextRun> expectedRuns)
+        IReadOnlyList<EditedTextRun> expectedRuns,
+        out string failureReason)
     {
-        if (pageIndex < 0 || pageIndex >= document.Pages.Count)
+        failureReason = string.Empty;
+        bool Fail(string reason)
+        {
+            failureReason = reason;
             return false;
+        }
+
+        if (pageIndex < 0 || pageIndex >= document.Pages.Count)
+            return Fail($"página inválida ({pageIndex + 1}).");
 
         var absorber = new TextFragmentAbsorber();
         document.Pages[pageIndex + 1].Accept(absorber);
@@ -581,11 +592,11 @@ public partial class EditorWindow : Window
         var fragment = absorber.TextFragments.FirstOrDefault(item =>
             NormalizePdfText(item.Text) == normalizedExpected);
 
-        if (fragment == null || fragment.Segments.Count == 0)
-            return false;
+        if (fragment == null)
+            return Fail("o texto editado não foi encontrado como um único bloco após reabrir o PDF.");
+        if (fragment.Segments.Count == 0)
+            return Fail("o texto foi encontrado, mas o Aspose não retornou segmentos para verificar.");
 
-        // Reconstitui os intervalos a partir dos segmentos efetivamente relidos
-        // do PDF já salvo, e não do objeto que ainda estava em memória antes do Save.
         var savedSegments = new List<(int Start, int End, TextSegment Segment)>();
         int offset = 0;
         foreach (TextSegment segment in fragment.Segments)
@@ -596,7 +607,7 @@ public partial class EditorWindow : Window
         }
 
         if (offset != expectedText.Length)
-            return false;
+            return Fail($"o texto relido tem {offset} caracteres, mas a prévia enviou {expectedText.Length}; não foi possível mapear os estilos por posição.");
 
         foreach (var run in expectedRuns.Where(item => item.Length > 0))
         {
@@ -605,29 +616,41 @@ public partial class EditorWindow : Window
                 item.Start < runEnd && item.End > run.Start).ToArray();
 
             if (covered.Length == 0)
-                return false;
+                return Fail($"nenhum segmento salvo corresponde ao trecho na posição {run.Start}.");
 
             foreach (var item in covered)
             {
                 var state = item.Segment.TextState;
                 if (run.FontSize > 0 && Math.Abs(state.FontSize - run.FontSize) > 0.75)
-                    return false;
-                if (state.IsBold != run.IsBold || state.IsItalic != run.IsItalic)
-                    return false;
+                    return Fail($"tamanho da fonte divergente na posição {run.Start}: esperado {run.FontSize:0.##} pt, salvo {state.FontSize:0.##} pt.");
+                if (state.IsBold != run.IsBold)
+                    return Fail($"negrito divergente na posição {run.Start}: esperado {run.IsBold}, salvo {state.IsBold}.");
+                if (state.IsItalic != run.IsItalic)
+                    return Fail($"itálico divergente na posição {run.Start}: esperado {run.IsItalic}, salvo {state.IsItalic}.");
 
-                if (run.Foreground is { } foreground &&
-                    state.ForegroundColor is { } savedForeground &&
-                    (Math.Abs(savedForeground.R - foreground.R) > 2 ||
-                     Math.Abs(savedForeground.G - foreground.G) > 2 ||
-                     Math.Abs(savedForeground.B - foreground.B) > 2))
-                    return false;
+                if (!string.IsNullOrWhiteSpace(run.FontFamily) &&
+                    !string.Equals(state.FontName, run.FontFamily, StringComparison.OrdinalIgnoreCase))
+                    return Fail($"fonte divergente na posição {run.Start}: esperada '{run.FontFamily}', salva '{state.FontName}'.");
 
-                if (run.Background is { } background &&
-                    state.BackgroundColor is { } savedBackground &&
-                    (Math.Abs(savedBackground.R - background.R) > 2 ||
-                     Math.Abs(savedBackground.G - background.G) > 2 ||
-                     Math.Abs(savedBackground.B - background.B) > 2))
-                    return false;
+                if (run.Foreground is { } foreground)
+                {
+                    if (state.ForegroundColor is not { } savedForeground)
+                        return Fail($"a cor do texto não foi recuperada na posição {run.Start}.");
+                    if (Math.Abs(savedForeground.R - foreground.R) > 2 ||
+                        Math.Abs(savedForeground.G - foreground.G) > 2 ||
+                        Math.Abs(savedForeground.B - foreground.B) > 2)
+                        return Fail($"cor do texto divergente na posição {run.Start}: esperada RGB({foreground.R},{foreground.G},{foreground.B}), salva RGB({savedForeground.R},{savedForeground.G},{savedForeground.B}).");
+                }
+
+                if (run.Background is { } background)
+                {
+                    if (state.BackgroundColor is not { } savedBackground)
+                        return Fail($"o realce/fundo não foi recuperado na posição {run.Start}.");
+                    if (Math.Abs(savedBackground.R - background.R) > 2 ||
+                        Math.Abs(savedBackground.G - background.G) > 2 ||
+                        Math.Abs(savedBackground.B - background.B) > 2)
+                        return Fail($"cor do realce divergente na posição {run.Start}: esperada RGB({background.R},{background.G},{background.B}), salva RGB({savedBackground.R},{savedBackground.G},{savedBackground.B}).");
+                }
             }
         }
 
