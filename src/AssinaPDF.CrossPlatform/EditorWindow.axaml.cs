@@ -566,6 +566,38 @@ public partial class EditorWindow : Window
         ?? throw new InvalidOperationException(
             "A versão do Aspose.PDF não expõe o vínculo interno de segmento esperado.");
 
+    private static void RestoreSegmentGeometry(
+        TextFragment fragment,
+        IReadOnlyList<(int Start, int End, TextSegment Segment)> sourceSegments)
+    {
+        int offset = 0;
+        foreach (TextSegment segment in fragment.Segments)
+        {
+            int segmentEnd = checked(offset + (segment.Text?.Length ?? 0));
+            var source = sourceSegments.FirstOrDefault(item =>
+                offset >= item.Start && segmentEnd <= item.End);
+
+            if (source.Segment is not null)
+            {
+                int localStart = offset - source.Start;
+                if (source.Segment.Position is { } sourcePosition)
+                {
+                    double prefixWidth = localStart == 0
+                        ? 0
+                        : source.Segment.PhysicalSegment.MeasureSegment(
+                            0, localStart - 1, includeTrailingSpaces: true);
+                    segment.Position = new Position(
+                        sourcePosition.XIndent + prefixWidth,
+                        sourcePosition.YIndent);
+                }
+
+                segment.BaselinePosition = source.Segment.BaselinePosition;
+            }
+
+            offset = segmentEnd;
+        }
+    }
+
     private static void RestoreSegmentStateOwnership(TextFragment fragment)
     {
         foreach (TextSegment segment in fragment.Segments)
@@ -592,6 +624,19 @@ public partial class EditorWindow : Window
 
         if (orderedRuns.Length == 0)
             return;
+
+        // Capture source geometry before isolating. Aspose's CloneSegmentText
+        // copies the TextState but drops Position/BaselinePosition. Those anchors
+        // are required by its font and colour writers to target the correct Tj/TJ
+        // operator after a run is split.
+        var sourceGeometry = new List<(int Start, int End, TextSegment Segment)>();
+        int sourceOffset = 0;
+        foreach (TextSegment sourceSegment in fragment.Segments)
+        {
+            int sourceEnd = checked(sourceOffset + (sourceSegment.Text?.Length ?? 0));
+            sourceGeometry.Add((sourceOffset, sourceEnd, sourceSegment));
+            sourceOffset = sourceEnd;
+        }
 
         // IsolateTextSegments rebuilds the fragment's segment collection. Therefore,
         // do not keep TextSegment references returned by one call while isolating the
@@ -624,10 +669,9 @@ public partial class EditorWindow : Window
             previousEnd = runEnd;
         }
 
-        // IsolateTextSegments clones each run's TextState but, in the
-        // current Aspose package, does not restore its internal OwnerSegment
-        // link. Reattach every final segment before changing formatting so the
-        // setters can rewrite the correct PDF content operators.
+        // Restore geometry first, then the state-to-segment back-reference.
+        // Both are lost by Aspose's current CloneSegmentText implementation.
+        RestoreSegmentGeometry(fragment, sourceGeometry);
         RestoreSegmentStateOwnership(fragment);
 
         var appliedRuns = new bool[orderedRuns.Length];
