@@ -190,9 +190,10 @@ public sealed class PdfTextFormattingTests
         }
         Assert.Equal(text.Length, beforeSaveOffset);
         _output.WriteLine($"Fragmento antes de salvar: FontSize={target.TextState.FontSize:0.##}; FontName={target.TextState.FontName}; FontSizeTouched={ReadInternalFlag(target.TextState, "FontSizeTouched")}; FontStyleTouched={ReadInternalFlag(target.TextState, "FontStyleTouched")}");
+        _output.WriteLine($"FONTE DO FRAGMENTO: FontName={target.TextState.FontName}; Font={target.TextState.Font?.FontName}; BaseFont={target.TextState.Font?.BaseFont}; FontData={target.TextState.FontData?.FontName}; SourceFontData={target.TextState.Font?.SourceFontData?.FontName}");
         foreach (var item in beforeSaveOffsets)
         {
-            _output.WriteLine($"ANTES [{item.Start},{item.End}): {DescribeSegment(item.Segment)}");
+            _output.WriteLine($"ANTES [{item.Start},{item.End}): {DescribeSegment(item.Segment)}; Font={item.Segment.TextState.Font?.FontName}; BaseFont={item.Segment.TextState.Font?.BaseFont}; FontData={item.Segment.TextState.FontData?.FontName}; SourceFontData={item.Segment.TextState.Font?.SourceFontData?.FontName}");
         }
         AssertRun(beforeSaveOffsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(beforeSaveOffsets, 5, 6, 10, bold: false, italic: false);
