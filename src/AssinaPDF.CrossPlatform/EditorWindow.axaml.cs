@@ -467,8 +467,12 @@ public partial class EditorWindow : Window
                     string savedPageText = NormalizePdfText(
                         string.Concat(verificationAbsorber.TextFragments.Select(item => item.Text)));
                     string expectedText = NormalizePdfText(replacementText);
-                    return expectedText.Length == 0 || savedPageText.Contains(
-                        expectedText, StringComparison.Ordinal);
+                    if (expectedText.Length == 0 || !savedPageText.Contains(
+                        expectedText, StringComparison.Ordinal))
+                        return false;
+
+                    return VerifyRichTextFormatting(
+                        savedDocument, pageIndex, replacementText, editedRuns);
                 });
         }
         catch (Exception ex)
@@ -498,47 +502,29 @@ public partial class EditorWindow : Window
         TextFragment fragment,
         IReadOnlyList<EditedTextRun> runs)
     {
-        foreach (var run in runs.OrderBy(item => item.Start))
-        {
-            if (run.Length <= 0)
-                continue;
+        var orderedRuns = runs
+            .Where(item => item.Length > 0)
+            .OrderBy(item => item.Start)
+            .ToArray();
 
-            // Aspose retorna exatamente os segmentos isolados para este intervalo.
-            // Aplicar o estilo diretamente neles evita depender de offsets recalculados
-            // depois que a coleção de segmentos é dividida.
+        if (orderedRuns.Length == 0)
+            return;
+
+        // IMPORTANTE: TextFragment é um agregado do Aspose. Alterar seu TextState
+        // depois de dividir os segmentos pode reuni-los e apagar estilos individuais.
+        // Primeiro aplicamos um estilo-base ao fragmento e SÓ DEPOIS isolamos cada
+        // intervalo para aplicar os estilos próprios de cada trecho.
+        ApplyRunStyle(fragment.TextState, orderedRuns[0]);
+
+        foreach (var run in orderedRuns)
+        {
             var isolatedSegments = fragment.IsolateTextSegments(run.Start, run.Length);
             bool foundSegment = false;
 
             foreach (TextSegment segment in isolatedSegments)
             {
                 foundSegment = true;
-
-                if (!string.IsNullOrWhiteSpace(run.FontFamily))
-                    segment.TextState.FontName = run.FontFamily;
-
-                if (run.FontSize > 0)
-                    segment.TextState.FontSize = (float)run.FontSize;
-
-                segment.TextState.IsBold = run.IsBold;
-                segment.TextState.IsItalic = run.IsItalic;
-
-                if (run.Foreground is { } foreground)
-                {
-                    segment.TextState.ForegroundColor = Aspose.Pdf.Color.FromRgb(
-                        foreground.R / 255d,
-                        foreground.G / 255d,
-                        foreground.B / 255d);
-                }
-
-                // BackgroundColor não deve receber null: em documentos sem realce
-                // isso pode causar falha no setter do Aspose durante a gravação.
-                if (run.Background is { } background)
-                {
-                    segment.TextState.BackgroundColor = Aspose.Pdf.Color.FromRgb(
-                        background.R / 255d,
-                        background.G / 255d,
-                        background.B / 255d);
-                }
+                ApplyRunStyle(segment.TextState, run);
             }
 
             if (!foundSegment)
@@ -547,6 +533,105 @@ public partial class EditorWindow : Window
                     $"Não foi possível localizar o trecho formatado no PDF (posição {run.Start}, tamanho {run.Length}).");
             }
         }
+    }
+
+    private static void ApplyRunStyle(Aspose.Pdf.Text.TextState state, EditedTextRun run)
+    {
+        if (!string.IsNullOrWhiteSpace(run.FontFamily))
+            state.FontName = run.FontFamily;
+
+        if (run.FontSize > 0)
+            state.FontSize = (float)run.FontSize;
+
+        state.IsBold = run.IsBold;
+        state.IsItalic = run.IsItalic;
+
+        if (run.Foreground is { } foreground)
+        {
+            state.ForegroundColor = Aspose.Pdf.Color.FromRgb(
+                foreground.R / 255d,
+                foreground.G / 255d,
+                foreground.B / 255d);
+        }
+
+        // Não atribuir Transparent quando não há realce: o Aspose pode renderizar
+        // um retângulo branco. A ausência de BackgroundColor mantém o fundo original.
+        if (run.Background is { } background)
+        {
+            state.BackgroundColor = Aspose.Pdf.Color.FromRgb(
+                background.R / 255d,
+                background.G / 255d,
+                background.B / 255d);
+        }
+    }
+
+    private static bool VerifyRichTextFormatting(
+        Document document,
+        int pageIndex,
+        string expectedText,
+        IReadOnlyList<EditedTextRun> expectedRuns)
+    {
+        if (pageIndex < 0 || pageIndex >= document.Pages.Count)
+            return false;
+
+        var absorber = new TextFragmentAbsorber();
+        document.Pages[pageIndex + 1].Accept(absorber);
+
+        string normalizedExpected = NormalizePdfText(expectedText);
+        var fragment = absorber.TextFragments.FirstOrDefault(item =>
+            NormalizePdfText(item.Text) == normalizedExpected);
+
+        if (fragment == null || fragment.Segments.Count == 0)
+            return false;
+
+        // Reconstitui os intervalos a partir dos segmentos efetivamente relidos
+        // do PDF já salvo, e não do objeto que ainda estava em memória antes do Save.
+        var savedSegments = new List<(int Start, int End, TextSegment Segment)>();
+        int offset = 0;
+        foreach (TextSegment segment in fragment.Segments)
+        {
+            int end = offset + (segment.Text?.Length ?? 0);
+            savedSegments.Add((offset, end, segment));
+            offset = end;
+        }
+
+        if (offset != expectedText.Length)
+            return false;
+
+        foreach (var run in expectedRuns.Where(item => item.Length > 0))
+        {
+            int runEnd = run.Start + run.Length;
+            var covered = savedSegments.Where(item =>
+                item.Start < runEnd && item.End > run.Start).ToArray();
+
+            if (covered.Length == 0)
+                return false;
+
+            foreach (var item in covered)
+            {
+                var state = item.Segment.TextState;
+                if (run.FontSize > 0 && Math.Abs(state.FontSize - run.FontSize) > 0.75)
+                    return false;
+                if (state.IsBold != run.IsBold || state.IsItalic != run.IsItalic)
+                    return false;
+
+                if (run.Foreground is { } foreground &&
+                    state.ForegroundColor is { } savedForeground &&
+                    (Math.Abs(savedForeground.R - foreground.R) > 2 ||
+                     Math.Abs(savedForeground.G - foreground.G) > 2 ||
+                     Math.Abs(savedForeground.B - foreground.B) > 2))
+                    return false;
+
+                if (run.Background is { } background &&
+                    state.BackgroundColor is { } savedBackground &&
+                    (Math.Abs(savedBackground.R - background.R) > 2 ||
+                     Math.Abs(savedBackground.G - background.G) > 2 ||
+                     Math.Abs(savedBackground.B - background.B) > 2))
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     private void ReplaceText_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
