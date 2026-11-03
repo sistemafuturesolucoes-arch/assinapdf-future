@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -552,6 +553,25 @@ public partial class EditorWindow : Window
         Avalonia.Media.Color? Foreground,
         Avalonia.Media.Color? Background);
 
+    // Aspose.PDF 26.11.0 creates fresh TextSegment instances in
+    // IsolateTextSegments, but its CloneSegmentText helper does not restore
+    // TextState.OwnerSegment. Without this back-reference, color/font/size
+    // setters update only the detached state and never reach the source PDF.
+    // Keep this compatibility bridge isolated here; fail clearly if Aspose
+    // changes the internal contract in a future version.
+    private static readonly PropertyInfo SegmentOwnerStateProperty =
+        typeof(Aspose.Pdf.Text.TextState).GetProperty(
+            "OwnerSegment",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException(
+            "A versão do Aspose.PDF não expõe o vínculo interno de segmento esperado.");
+
+    private static void RestoreSegmentStateOwnership(TextFragment fragment)
+    {
+        foreach (TextSegment segment in fragment.Segments)
+            SegmentOwnerStateProperty.SetValue(segment.TextState, segment);
+    }
+
     private static Avalonia.Media.Color? GetAvaloniaSolidColor(Avalonia.Media.IBrush? brush)
     {
         if (brush is Avalonia.Media.ISolidColorBrush solid)
@@ -603,6 +623,12 @@ public partial class EditorWindow : Window
 
             previousEnd = runEnd;
         }
+
+        // IsolateTextSegments clones each run's TextState but, in the
+        // current Aspose package, does not restore its internal OwnerSegment
+        // link. Reattach every final segment before changing formatting so the
+        // setters can rewrite the correct PDF content operators.
+        RestoreSegmentStateOwnership(fragment);
 
         var appliedRuns = new bool[orderedRuns.Length];
         int offset = 0;
