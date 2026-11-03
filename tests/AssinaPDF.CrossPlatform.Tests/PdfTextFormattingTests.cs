@@ -61,6 +61,52 @@ public sealed class PdfTextFormattingTests
         }
     }
 
+
+    [Fact]
+    public void ApplyRichTextFormatting_PersistsStyleForNewlyAppendedSingleRun()
+    {
+        using var document = new Document();
+        var page = document.Pages.Add();
+        var target = new TextFragment("Diogo")
+        {
+            Position = new Position(50, 700)
+        };
+        target.TextState.FontName = "Helvetica";
+        target.TextState.FontSize = 8.04f;
+        new TextBuilder(page).AppendText(target);
+
+        EditorWindow.ApplyRichTextFormatting(
+            target,
+            new[]
+            {
+                new EditorWindow.EditedTextRun(
+                    0, 5, "Helvetica", 20, true, true,
+                    Colors.Red, Colors.Yellow)
+            },
+            "Helvetica",
+            originalFontEmbedded: false);
+
+        using var output = new MemoryStream();
+        document.Save(output);
+        output.Position = 0;
+
+        using var reopened = Document.Open(output);
+        var absorber = new TextFragmentAbsorber("Diogo");
+        reopened.Pages[1].Accept(absorber);
+        var savedFragment = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
+        var savedSegments = savedFragment.Segments.Cast<TextSegment>().ToArray();
+
+        Assert.Equal("Diogo", string.Concat(savedSegments.Select(segment => segment.Text)));
+        foreach (var segment in savedSegments)
+        {
+            Assert.InRange(Math.Abs(segment.TextState.FontSize - 20), 0, 0.01);
+            Assert.True(segment.TextState.IsBold);
+            Assert.True(segment.TextState.IsItalic);
+            AssertColor(segment.TextState.ForegroundColor, 255, 0, 0);
+            AssertColor(segment.TextState.BackgroundColor, 255, 255, 0);
+        }
+    }
+
     [Fact]
     public void ApplyRichTextFormatting_PreservesDifferentStylesAcrossAdjacentRuns()
     {
