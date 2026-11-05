@@ -1173,16 +1173,20 @@ public partial class EditorWindow : Window
                 {
                     string actualFontName = state.Font?.FontName ?? "(sem objeto Font)";
                     string actualBaseFont = state.Font?.BaseFont ?? "(sem BaseFont)";
+                    string savedFontName = state.FontName ?? "(nulo)";
                     return Fail(
                         $"negrito divergente na posição {run.Start}: esperado {run.IsBold}, " +
                         $"IsBold salvo={state.IsBold}; FontStyle salvo={state.FontStyle}; " +
-                        $"FontName salvo='{state.FontName ?? "(nulo")}'; " +
+                        $"FontName salvo='{savedFontName}'; " +
                         $"Font.FontName='{actualFontName}'; Font.BaseFont='{actualBaseFont}'.");
                 }
                 if (state.IsItalic != run.IsItalic)
+                {
+                    string savedFontName = state.FontName ?? "(nulo)";
                     return Fail(
                         $"itálico divergente na posição {run.Start}: esperado {run.IsItalic}, " +
-                        $"salvo {state.IsItalic}; FontStyle={state.FontStyle}; FontName='{state.FontName ?? "(nulo")}'.");
+                        $"salvo {state.IsItalic}; FontStyle={state.FontStyle}; FontName='{savedFontName}'.");
+                }
 
                 if (!string.IsNullOrWhiteSpace(run.FontFamily) &&
                     !(originalFontEmbedded && string.Equals(
