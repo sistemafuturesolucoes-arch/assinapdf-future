@@ -77,6 +77,92 @@ public partial class EditorWindow : Window
         }
 
         Closed += (_, _) => DisposeResources();
+        Opened += async (_, _) => await VerifyDocumentFontsAsync();
+    }
+
+    private async Task VerifyDocumentFontsAsync()
+    {
+        if (!File.Exists(_workingCopyPath))
+            return;
+
+        EditorStatusText.Text = "Verificando as fontes utilizadas no PDF...";
+
+        try
+        {
+            var fonts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            using (var document = Document.Open(_workingCopyPath))
+            {
+                foreach (Page page in document.Pages)
+                {
+                    var absorber = new TextFragmentAbsorber();
+                    page.Accept(absorber);
+
+                    foreach (TextFragment fragment in absorber.TextFragments)
+                    {
+                        var font = fragment.TextState.Font;
+                        string rawName = font?.DecodedFontName ??
+                                         font?.BaseFont ??
+                                         fragment.TextState.FontName ??
+                                         string.Empty;
+                        string family = NormalizePdfFontFamily(rawName);
+                        if (string.IsNullOrWhiteSpace(family) ||
+                            family.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
+                            family.Length <= 2)
+                            continue;
+
+                        bool embedded = font?.IsEmbedded == true;
+                        if (fonts.TryGetValue(family, out bool wasEmbedded))
+                            fonts[family] = wasEmbedded || embedded;
+                        else
+                            fonts[family] = embedded;
+                    }
+                }
+            }
+
+            var missing = fonts
+                .Where(item => !item.Value && !FontDownloadService.IsAvailable(item.Key))
+                .Select(item => item.Key)
+                .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+
+            if (missing.Length == 0)
+            {
+                EditorStatusText.Text = fonts.Count == 0
+                    ? "PDF aberto. Não foram encontrados textos com fontes identificáveis."
+                    : $"Verificação concluída: {fonts.Count} família(s) de fonte identificada(s); nenhuma fonte ausente que precise ser baixada.";
+                return;
+            }
+
+            var unavailable = new List<string>();
+            foreach (string family in missing)
+            {
+                try
+                {
+                    bool downloaded = await FontDownloadService.EnsureAvailableAsync(this, family);
+                    if (!downloaded)
+                        unavailable.Add(family);
+                }
+                catch (Exception ex)
+                {
+                    unavailable.Add(family);
+                    System.Diagnostics.Debug.WriteLine(
+                        $"AssinaPDF: não foi possível obter a fonte '{family}': {ex.Message}");
+                }
+            }
+
+            if (unavailable.Count == 0)
+            {
+                EditorStatusText.Text = $"Verificação concluída: {fonts.Count} fonte(s) identificada(s). As fontes ausentes foram obtidas para uso interno do AssinaPDF; nenhuma foi instalada no sistema.";
+                return;
+            }
+
+            string names = string.Join(", ", unavailable);
+            EditorStatusText.Text = $"Atenção: {unavailable.Count} fonte(s) não estão disponíveis ({names}). O PDF continua aberto e será exibido com a substituição de fonte do mecanismo de visualização. Ao editar, selecione uma família instalada para substituir a original; espaçamento e quebras de linha podem mudar.";
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text = "Não foi possível concluir a verificação de fontes. O PDF continua aberto; a aparência original da visualização foi mantida. " + ex.Message;
+        }
     }
 
     private void LoadDocumentPreview()
