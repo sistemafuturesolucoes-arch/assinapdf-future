@@ -1007,9 +1007,12 @@ public partial class EditorWindow : Window
                     ex);
             }
 
-            // Só altere o estilo do objeto-fonte quando uma nova face foi
-            // resolvida. Na preservação, o estilo original já é o desejado.
-            state.FontStyle = requestedStyle;
+            // O Aspose.PDF FOSS expõe IsBold/IsItalic como propriedades
+            // próprias que selecionam a variante correta da família atual.
+            // Definir apenas FontStyle pode deixar o sinalizador de estilo
+            // diferente do estado efetivamente serializado no PDF.
+            state.IsBold = run.IsBold;
+            state.IsItalic = run.IsItalic;
         }
 
         // Assign colours directly to the final owned state. The setters retain the
