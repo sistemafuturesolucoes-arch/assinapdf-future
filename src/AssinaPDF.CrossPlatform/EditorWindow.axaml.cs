@@ -1263,6 +1263,41 @@ public partial class EditorWindow : Window
         if (orderedRuns.Length == 0)
             return;
 
+        // A reprodução mínima com Aspose 26.11 confirmou que um fragmento
+        // inteiro pode trocar de fonte CID/Type0 para uma face TrueType
+        // incorporada sem IsolateTextSegments. Nesse cenário, isolar o intervalo
+        // completo só recria segmentos e introduz risco de perder o vínculo com
+        // os operadores originais do fluxo de conteúdo. Preserve os segmentos
+        // originais e aplique o estilo diretamente aos estados que já pertencem
+        // ao documento, como no teste de gravação/reabertura.
+        if (orderedRuns.Length == 1 &&
+            orderedRuns[0].Start == 0 &&
+            orderedRuns[0].Length == fragment.Text.Length)
+        {
+            EditedTextRun wholeRun = orderedRuns[0];
+            foreach (TextSegment segment in fragment.Segments)
+            {
+                ApplyRunStyle(
+                    segment.TextState,
+                    wholeRun,
+                    originalFontName,
+                    originalFontEmbedded,
+                    originalBold,
+                    originalItalic,
+                    formattingTrace);
+            }
+
+            ApplyRunStyle(
+                fragment.TextState,
+                wholeRun,
+                originalFontName,
+                originalFontEmbedded,
+                originalBold,
+                originalItalic,
+                formattingTrace);
+            return;
+        }
+
         // Capture source geometry before isolating. Aspose's CloneSegmentText
         // copies the TextState but drops Position/BaselinePosition. Those anchors
         // are required by its font and colour writers to target the correct Tj/TJ
