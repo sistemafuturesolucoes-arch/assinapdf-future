@@ -945,6 +945,8 @@ public partial class EditorWindow : Window
         // next range: those references can become detached from the final collection.
         // First isolate every range, then re-read the FINAL collection and map each
         // physical segment back to its logical editor run by character offsets.
+        // Apply mapped styles in descending character order because font/size setters
+        // rewrite the source stream and can move the later text on the same line.
         int previousEnd = 0;
         foreach (var run in orderedRuns)
         {
@@ -977,6 +979,7 @@ public partial class EditorWindow : Window
         RestoreSegmentStateOwnership(fragment);
 
         var appliedRuns = new bool[orderedRuns.Length];
+        var segmentsToFormat = new List<(int Start, int End, int RunIndex, TextSegment Segment)>();
         int offset = 0;
         foreach (TextSegment segment in fragment.Segments)
         {
@@ -994,15 +997,7 @@ public partial class EditorWindow : Window
                     $"O segmento PDF [{offset}, {segmentEnd}) não corresponde integralmente a um trecho formatado do editor. A edição foi cancelada para evitar estilos incorretos.");
             }
 
-            ApplyRunStyle(
-                segment.TextState,
-                orderedRuns[runIndex],
-                originalFontName,
-                originalFontEmbedded,
-                originalBold,
-                originalItalic,
-                formattingTrace);
-            appliedRuns[runIndex] = true;
+            segmentsToFormat.Add((offset, segmentEnd, runIndex, segment));
             offset = segmentEnd;
         }
 
@@ -1010,6 +1005,22 @@ public partial class EditorWindow : Window
         {
             throw new InvalidOperationException(
                 $"A segmentação PDF retornou {offset} caracteres, mas o texto possui {fragment.Text.Length}.");
+        }
+
+        // Applying font/size changes rewrites the source content stream and can
+        // re-seat text that follows the edited run. Work from right to left so
+        // every not-yet-edited segment keeps its original source position.
+        foreach (var item in segmentsToFormat.OrderByDescending(item => item.Start))
+        {
+            ApplyRunStyle(
+                item.Segment.TextState,
+                orderedRuns[item.RunIndex],
+                originalFontName,
+                originalFontEmbedded,
+                originalBold,
+                originalItalic,
+                formattingTrace);
+            appliedRuns[item.RunIndex] = true;
         }
 
         for (int i = 0; i < appliedRuns.Length; i++)
@@ -1128,8 +1139,10 @@ public partial class EditorWindow : Window
             // próprias que selecionam a variante correta da família atual.
             // Definir apenas FontStyle pode deixar o sinalizador de estilo
             // diferente do estado efetivamente serializado no PDF.
-            state.IsBold = run.IsBold;
-            state.IsItalic = run.IsItalic;
+            // FontStyle is the explicit-style API consumed by the PDF writer.
+            // Assigning IsBold/IsItalic alone changes the in-memory flags but leaves
+            // FontStyleTouched false, so absorbed text is serialized with its old face.
+            state.FontStyle = requestedStyle;
         }
 
         formattingTrace?.Add(
