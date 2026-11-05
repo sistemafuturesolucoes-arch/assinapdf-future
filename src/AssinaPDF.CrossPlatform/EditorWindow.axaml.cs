@@ -860,7 +860,7 @@ public partial class EditorWindow : Window
                     4, Math.Max(4, pageSurface.Image.Bounds.Width - editorWidth - 4));
                 editorTop = Math.Clamp(
                     dragStartTop + current.Y - dragStart.Y,
-                    4, Math.Max(4, pageSurface.Image.Bounds.Height - inlineEditor.Height - 4));
+                    4, Math.Max(4, pageSurface.Image.Bounds.Height - 300));
                 Canvas.SetLeft(inlineEditor, editorLeft);
                 Canvas.SetTop(inlineEditor, editorTop);
                 args.Handled = true;
@@ -904,6 +904,12 @@ public partial class EditorWindow : Window
             if (_formattingToolbar != null && _defaultToolbarEditor != null)
                 _formattingToolbar.Target = _defaultToolbarEditor;
 
+            // Cancelar fecha o editor sem gerar qualquer alteração no PDF.
+            if (!accepted)
+            {
+                EditorStatusText.Text = "Edição cancelada. O PDF permaneceu sem alterações.";
+                return;
+            }
 
             var editedRuns = new List<EditedTextRun>();
             var replacementBuilder = new System.Text.StringBuilder();
