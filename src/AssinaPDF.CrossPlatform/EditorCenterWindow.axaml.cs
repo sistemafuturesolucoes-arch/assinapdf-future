@@ -94,7 +94,7 @@ public partial class EditorCenterWindow : Window
 
             var resumeButton = new Button
             {
-                Content = "Retomar edição",
+                Content = "Editar documento",
                 Padding = new Avalonia.Thickness(14, 9),
                 Background = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.FromRgb(75, 82, 94)),
