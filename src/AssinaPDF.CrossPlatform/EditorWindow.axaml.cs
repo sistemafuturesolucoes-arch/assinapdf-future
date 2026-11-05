@@ -120,6 +120,10 @@ public partial class EditorWindow : Window
 
         EditorStatusText.Text = "Verificando as fontes utilizadas no PDF...";
 
+        // Registra as pastas nativas antes de consultar Aspose.FontRepository.
+        // Assim, fontes já instaladas não são tratadas como ausentes.
+        InstalledFontCatalogService.RegisterSystemFontDirectories();
+
         try
         {
             var fonts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
