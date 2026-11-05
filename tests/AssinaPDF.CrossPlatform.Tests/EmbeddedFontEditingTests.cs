@@ -102,7 +102,14 @@ public sealed class EmbeddedFontEditingTests
             "Helvetica-Bold",
             saved.TextState.FontName ?? saved.TextState.Font?.FontName ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
-        Assert.True(saved.TextState.Font?.IsBold ?? false);
+        Assert.True(saved.TextState.Font?.IsBold ?? false,
+            $"Objeto Font não reconhece negrito após reabrir. " +
+            $"TextState.IsBold={saved.TextState.IsBold}; FontName='{saved.TextState.FontName}'; " +
+            $"Font.FontName='{saved.TextState.Font?.FontName}'; BaseFont='{saved.TextState.Font?.BaseFont}'; " +
+            $"DecodedFontName='{saved.TextState.Font?.DecodedFontName}'; " +
+            $"Font.IsBold={saved.TextState.Font?.IsBold}; Font.IsItalic={saved.TextState.Font?.IsItalic}; " +
+            $"FontStyle={saved.TextState.FontStyle}; Subtype='{saved.TextState.Font?.Subtype}'; " +
+            $"IsEmbedded={saved.TextState.Font?.IsEmbedded}");
     }
 
     [Fact]
