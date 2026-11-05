@@ -1116,13 +1116,16 @@ public partial class EditorWindow : Window
 
                 if (IsStandard14Family(fontFamily))
                 {
-                    // Standard 14 fonts are PDF resource names, not embedded font programs.
-                    // For absorbed text, write the face name directly so the content stream
-                    // switches its Tf resource instead of retaining the source CID font.
-                    state.FontName = faceName;
+                    // Assign the actual Standard-14 face through TextState.Font.
+                    // FontName is metadata only: setting it does not rewrite the source Tf.
+                    // The Font setter routes through TextStateModifier.ModifyFont, which
+                    // registers a Type1 resource and switches the absorbed run in the PDF.
+                    state.Font = FontRepository.FindFont(faceName);
                 }
                 else
                 {
+                    // Use the requested family member; assigning Font also marks the face
+                    // as reassigned so the following size setter targets the isolated run.
                     state.Font = FontRepository.FindFont(fontFamily, requestedStyle);
                 }
             }
