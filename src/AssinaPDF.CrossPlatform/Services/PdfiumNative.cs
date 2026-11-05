@@ -235,6 +235,30 @@ internal static class PdfiumNative
         CallingConvention = NativeCallingConvention)]
     internal static extern void BitmapDestroy(IntPtr bitmap);
 
+    [DllImport(LibraryName, EntryPoint = "FPDFPage_CountObjects", CallingConvention = NativeCallingConvention)]
+    internal static extern int PageCountObjects(IntPtr page);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFPage_GetObject", CallingConvention = NativeCallingConvention)]
+    internal static extern IntPtr PageGetObject(IntPtr page, int index);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFPageObj_GetType", CallingConvention = NativeCallingConvention)]
+    internal static extern int PageObjectGetType(IntPtr pageObject);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFPageObj_GetBounds", CallingConvention = NativeCallingConvention)]
+    internal static extern int PageObjectGetBounds(IntPtr pageObject, out float left, out float bottom, out float right, out float top);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFText_LoadPage", CallingConvention = NativeCallingConvention)]
+    internal static extern IntPtr TextLoadPage(IntPtr page);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFText_ClosePage", CallingConvention = NativeCallingConvention)]
+    internal static extern void TextClosePage(IntPtr textPage);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFTextObj_GetText", CallingConvention = NativeCallingConvention)]
+    internal static extern uint TextObjectGetText(IntPtr textObject, IntPtr textPage, IntPtr buffer, uint length);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFTextObj_GetFontSize", CallingConvention = NativeCallingConvention)]
+    internal static extern int TextObjectGetFontSize(IntPtr textObject, out float fontSize);
+
     [DllImport(
         LibraryName,
         EntryPoint = "FPDF_ClosePage",
