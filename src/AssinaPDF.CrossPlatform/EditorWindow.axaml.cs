@@ -653,6 +653,7 @@ public partial class EditorWindow : Window
 
             Aspose.Pdf.Rectangle? expectedBounds = null;
 
+            var formattingTrace = new List<string>();
             ApplyPdfEdit(document =>
             {
                 TextFragment target;
@@ -713,7 +714,7 @@ public partial class EditorWindow : Window
 
                 ApplyRichTextFormatting(
                     target, editedRuns, originalFontName, originalFontEmbedded,
-                    originalBold, originalItalic);
+                    originalBold, originalItalic, formattingTrace);
 
                 var editedRectangle = target.Rectangle;
                 if (editedRectangle != null)
@@ -746,7 +747,10 @@ public partial class EditorWindow : Window
                         originalFontName, originalFontEmbedded,
                         originalBold, originalItalic, expectedBounds);
                     if (formattingFailure != null)
-                        throw new InvalidOperationException("Diagnóstico da formatação: " + formattingFailure);
+                        throw new InvalidOperationException(
+                            "Diagnóstico da formatação: " + formattingFailure +
+                            Environment.NewLine + "Rastreamento antes/depois da aplicação do estilo:" +
+                            Environment.NewLine + string.Join(Environment.NewLine, formattingTrace));
 
                     return true;
                 });
@@ -912,7 +916,8 @@ public partial class EditorWindow : Window
         string? originalFontName,
         bool originalFontEmbedded,
         bool originalBold = false,
-        bool originalItalic = false)
+        bool originalItalic = false,
+        List<string>? formattingTrace = null)
     {
         var orderedRuns = runs
             .Where(item => item.Length > 0)
@@ -995,7 +1000,8 @@ public partial class EditorWindow : Window
                 originalFontName,
                 originalFontEmbedded,
                 originalBold,
-                originalItalic);
+                originalItalic,
+                formattingTrace);
             appliedRuns[runIndex] = true;
             offset = segmentEnd;
         }
@@ -1032,7 +1038,8 @@ public partial class EditorWindow : Window
                 originalFontName,
                 originalFontEmbedded,
                 originalBold,
-                originalItalic);
+                originalItalic,
+                formattingTrace);
         }
     }
 
@@ -1042,7 +1049,8 @@ public partial class EditorWindow : Window
         string? originalFontName,
         bool originalFontEmbedded,
         bool originalBold,
-        bool originalItalic)
+        bool originalItalic,
+        List<string>? formattingTrace)
     {
         // Apply directly to the state owned by the final TextSegment/TextFragment.
         // A detached TextState followed by ApplyChangesFrom loses FontStyleTouched
@@ -1072,6 +1080,14 @@ public partial class EditorWindow : Window
         // Só preservamos a face incorporada quando o usuário não mudou família,
         // negrito ou itálico; alterações explícitas continuam exigindo uma face
         // instalada/baixada e validada antes da gravação.
+        formattingTrace?.Add(
+            $"ANTES: runFont='{fontFamily}'; originalFont='{originalFontName}'; " +
+            $"originalEmbedded={originalFontEmbedded}; originalBold={originalBold}; " +
+            $"requestedBold={run.IsBold}; originalItalic={originalItalic}; " +
+            $"requestedItalic={run.IsItalic}; stateFont='{state.FontName}'; " +
+            $"stateBold={state.IsBold}; stateStyle={state.FontStyle}; " +
+            $"stateFontEmbedded={state.Font?.IsEmbedded}");
+
         bool preserveEmbeddedFace =
             originalFontEmbedded &&
             string.Equals(
@@ -1107,6 +1123,13 @@ public partial class EditorWindow : Window
             state.IsBold = run.IsBold;
             state.IsItalic = run.IsItalic;
         }
+
+        formattingTrace?.Add(
+            $"DEPOIS: preservouCID={preserveEmbeddedFace}; stateFont='{state.FontName}'; " +
+            $"stateBold={state.IsBold}; stateStyle={state.FontStyle}; " +
+            $"fontName='{state.Font?.FontName}'; baseFont='{state.Font?.BaseFont}'; " +
+            $"decodedFont='{state.Font?.DecodedFontName}'; " +
+            $"fontEmbedded={state.Font?.IsEmbedded}; fontBold={state.Font?.IsBold}");
 
         // Assign colours directly to the final owned state. The setters retain the
         // values consumed by the PDF writer; on absorbed text they also perform the
