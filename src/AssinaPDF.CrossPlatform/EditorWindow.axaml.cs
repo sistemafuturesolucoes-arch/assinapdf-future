@@ -1076,19 +1076,9 @@ public partial class EditorWindow : Window
             {
                 string faceName = GetPdfFontFaceName(fontFamily, run.IsBold, run.IsItalic);
 
-                if (IsStandard14Family(fontFamily))
-                {
-                    // Para as 14 fontes padrão, use o nome explícito da face PDF
-                    // (por exemplo, Helvetica-Bold). Em texto absorvido de PDFs com
-                    // fontes Type0/CID incorporadas, atribuir apenas um objeto Font
-                    // pode deixar o operador Tf apontando para o recurso CID original.
-                    // FontName força a troca do recurso tipográfico no conteúdo salvo.
-                    state.FontName = faceName;
-                }
-                else
-                {
-                    state.Font = FontRepository.FindFont(fontFamily, requestedStyle);
-                }
+                state.Font = IsStandard14Family(fontFamily)
+                    ? FontRepository.FindFont(faceName)
+                    : FontRepository.FindFont(fontFamily, requestedStyle);
             }
             catch (Exception ex)
             {
