@@ -1390,6 +1390,50 @@ public partial class EditorWindow : Window
         }
     }
 
+    private static Font ResolveEmbeddedTrueTypeFont(
+        string requestedFamily,
+        FontStyles requestedStyle,
+        bool allowCidFallback,
+        out string resolvedFamily)
+    {
+        // Arial é a primeira escolha para substituir estilos de fontes CID/Type0.
+        // Em macOS, Arial pode não estar instalado; nesses casos tentamos famílias
+        // TrueType/OpenType comuns, sem recorrer às fontes Standard-14 do PDF.
+        string[] candidates = allowCidFallback
+            ? new[] { requestedFamily, "Helvetica Neue", "Noto Sans", "Liberation Sans", "DejaVu Sans" }
+            : new[] { requestedFamily };
+
+        var failures = new List<string>();
+        foreach (string candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                Font font = FontRepository.FindFont(candidate, requestedStyle);
+                font.IsEmbedded = true;
+
+                if (!font.IsEmbedded)
+                {
+                    string reason = font.GetLastFontEmbeddingError() ?? "a biblioteca não confirmou a incorporação";
+                    throw new InvalidOperationException(reason);
+                }
+
+                resolvedFamily = NormalizePdfFontFamily(font.FontName);
+                if (string.IsNullOrWhiteSpace(resolvedFamily))
+                    resolvedFamily = candidate;
+
+                return font;
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{candidate}: {ex.Message}");
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Não foi possível localizar e incorporar uma fonte TrueType/OpenType compatível. " +
+            string.Join(" | ", failures));
+    }
+
     private static void ApplyRunStyle(
         Aspose.Pdf.Text.TextState state,
         EditedTextRun run,
@@ -1463,16 +1507,20 @@ public partial class EditorWindow : Window
                     // This is essential for CID/Type0 source text: changing only FontName
                     // or selecting Helvetica-Bold can leave the original CID CMap/resource
                     // attached to the content stream after save.
-                    var embeddedFont = FontRepository.FindFont(fontFamily, requestedStyle);
-                    embeddedFont.IsEmbedded = true;
+                    bool isCidFallback =
+                        originalFontEmbedded &&
+                        string.Equals(originalFontName, "Arial", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(fontFamily, "Arial", StringComparison.OrdinalIgnoreCase);
 
-                    if (!embeddedFont.IsEmbedded)
-                    {
-                        throw new InvalidOperationException(
-                            $"A fonte '{fontFamily}' não aceitou a incorporação no PDF.");
-                    }
-
+                    var embeddedFont = ResolveEmbeddedTrueTypeFont(
+                        fontFamily, requestedStyle, isCidFallback, out string resolvedFamily);
                     state.Font = embeddedFont;
+
+                    formattingTrace?.Add(
+                        $"FONTE RESOLVIDA: solicitada='{fontFamily}'; " +
+                        $"resolvida='{resolvedFamily}'; " +
+                        $"font='{embeddedFont.FontName}'; embedded={embeddedFont.IsEmbedded}; " +
+                        $"CIDFallback={isCidFallback}");
                 }
             }
             catch (Exception ex)
@@ -1761,9 +1809,13 @@ public partial class EditorWindow : Window
                         $"Fonte salva='{state.FontName}'; erro de incorporação='{embeddingError}'.");
                 }
 
+                bool acceptedEmbeddedCidSubstitute =
+                    expectsEmbeddedTrueTypeReplacement && state.Font?.IsEmbedded == true;
+
                 if (!string.IsNullOrWhiteSpace(run.FontFamily) &&
                     !(originalFontEmbedded && string.Equals(
                         run.FontFamily, originalFontName, StringComparison.OrdinalIgnoreCase)) &&
+                    !acceptedEmbeddedCidSubstitute &&
                     !string.Equals(
                         NormalizePdfFontFamily(state.FontName),
                         NormalizePdfFontFamily(run.FontFamily),
