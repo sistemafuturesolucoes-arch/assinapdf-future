@@ -187,6 +187,9 @@ public sealed class PdfTextFormattingTests
         AssertRun(beforeSaveOffsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(beforeSaveOffsets, 5, 6, 10, bold: false, italic: false);
         AssertRun(beforeSaveOffsets, 6, 11, 12, bold: false, italic: true);
+        Assert.All(beforeSaveOffsets, item => Assert.True(
+            ReadInternalFlag(item.Segment.TextState, "FontStyleTouched"),
+            "O estilo do segmento precisa estar marcado como explícito: " + DescribeSegment(item.Segment)));
         AssertRunColors(beforeSaveOffsets, 0, 5, Colors.Red, Colors.Yellow);
         AssertRunColors(beforeSaveOffsets, 5, 6, Colors.Black, null);
         AssertRunColors(beforeSaveOffsets, 6, 11, Colors.Blue, null);
