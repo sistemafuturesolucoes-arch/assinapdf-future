@@ -38,6 +38,16 @@ public partial class EditorWindow : Window
     private readonly Stack<byte[]> _undoStack = new();
     private readonly Stack<byte[]> _redoStack = new();
 
+    // Construtor sem parâmetros usado pelo carregador XAML do Avalonia.
+    // A janela funcional é criada pelo fluxo do editor com os caminhos explícitos.
+    public EditorWindow()
+    {
+        _workingCopyPath = string.Empty;
+        _originalPath = string.Empty;
+        _sessionDirectory = string.Empty;
+        InitializeComponent();
+    }
+
     public EditorWindow(string workingCopyPath, string originalPath, string sessionDirectory)
     {
         InitializeComponent();
