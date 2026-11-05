@@ -32,8 +32,12 @@
           <TextBox x:Name="SearchTextBox" Width="170" PlaceholderText="Texto existente"/>
           <TextBox x:Name="ReplaceTextBox" Width="170" PlaceholderText="Substituir por"/>
           <Button Content="Substituir tudo" Click="ReplaceText_Click" Padding="12,6"/>
-          <TextBlock Text="Dica: dê dois cliques no texto para editar ou em uma área vazia para inserir."
+          <TextBlock Text="Clique uma vez em um texto para selecioná-lo."
                      VerticalAlignment="Center" Foreground="#666D77" Margin="8,0,0,0"/>
+          <TextBlock x:Name="SelectedTextLabel" Text="" IsVisible="False"
+                     VerticalAlignment="Center" Foreground="#292D36" FontWeight="SemiBold"/>
+          <Button x:Name="EditSelectedTextButton" Content="Editar seleção"
+                  IsVisible="False" Click="EditSelectedText_Click" Padding="12,6"/>
         </StackPanel>
       </ScrollViewer>
     </Border>
