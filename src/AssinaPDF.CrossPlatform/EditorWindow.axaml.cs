@@ -661,11 +661,12 @@ public partial class EditorWindow : Window
                                                   string.Empty;
                         originalFontName = NormalizePdfFontFamily(decodedFontName);
                         // CIDFONT+F2 and similar resource labels are PDF internals, not family names.
-                        // Keep the embedded font in the PDF and show a standard editing fallback.
+                        // Keep the original embedded CID font when its style is unchanged;
+                        // when the user changes style, use an embeddable TrueType family.
                         if (string.IsNullOrWhiteSpace(originalFontName) ||
                             originalFontName.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
                             originalFontName.Length <= 2)
-                            originalFontName = "Helvetica";
+                            originalFontName = "Arial";
                         originalFontSize = fragment.TextState.FontSize > 0
                             ? fragment.TextState.FontSize
                             : 12;
@@ -1451,17 +1452,27 @@ public partial class EditorWindow : Window
 
                 if (IsStandard14Family(fontFamily))
                 {
-                    // Assign the actual Standard-14 face through TextState.Font.
-                    // FontName is metadata only: setting it does not rewrite the source Tf.
-                    // The Font setter routes through TextStateModifier.ModifyFont, which
-                    // registers a Type1 resource and switches the absorbed run in the PDF.
+                    // Standard-14 faces are Type1 resources and are not embedded.
+                    // Keep this route only when the user explicitly chooses one of them.
                     state.Font = FontRepository.FindFont(faceName);
                 }
                 else
                 {
-                    // Use the requested family member; assigning Font also marks the face
-                    // as reassigned so the following size setter targets the isolated run.
-                    state.Font = FontRepository.FindFont(fontFamily, requestedStyle);
+                    // Resolve the real installed TrueType/OpenType face (not a PDF
+                    // Standard-14 alias), request embedding, then assign the Font object.
+                    // This is essential for CID/Type0 source text: changing only FontName
+                    // or selecting Helvetica-Bold can leave the original CID CMap/resource
+                    // attached to the content stream after save.
+                    var embeddedFont = FontRepository.FindFont(fontFamily, requestedStyle);
+                    embeddedFont.IsEmbedded = true;
+
+                    if (!embeddedFont.IsEmbedded)
+                    {
+                        throw new InvalidOperationException(
+                            $"A fonte '{fontFamily}' não aceitou a incorporação no PDF.");
+                    }
+
+                    state.Font = embeddedFont;
                 }
             }
             catch (Exception ex)
@@ -1736,10 +1747,27 @@ public partial class EditorWindow : Window
                         $"salvo {state.IsItalic}; FontStyle={state.FontStyle}; FontName='{savedFontName}'.");
                 }
 
+                bool expectsEmbeddedTrueTypeReplacement =
+                    originalFontEmbedded &&
+                    string.Equals(originalFontName, "Arial", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(run.FontFamily, "Arial", StringComparison.OrdinalIgnoreCase) &&
+                    (run.IsBold != originalBold || run.IsItalic != originalItalic);
+
+                if (expectsEmbeddedTrueTypeReplacement && state.Font?.IsEmbedded != true)
+                {
+                    string embeddingError = state.Font?.GetLastFontEmbeddingError() ?? "sem detalhe informado";
+                    return Fail(
+                        $"a fonte TrueType substituta não permaneceu incorporada na posição {run.Start}. " +
+                        $"Fonte salva='{state.FontName}'; erro de incorporação='{embeddingError}'.");
+                }
+
                 if (!string.IsNullOrWhiteSpace(run.FontFamily) &&
                     !(originalFontEmbedded && string.Equals(
                         run.FontFamily, originalFontName, StringComparison.OrdinalIgnoreCase)) &&
-                    !string.Equals(state.FontName, run.FontFamily, StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(
+                        NormalizePdfFontFamily(state.FontName),
+                        NormalizePdfFontFamily(run.FontFamily),
+                        StringComparison.OrdinalIgnoreCase))
                     return Fail($"fonte divergente na posição {run.Start}: esperada '{run.FontFamily}', salva '{state.FontName}'.");
 
                 if (run.Foreground is { } foreground)
