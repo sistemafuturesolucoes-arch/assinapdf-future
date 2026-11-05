@@ -80,8 +80,8 @@ public partial class EditorWindow : Window
         try
         {
             LoadDocumentPreview();
-            EditorStatusText.Text =
-                "Documento aberto em uma cópia de trabalho salva neste computador. O PDF original permanece intacto.";
+            // Preserve the result/warning produced by VerifyDocumentFontsAsync.
+            // It is more useful than replacing it with a generic "opened" message.
         }
         catch
         {
