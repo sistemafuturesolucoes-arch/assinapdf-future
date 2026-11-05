@@ -31,6 +31,17 @@ public sealed class RenderedPdfPage
     }
 }
 
+public sealed record PdfiumPageObjectInfo(
+    int PageIndex,
+    int ObjectIndex,
+    int ObjectType,
+    string? Text,
+    float Left,
+    float Bottom,
+    float Right,
+    float Top,
+    float? FontSize);
+
 public sealed class PdfiumDocument : IDisposable
 {
     private const int MaximumDimension = 5000;
@@ -252,6 +263,92 @@ public sealed class PdfiumDocument : IDisposable
 
                 if (bitmap != IntPtr.Zero)
                     PdfiumNative.BitmapDestroy(bitmap);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Inspeciona os objetos nativos de uma página sem depender dos fragmentos
+    /// de texto produzidos pelo Aspose. As coordenadas retornadas usam o sistema
+    /// PDF (origem inferior esquerda), em pontos.
+    /// </summary>
+    public IReadOnlyList<PdfiumPageObjectInfo> InspectPageObjects(int pageIndex)
+    {
+        ThrowIfDisposed();
+
+        if (pageIndex < 0 || pageIndex >= PageCount)
+            throw new ArgumentOutOfRangeException(nameof(pageIndex));
+
+        lock (PdfiumNative.SyncRoot)
+        {
+            ThrowIfDisposed();
+
+            IntPtr page = IntPtr.Zero;
+            IntPtr textPage = IntPtr.Zero;
+            try
+            {
+                page = PdfiumNative.LoadPage(_document, pageIndex);
+                if (page == IntPtr.Zero)
+                    throw new InvalidDataException($"Não foi possível carregar a página {pageIndex + 1}.");
+
+                textPage = PdfiumNative.TextLoadPage(page);
+                int objectCount = PdfiumNative.PageCountObjects(page);
+                if (objectCount < 0)
+                    throw new InvalidDataException($"Não foi possível enumerar os objetos da página {pageIndex + 1}.");
+
+                var result = new List<PdfiumPageObjectInfo>(objectCount);
+                for (int index = 0; index < objectCount; index++)
+                {
+                    IntPtr pageObject = PdfiumNative.PageGetObject(page, index);
+                    if (pageObject == IntPtr.Zero)
+                        continue;
+
+                    int objectType = PdfiumNative.PageObjectGetType(pageObject);
+                    if (PdfiumNative.PageObjectGetBounds(pageObject, out float left, out float bottom, out float right, out float top) == 0)
+                        continue;
+
+                    string? text = null;
+                    float? fontSize = null;
+
+                    // FPDF_PAGEOBJ_TEXT = 1. Os demais objetos também são
+                    // devolvidos para que a futura camada visual possa selecionar
+                    // imagens e elementos gráficos separadamente.
+                    if (objectType == 1 && textPage != IntPtr.Zero)
+                    {
+                        uint requiredBytes = PdfiumNative.TextObjectGetText(pageObject, textPage, IntPtr.Zero, 0);
+                        if (requiredBytes >= 2 && requiredBytes <= 4 * 1024 * 1024)
+                        {
+                            IntPtr buffer = Marshal.AllocHGlobal(checked((int)requiredBytes));
+                            try
+                            {
+                                uint writtenBytes = PdfiumNative.TextObjectGetText(pageObject, textPage, buffer, requiredBytes);
+                                if (writtenBytes > 0)
+                                    text = Marshal.PtrToStringUni(buffer)?.TrimEnd('\0');
+                            }
+                            finally
+                            {
+                                Marshal.FreeHGlobal(buffer);
+                            }
+                        }
+
+                        if (PdfiumNative.TextObjectGetFontSize(pageObject, out float size) != 0 &&
+                            float.IsFinite(size) && size > 0)
+                            fontSize = size;
+                    }
+
+                    result.Add(new PdfiumPageObjectInfo(
+                        pageIndex, index, objectType, text,
+                        left, bottom, right, top, fontSize));
+                }
+
+                return result;
+            }
+            finally
+            {
+                if (textPage != IntPtr.Zero)
+                    PdfiumNative.TextClosePage(textPage);
+                if (page != IntPtr.Zero)
+                    PdfiumNative.ClosePage(page);
             }
         }
     }
