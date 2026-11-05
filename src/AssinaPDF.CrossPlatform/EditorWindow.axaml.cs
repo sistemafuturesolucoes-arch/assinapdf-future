@@ -632,7 +632,8 @@ public partial class EditorWindow : Window
                         NormalizePdfFontFamily(run.FontFamily),
                         NormalizePdfFontFamily(originalFontName),
                         StringComparison.OrdinalIgnoreCase) ||
-                     run.IsBold || run.IsItalic))
+                     run.IsBold != originalBold ||
+                     run.IsItalic != originalItalic))
                 .Select(run => run.FontFamily!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -1459,13 +1460,37 @@ public partial class EditorWindow : Window
     private static string NormalizePdfText(string? value) =>
         new string((value ?? string.Empty).Where(character => !char.IsWhiteSpace(character)).ToArray());
 
-    private static string NormalizePdfFontFamily(string? value)
+    internal static string NormalizePdfFontFamily(string? value)
     {
         string family = (value ?? string.Empty).Trim();
         int separator = family.IndexOf('+');
         if (separator == 6 && family[..6].All(character =>
                 character is >= 'A' and <= 'Z'))
             family = family[7..];
+
+        // PDF BaseFont/DecodedFontName often stores the face name, not the
+        // family name (for example "BQVIXP+VerdanaBold"). The editor keeps
+        // weight and italic as separate properties, so strip the face suffix
+        // before resolving the requested family/style in FontRepository.
+        string[] faceSuffixes =
+        {
+            "-BoldItalic", "-BoldOblique", "BoldItalic", "BoldOblique",
+            "-BoldMT", "BoldMT", "-ItalicMT", "ItalicMT",
+            "-SemiBold", "SemiBold", "-DemiBold", "DemiBold",
+            "-Bold", "Bold", "-Italic", "Italic", "-Oblique", "Oblique",
+            "-Regular", "Regular", "-Roman", "Roman"
+        };
+
+        foreach (string suffix in faceSuffixes)
+        {
+            if (family.Length > suffix.Length &&
+                family.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                family = family[..^suffix.Length].TrimEnd(' ', '-', '_');
+                break;
+            }
+        }
+
         return family.Trim();
     }
 
