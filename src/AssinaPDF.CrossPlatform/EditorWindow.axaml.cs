@@ -92,7 +92,7 @@ public partial class EditorWindow : Window
             var fonts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
             using (var document = Document.Open(_workingCopyPath))
             {
-                foreach (Page page in document.Pages)
+                foreach (Aspose.Pdf.Page page in document.Pages)
                 {
                     var absorber = new TextFragmentAbsorber();
                     page.Accept(absorber);
