@@ -2,11 +2,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.EditorWindow"
         Title="AssinaPDF | Editor de PDF"
-        Width="1050" Height="700"
-        MinWidth="760" MinHeight="520"
+        Width="1180" Height="780"
+        MinWidth="820" MinHeight="560"
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
-  <Grid RowDefinitions="68,82,*,42">
+  <Grid RowDefinitions="64,112,*,42">
     <Border Grid.Row="0" Background="#292D36" Padding="20,8">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
         <StackPanel VerticalAlignment="Center" Spacing="2">
@@ -15,7 +15,7 @@
           <TextBlock x:Name="DocumentNameText" Text="Cópia de trabalho"
                      FontSize="11" Foreground="#D5D8DE"/>
         </StackPanel>
-        <Button Grid.Column="1" Content="Salvar como novo PDF" Click="SaveAs_Click"
+        <Button Grid.Column="1" Content="Salvar como PDF" Click="SaveAs_Click"
                 VerticalAlignment="Center" Padding="18,10"
                 Background="#FFFFFF" Foreground="#292D36" BorderThickness="0"/>
         <Button Grid.Column="2" Content="Fechar" Click="CloseEditor_Click"
@@ -24,11 +24,20 @@
       </Grid>
     </Border>
 
-    <!-- Faixa de ferramentas inspirada no Word: somente ações já funcionais. -->
+    <!-- Faixa permanente de opções, inspirada no Microsoft Word. -->
     <Border Grid.Row="1" Background="#FFFFFF"
-            BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="14,8">
+            BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="12,7">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+          <StackPanel Spacing="5" VerticalAlignment="Center">
+            <TextBlock Text="ARQUIVO" FontSize="9" FontWeight="Bold"
+                       Foreground="#7A808A" HorizontalAlignment="Center"/>
+            <Button Content="Abrir PDF" Click="OpenPdf_Click" Padding="16,9"
+                    Background="#292D36" Foreground="White" BorderThickness="0"/>
+          </StackPanel>
+
+          <Border Width="1" Height="58" Background="#E0E2E6"/>
+
           <StackPanel Spacing="5" VerticalAlignment="Center">
             <TextBlock Text="HISTÓRICO" FontSize="9" FontWeight="Bold"
                        Foreground="#7A808A" HorizontalAlignment="Center"/>
@@ -42,19 +51,35 @@
             </StackPanel>
           </StackPanel>
 
-          <Border Width="1" Height="48" Background="#E0E2E6"/>
+          <Border Width="1" Height="58" Background="#E0E2E6"/>
 
           <StackPanel Spacing="5" VerticalAlignment="Center">
-            <TextBlock Text="EDIÇÃO DE TEXTO" FontSize="9" FontWeight="Bold"
+            <TextBlock Text="FERRAMENTAS" FontSize="9" FontWeight="Bold"
                        Foreground="#7A808A" HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <TextBlock x:Name="SelectedTextLabel" Text="" IsVisible="False"
-                         VerticalAlignment="Center" Foreground="#292D36"
-                         FontWeight="SemiBold" MaxWidth="320"
-                         TextTrimming="CharacterEllipsis"/>
-              <Button x:Name="EditSelectedTextButton" Content="Editar texto selecionado"
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button x:Name="SelectModeButton" Content="↖ Selecionar"
+                      Click="SelectMode_Click" Padding="14,9"
+                      Background="#E9E3F5" Foreground="#4C3482"
+                      BorderBrush="#D5C9EA" FontWeight="SemiBold"/>
+              <Button x:Name="AddTextModeButton" Content="T Adicionar texto"
+                      Click="AddTextMode_Click" Padding="14,9"
+                      Background="#F0F1F4" Foreground="#34383E"
+                      BorderBrush="#D9DCE0"/>
+            </StackPanel>
+          </StackPanel>
+
+          <Border Width="1" Height="58" Background="#E0E2E6"/>
+
+          <StackPanel Spacing="5" VerticalAlignment="Center">
+            <TextBlock Text="TEXTO SELECIONADO" FontSize="9" FontWeight="Bold"
+                       Foreground="#7A808A" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+              <TextBlock x:Name="SelectedTextLabel" Text="Selecione um trecho no PDF"
+                         VerticalAlignment="Center" Foreground="#737B87"
+                         MaxWidth="240" TextTrimming="CharacterEllipsis"/>
+              <Button x:Name="EditSelectedTextButton" Content="Editar"
                       IsVisible="False" Click="EditSelectedText_Click"
-                      Padding="14,8" Background="#E9E3F5"
+                      Padding="13,8" Background="#E9E3F5"
                       Foreground="#4C3482" BorderBrush="#D5C9EA"/>
             </StackPanel>
           </StackPanel>
@@ -76,7 +101,7 @@
                  TextTrimming="CharacterEllipsis"/>
     </Border>
 
-    <!-- Mantém os campos ligados ao código legado sem exibi-los na nova interface. -->
+    <!-- Campos usados pelos comandos internos de localizar/substituir. -->
     <StackPanel IsVisible="False">
       <TextBox x:Name="SearchTextBox"/>
       <TextBox x:Name="ReplaceTextBox"/>
