@@ -46,7 +46,7 @@
 
     <Border Grid.Row="3" Background="#E7E9ED" Padding="12,4">
       <TextBlock x:Name="EditorStatusText"
-                 Text="O documento está aberto em uma cópia temporária. O original permanece preservado."
+                 Text="O documento está aberto em uma cópia de trabalho permanente. O original permanece preservado."
                  FontSize="11" Foreground="#555B63" VerticalAlignment="Center"/>
     </Border>
   </Grid>
