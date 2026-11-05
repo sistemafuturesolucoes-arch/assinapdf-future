@@ -32,7 +32,7 @@
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
           <Button Content="Validação" Click="DashboardValidate_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
-          <Button Content="Editar PDF" Click="DashboardEditNew_Click"
+          <Button Content="Editar PDF" Click="DashboardEdit_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
           <Button Content="Organizar" Click="DashboardOrganize_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
@@ -85,7 +85,7 @@
               </StackPanel>
             </Button>
 
-            <Button Grid.Row="1" Grid.Column="0" Click="DashboardEditNew_Click"
+            <Button Grid.Row="1" Grid.Column="0" Click="DashboardEdit_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
                     CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
