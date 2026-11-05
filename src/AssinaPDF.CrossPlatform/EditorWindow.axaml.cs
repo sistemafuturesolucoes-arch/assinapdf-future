@@ -1226,7 +1226,6 @@ public partial class EditorWindow : Window
     {
         string normalized = NormalizePdfFontFamily(family);
         return normalized.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Equals("Arial", StringComparison.OrdinalIgnoreCase) ||
                normalized.Equals("Courier", StringComparison.OrdinalIgnoreCase) ||
                normalized.Equals("Courier New", StringComparison.OrdinalIgnoreCase) ||
                normalized.Equals("Times", StringComparison.OrdinalIgnoreCase) ||
@@ -1239,8 +1238,7 @@ public partial class EditorWindow : Window
     private static string GetPdfFontFaceName(string family, bool bold, bool italic)
     {
         string normalized = NormalizePdfFontFamily(family);
-        bool isHelvetica = normalized.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) ||
-                           normalized.Equals("Arial", StringComparison.OrdinalIgnoreCase);
+        bool isHelvetica = normalized.Equals("Helvetica", StringComparison.OrdinalIgnoreCase);
         bool isCourier = normalized.Equals("Courier", StringComparison.OrdinalIgnoreCase) ||
                          normalized.Equals("Courier New", StringComparison.OrdinalIgnoreCase);
         bool isTimes = normalized.Equals("Times", StringComparison.OrdinalIgnoreCase) ||
