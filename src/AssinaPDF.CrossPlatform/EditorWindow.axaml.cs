@@ -90,6 +90,29 @@ public partial class EditorWindow : Window
         }
     }
 
+    private static void RegisterDocumentFont(
+        Aspose.Pdf.Text.Font? font,
+        string? stateFontName,
+        IDictionary<string, bool> fonts)
+    {
+        string rawName = font?.DecodedFontName ??
+                         font?.BaseFont ??
+                         stateFontName ??
+                         string.Empty;
+        string family = NormalizePdfFontFamily(rawName);
+
+        if (string.IsNullOrWhiteSpace(family) ||
+            family.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
+            family.Length <= 2)
+            return;
+
+        bool embedded = font?.IsEmbedded == true;
+        if (fonts.TryGetValue(family, out bool wasEmbedded))
+            fonts[family] = wasEmbedded || embedded;
+        else
+            fonts[family] = embedded;
+    }
+
     private async Task VerifyDocumentFontsAsync()
     {
         if (!File.Exists(_workingCopyPath))
@@ -109,22 +132,26 @@ public partial class EditorWindow : Window
 
                     foreach (TextFragment fragment in absorber.TextFragments)
                     {
-                        var font = fragment.TextState.Font;
-                        string rawName = font?.DecodedFontName ??
-                                         font?.BaseFont ??
-                                         fragment.TextState.FontName ??
-                                         string.Empty;
-                        string family = NormalizePdfFontFamily(rawName);
-                        if (string.IsNullOrWhiteSpace(family) ||
-                            family.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
-                            family.Length <= 2)
+                        // Um fragmento pode conter vários segmentos com fontes
+                        // diferentes. A pré-verificação precisa inspecionar cada
+                        // segmento, não apenas a fonte herdada pelo fragmento.
+                        var segments = fragment.Segments.Cast<TextSegment>().ToArray();
+                        if (segments.Length == 0)
+                        {
+                            RegisterDocumentFont(
+                                fragment.TextState.Font,
+                                fragment.TextState.FontName,
+                                fonts);
                             continue;
+                        }
 
-                        bool embedded = font?.IsEmbedded == true;
-                        if (fonts.TryGetValue(family, out bool wasEmbedded))
-                            fonts[family] = wasEmbedded || embedded;
-                        else
-                            fonts[family] = embedded;
+                        foreach (TextSegment segment in segments)
+                        {
+                            RegisterDocumentFont(
+                                segment.TextState.Font,
+                                segment.TextState.FontName,
+                                fonts);
+                        }
                     }
                 }
             }
