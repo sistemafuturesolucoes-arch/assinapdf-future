@@ -39,6 +39,20 @@ public sealed class PdfiumObjectInspectionTests
             var following = Assert.Single(characters, item => item.CharacterIndex == 1 && item.Text == "u");
             Assert.True(following.Left >= letterF.Left);
             Assert.True(following.CharacterIndex > letterF.CharacterIndex);
+
+            var hit = PdfiumTextHitTest.FindCharacterAtPoint(
+                characters,
+                pageIndex: 0,
+                x: (letterF.Left + letterF.Right) / 2,
+                y: (letterF.Bottom + letterF.Top) / 2);
+
+            Assert.NotNull(hit);
+            Assert.Equal(0, hit.CharacterIndex);
+
+            var miss = PdfiumTextHitTest.FindCharacterAtPoint(
+                characters, pageIndex: 0, x: 10, y: 10);
+
+            Assert.Null(miss);
         }
         finally
         {
