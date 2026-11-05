@@ -284,11 +284,20 @@ public partial class MainWindow : Window
         UpdateActionButtons();
     }
 
-    private void DashboardEdit_Click(
+    private async void DashboardEdit_Click(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
-        DashboardStatusText.Text = "As ferramentas de edição serão disponibilizadas em uma próxima etapa.";
+        try
+        {
+            var editorCenter = new EditorCenterWindow();
+            await editorCenter.ShowDialog(this);
+            DashboardStatusText.Text = "Central de edição fechada.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir a central de edição: {ex.Message}";
+        }
     }
 
     private void DashboardOrganize_Click(
