@@ -1076,9 +1076,19 @@ public partial class EditorWindow : Window
             {
                 string faceName = GetPdfFontFaceName(fontFamily, run.IsBold, run.IsItalic);
 
-                state.Font = IsStandard14Family(fontFamily)
-                    ? FontRepository.FindFont(faceName)
-                    : FontRepository.FindFont(fontFamily, requestedStyle);
+                if (IsStandard14Family(fontFamily))
+                {
+                    // Standard 14 faces are PDF base-font names, not embedded
+                    // font programs. Use FontName so the writer emits the exact
+                    // face (for example Helvetica-Bold) in the Tf operator.
+                    state.FontName = faceName;
+                }
+                else
+                {
+                    // For other families, resolve the requested physical face
+                    // and let Aspose embed/use that font program.
+                    state.Font = FontRepository.FindFont(fontFamily, requestedStyle);
+                }
             }
             catch (Exception ex)
             {
