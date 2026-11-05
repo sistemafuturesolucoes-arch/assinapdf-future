@@ -697,7 +697,14 @@ public partial class EditorWindow : Window
                 TextFragment target;
                 if (originalBounds != null && originalText != null)
                 {
-                    var pageAbsorber = new TextFragmentAbsorber();
+                    // A opção RemoveUnusedFonts instrui o mecanismo de edição a
+                    // substituir a referência de fonte do trecho absorvido e limpar
+                    // recursos antigos que deixarem de ser usados. Isso é essencial
+                    // quando o PDF original usa uma fonte CID Type0 incorporada e o
+                    // usuário escolhe uma face compatível (por exemplo, Helvetica-Bold).
+                    var fontEditOptions = new TextEditOptions(
+                        TextEditOptions.FontReplace.RemoveUnusedFonts);
+                    var pageAbsorber = new TextFragmentAbsorber(fontEditOptions);
                     document.Pages[pageIndex + 1].Accept(pageAbsorber);
 
                     target = null!;
