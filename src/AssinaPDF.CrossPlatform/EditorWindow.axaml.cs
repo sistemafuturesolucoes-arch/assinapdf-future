@@ -52,6 +52,8 @@ public partial class EditorWindow : Window
     private AvaloniaImage? _activeSelectionImage;
     private PagePreviewInfo? _activeSelectionPage;
     private string _selectedText = string.Empty;
+    private RichEditorControl? _defaultToolbarEditor;
+    private RichEditorToolbar? _formattingToolbar;
 
     // Construtor sem parâmetros usado pelo carregador XAML do Avalonia.
     // A janela funcional é criada pelo fluxo do editor com os caminhos explícitos.
@@ -64,6 +66,7 @@ public partial class EditorWindow : Window
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_sessionDirectory);
         InitializeComponent();
+        InitializeFormattingToolbar();
         Closed += (_, _) => DisposeResources();
         EditorStatusText.Text = "Clique em “Abrir PDF” para começar. O documento original será preservado.";
     }
@@ -71,6 +74,7 @@ public partial class EditorWindow : Window
     public EditorWindow(string workingCopyPath, string originalPath, string sessionDirectory)
     {
         InitializeComponent();
+        InitializeFormattingToolbar();
 
         _workingCopyPath = workingCopyPath;
         _originalPath = originalPath;
@@ -85,6 +89,40 @@ public partial class EditorWindow : Window
 
         Closed += (_, _) => DisposeResources();
         Opened += async (_, _) => await InitializeDocumentAsync();
+    }
+
+    private void InitializeFormattingToolbar()
+    {
+        RichEditorToolbar.FontSizes = new[]
+        {
+            6d, 7d, 8d, 9d, 10d, 11d, 12d, 14d, 16d,
+            18d, 20d, 22d, 24d, 26d, 28d, 36d, 48d, 72d
+        };
+
+        _defaultToolbarEditor = new RichEditorControl
+        {
+            Document = new RichFlowDocument(),
+            FontFamilyChoices = InstalledFontCatalogService.GetInstalledFamilyNames(),
+            DefaultFontSize = 12,
+            DefaultForeground = Avalonia.Media.Brushes.Black,
+            AllowImages = false,
+            AllowTables = false,
+            AllowRichPaste = false,
+            AllowFindReplace = false,
+            ShowPageBoundaries = false
+        };
+
+        _formattingToolbar = new RichEditorToolbar
+        {
+            Target = _defaultToolbarEditor,
+            ToolbarLevel = RichToolbarLevel.Normal
+        };
+        EditorFormattingToolbarHost.Content = _formattingToolbar;
+    }
+
+    private void TextTool_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        AddTextMode_Click(sender, e);
     }
 
     private async Task InitializeDocumentAsync()
@@ -514,45 +552,15 @@ public partial class EditorWindow : Window
 
     private async Task AddTextAtPointAsync(PagePreviewInfo pageInfo, Avalonia.Point point, AvaloniaImage image)
     {
-        if (!PdfiumPageCoordinateMapper.TryViewToPdf(point.X, point.Y, image.Bounds.Width, image.Bounds.Height,
-            pageInfo.WidthPoints, pageInfo.HeightPoints, out double pdfX, out double pdfY))
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+            point.X, point.Y, image.Bounds.Width, image.Bounds.Height,
+            pageInfo.WidthPoints, pageInfo.HeightPoints,
+            out double pdfX, out double pdfY))
             return;
-        var input = new TextBox { PlaceholderText = "Digite o texto que deseja inserir", AcceptsReturn = true,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 90 };
-        var confirm = new Button { Content = "Inserir texto", MinWidth = 110 };
-        var cancel = new Button { Content = "Cancelar", MinWidth = 90 };
-        var dialog = new Window { Title = "Adicionar texto ao PDF", Width = 460, Height = 230,
-            MinWidth = 420, WindowStartupLocation = WindowStartupLocation.CenterOwner, CanResize = false };
-        confirm.Click += (_, _) => dialog.Close(input.Text ?? string.Empty);
-        cancel.Click += (_, _) => dialog.Close(null);
-        dialog.Content = new StackPanel { Margin = new Thickness(20), Spacing = 12, Children =
-        {
-            new TextBlock { Text = "O texto será inserido no ponto escolhido da página.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
-            input,
-            new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Spacing = 8,
-                Children = { cancel, confirm } }
-        }};
-        string? value = await dialog.ShowDialog<string?>(this);
-        if (string.IsNullOrWhiteSpace(value)) return;
-        try
-        {
-            ApplyPdfEdit(document =>
-            {
-                var fragment = new TextFragment(value);
-                fragment.Position = new Position(pdfX, pdfY);
-                fragment.TextState.FontSize = 12;
-                fragment.TextState.Font = FontRepository.FindFont("Arial");
-                new TextBuilder(document.Pages[pageInfo.PageIndex + 1]).AppendText(fragment);
-            }, "Texto inserido na página.", savedDocument =>
-            {
-                var absorber = new TextFragmentAbsorber();
-                savedDocument.Pages[pageInfo.PageIndex + 1].Accept(absorber);
-                return absorber.TextFragments.Any(item => item.Text.Contains(value, StringComparison.Ordinal));
-            });
-            SelectMode_Click(null, new Avalonia.Interactivity.RoutedEventArgs());
-        }
-        catch (Exception ex) { EditorStatusText.Text = $"Não foi possível inserir o texto: {ex.Message}"; }
+
+        // A ferramenta T usa o mesmo editor rico inline da edição de texto:
+        // clique na página, digite e aplique sem abrir uma janela modal.
+        await EditTextAtPointAsync(pageInfo.PageIndex, pdfX, pdfY);
     }
 
     private async void OpenPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -720,13 +728,9 @@ public partial class EditorWindow : Window
                 18d, 20d, 22d, 24d, 26d, 28d, 36d, 48d, 72d
             };
 
-            var toolbar = new RichEditorToolbar
-            {
-                Target = richEditor,
-                ToolbarLevel = RichToolbarLevel.Normal
-            };
-
-            EditorFormattingToolbarHost.Content = toolbar;
+            if (_formattingToolbar == null)
+                InitializeFormattingToolbar();
+            _formattingToolbar!.Target = richEditor;
 
             var actionPanel = new StackPanel
             {
@@ -774,7 +778,8 @@ public partial class EditorWindow : Window
             if (!_pageSurfaces.TryGetValue(pageIndex, out var pageSurface) ||
                 pageSurface.Image.Tag is not PagePreviewInfo inlinePageInfo)
             {
-                EditorFormattingToolbarHost.Content = null;
+                if (_formattingToolbar != null && _defaultToolbarEditor != null)
+                    _formattingToolbar.Target = _defaultToolbarEditor;
                 return;
             }
 
@@ -796,6 +801,18 @@ public partial class EditorWindow : Window
             if (editorTop + 250 > pageSurface.Image.Bounds.Height)
                 editorTop = Math.Max(8, anchor.Y - 250);
 
+            double insertionPdfX = x;
+            double insertionPdfY = y;
+            var dragHandle = new TextBlock
+            {
+                Text = originalText == null ? "↕  Arraste para posicionar o texto" : "Editando texto selecionado",
+                FontSize = 11,
+                FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                Foreground = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(76, 52, 130)),
+                Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeAll)
+            };
+
             var inlineEditor = new Border
             {
                 Width = editorWidth,
@@ -811,20 +828,61 @@ public partial class EditorWindow : Window
                     Spacing = 7,
                     Children =
                     {
-                        new TextBlock
-                        {
-                            Text = originalText == null
-                                ? "Novo texto"
-                                : "Editando texto selecionado",
-                            FontSize = 11,
-                            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-                            Foreground = new Avalonia.Media.SolidColorBrush(
-                                Avalonia.Media.Color.FromRgb(76, 52, 130))
-                        },
+                        dragHandle,
                         editorSurface,
                         actionPanel
                     }
                 }
+            };
+
+            bool draggingEditor = false;
+            Avalonia.Point dragStart = default;
+            double dragStartLeft = editorLeft;
+            double dragStartTop = editorTop;
+            dragHandle.PointerPressed += (_, args) =>
+            {
+                if (!args.GetCurrentPoint(dragHandle).Properties.IsLeftButtonPressed)
+                    return;
+                draggingEditor = true;
+                dragStart = args.GetPosition(pageSurface.Overlay);
+                dragStartLeft = editorLeft;
+                dragStartTop = editorTop;
+                args.Pointer.Capture(dragHandle);
+                args.Handled = true;
+            };
+            dragHandle.PointerMoved += (_, args) =>
+            {
+                if (!draggingEditor)
+                    return;
+                var current = args.GetPosition(pageSurface.Overlay);
+                editorLeft = Math.Clamp(
+                    dragStartLeft + current.X - dragStart.X,
+                    4, Math.Max(4, pageSurface.Image.Bounds.Width - editorWidth - 4));
+                editorTop = Math.Clamp(
+                    dragStartTop + current.Y - dragStart.Y,
+                    4, Math.Max(4, pageSurface.Image.Bounds.Height - inlineEditor.Height - 4));
+                Canvas.SetLeft(inlineEditor, editorLeft);
+                Canvas.SetTop(inlineEditor, editorTop);
+                args.Handled = true;
+            };
+            dragHandle.PointerReleased += (_, args) =>
+            {
+                if (!draggingEditor)
+                    return;
+                draggingEditor = false;
+                args.Pointer.Capture(null);
+                if (originalText == null)
+                {
+                    var insertionAnchor = new Avalonia.Point(
+                        Math.Clamp(editorLeft + 12, 0, pageSurface.Image.Bounds.Width),
+                        Math.Clamp(editorTop + 48, 0, pageSurface.Image.Bounds.Height));
+                    PdfiumPageCoordinateMapper.TryViewToPdf(
+                        insertionAnchor.X, insertionAnchor.Y,
+                        pageSurface.Image.Bounds.Width, pageSurface.Image.Bounds.Height,
+                        inlinePageInfo.WidthPoints, inlinePageInfo.HeightPoints,
+                        out insertionPdfX, out insertionPdfY);
+                }
+                args.Handled = true;
             };
 
             Canvas.SetLeft(inlineEditor, editorLeft);
@@ -843,7 +901,8 @@ public partial class EditorWindow : Window
 
             pageSurface.Overlay.Children.Remove(inlineEditor);
             pageSurface.Overlay.IsHitTestVisible = false;
-            EditorFormattingToolbarHost.Content = null;
+            if (_formattingToolbar != null && _defaultToolbarEditor != null)
+                _formattingToolbar.Target = _defaultToolbarEditor;
 
 
             var editedRuns = new List<EditedTextRun>();
@@ -960,7 +1019,7 @@ public partial class EditorWindow : Window
                 {
                     target = new TextFragment(replacementText)
                     {
-                        Position = new Position(x, y)
+                        Position = new Position(insertionPdfX, insertionPdfY)
                     };
                 }
 
@@ -1025,6 +1084,8 @@ public partial class EditorWindow : Window
         }
         catch (Exception ex)
         {
+            if (_formattingToolbar != null && _defaultToolbarEditor != null)
+                _formattingToolbar.Target = _defaultToolbarEditor;
             EditorStatusText.Text = $"Não foi possível concluir a edição: {ex.Message}";
             await ShowEditingDiagnosticAsync(ex);
         }
