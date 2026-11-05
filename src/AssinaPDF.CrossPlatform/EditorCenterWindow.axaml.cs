@@ -145,29 +145,17 @@ public partial class EditorCenterWindow : Window
     {
         try
         {
-            var files = await StorageProvider.OpenFilePickerAsync(
-                new FilePickerOpenOptions
-                {
-                    Title = "Selecionar PDF para edição",
-                    AllowMultiple = false,
-                    FileTypeFilter = new[]
-                    {
-                        new FilePickerFileType("Documentos PDF")
-                        {
-                            Patterns = new[] { "*.pdf", "*.PDF" }
-                        }
-                    }
-                });
-
-            if (files.Count == 0)
-                return;
-
-            var entry = _history.CreateWorkingCopy(files[0].Path.LocalPath);
-            await OpenEntryAsync(entry);
+            // A central de edição abre diretamente o editor; a escolha do PDF
+            // acontece pelo botão Abrir PDF na faixa de ferramentas.
+            var editor = new EditorWindow();
+            CenterStatusText.Text = "Editor iniciado. Use “Abrir PDF” para escolher um documento.";
+            await editor.ShowDialog(this);
+            RefreshRecentDocuments();
+            CenterStatusText.Text = "Central de edição atualizada.";
         }
         catch (Exception ex)
         {
-            CenterStatusText.Text = $"Não foi possível iniciar a edição: {ex.Message}";
+            CenterStatusText.Text = $"Não foi possível iniciar o editor: {ex.Message}";
         }
     }
 
