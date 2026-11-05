@@ -220,6 +220,65 @@ public sealed class PdfTextFormattingTests
         AssertRunForegroundColors(offsets, 6, 11, Colors.Blue);
     }
 
+    [Fact]
+    public void ApplyRichTextFormatting_PersistsBoldForRunStartingAtNonZeroOffset()
+    {
+        const string text = "ABCDE";
+        using var original = new Document();
+        var page = original.Pages.Add();
+        var fragment = new TextFragment(text)
+        {
+            Position = new Position(50, 700)
+        };
+        fragment.TextState.FontName = "Helvetica";
+        fragment.TextState.FontSize = 11;
+        new TextBuilder(page).AppendText(fragment);
+
+        using var initialPdf = new MemoryStream();
+        original.Save(initialPdf);
+        initialPdf.Position = 0;
+
+        using var editable = Document.Open(initialPdf);
+        var absorber = new TextFragmentAbsorber(text);
+        editable.Pages[1].Accept(absorber);
+        var target = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
+
+        EditorWindow.ApplyRichTextFormatting(
+            target,
+            new[]
+            {
+                new EditorWindow.EditedTextRun(0, 1, "Helvetica", 11, false, false, Colors.Black, null),
+                new EditorWindow.EditedTextRun(1, 3, "Helvetica", 18, true, false, Colors.Black, null),
+                new EditorWindow.EditedTextRun(4, 1, "Helvetica", 11, false, false, Colors.Black, null)
+            },
+            "Helvetica",
+            originalFontEmbedded: false);
+
+        using var output = new MemoryStream();
+        editable.Save(output);
+        output.Position = 0;
+
+        using var reopened = Document.Open(output);
+        var savedAbsorber = new TextFragmentAbsorber(text);
+        reopened.Pages[1].Accept(savedAbsorber);
+        var saved = Assert.Single(savedAbsorber.TextFragments.Cast<TextFragment>());
+
+        var offsets = new List<(int Start, int End, TextSegment Segment)>();
+        int offset = 0;
+        foreach (TextSegment segment in saved.Segments)
+        {
+            int end = offset + (segment.Text?.Length ?? 0);
+            offsets.Add((offset, end, segment));
+            offset = end;
+        }
+
+        Assert.Equal(text.Length, offset);
+        AssertRun(offsets, 0, 1, 11, bold: false, italic: false);
+        AssertRun(offsets, 1, 4, 18, bold: true, italic: false);
+        AssertRun(offsets, 4, 5, 11, bold: false, italic: false);
+        Assert.All(offsets, item => Assert.NotNull(item.Segment.Position));
+    }
+
     private void AssertYellowBackgroundRendered(byte[] pdfBytes, string context)
     {
         string path = Path.Combine(
