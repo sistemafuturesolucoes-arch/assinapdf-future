@@ -42,6 +42,18 @@ public sealed record PdfiumPageObjectInfo(
     float Top,
     float? FontSize);
 
+public sealed record PdfiumCharacterInfo(
+    int PageIndex,
+    int CharacterIndex,
+    string Text,
+    double Left,
+    double Bottom,
+    double Right,
+    double Top,
+    double FontSize,
+    string? FontName,
+    int FontFlags);
+
 public sealed class PdfiumDocument : IDisposable
 {
     private const int MaximumDimension = 5000;
@@ -339,6 +351,100 @@ public sealed class PdfiumDocument : IDisposable
                     result.Add(new PdfiumPageObjectInfo(
                         pageIndex, index, objectType, text,
                         left, bottom, right, top, fontSize));
+                }
+
+                return result;
+            }
+            finally
+            {
+                if (textPage != IntPtr.Zero)
+                    PdfiumNative.TextClosePage(textPage);
+                if (page != IntPtr.Zero)
+                    PdfiumNative.ClosePage(page);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Retorna o fluxo de caracteres do PDFium com posição individual,
+    /// tamanho e, quando disponível no build nativo, nome/flags da fonte.
+    /// As coordenadas são pontos PDF, com origem no canto inferior esquerdo.
+    /// </summary>
+    public IReadOnlyList<PdfiumCharacterInfo> InspectPageCharacters(int pageIndex)
+    {
+        ThrowIfDisposed();
+
+        if (pageIndex < 0 || pageIndex >= PageCount)
+            throw new ArgumentOutOfRangeException(nameof(pageIndex));
+
+        lock (PdfiumNative.SyncRoot)
+        {
+            ThrowIfDisposed();
+
+            IntPtr page = IntPtr.Zero;
+            IntPtr textPage = IntPtr.Zero;
+            try
+            {
+                page = PdfiumNative.LoadPage(_document, pageIndex);
+                if (page == IntPtr.Zero)
+                    throw new InvalidDataException($"Não foi possível carregar a página {pageIndex + 1}.");
+
+                textPage = PdfiumNative.TextLoadPage(page);
+                if (textPage == IntPtr.Zero)
+                    throw new InvalidDataException($"Não foi possível analisar o texto da página {pageIndex + 1}.");
+
+                int characterCount = PdfiumNative.TextCountChars(textPage);
+                if (characterCount < 0)
+                    throw new InvalidDataException($"Não foi possível contar os caracteres da página {pageIndex + 1}.");
+                if (characterCount > 2_000_000)
+                    throw new InvalidDataException("A página contém caracteres demais para inspeção segura.");
+
+                var result = new List<PdfiumCharacterInfo>(characterCount);
+                IntPtr fontBuffer = Marshal.AllocHGlobal(512);
+                try
+                {
+                    for (int index = 0; index < characterCount; index++)
+                    {
+                        uint unicode = PdfiumNative.TextGetUnicode(textPage, index);
+                        string character = unicode == 0 || !Rune.IsValid((int)unicode)
+                            ? string.Empty
+                            : char.ConvertFromUtf32((int)unicode);
+
+                        PdfiumNative.TextGetCharBox(
+                            textPage, index,
+                            out double left, out double right,
+                            out double bottom, out double top);
+
+                        double fontSize = PdfiumNative.TextGetCharacterFontSize(textPage, index);
+                        if (!double.IsFinite(left) || !double.IsFinite(right) ||
+                            !double.IsFinite(bottom) || !double.IsFinite(top) ||
+                            !double.IsFinite(fontSize))
+                            continue;
+
+                        string? fontName = null;
+                        int fontFlags = 0;
+                        try
+                        {
+                            nuint nameLength = PdfiumNative.TextGetFontInfo(
+                                textPage, index, fontBuffer, (nuint)512, out fontFlags);
+                            if (nameLength > 1 && nameLength <= 512)
+                                fontName = Marshal.PtrToStringUTF8(fontBuffer);
+                        }
+                        catch (EntryPointNotFoundException)
+                        {
+                            // A API é experimental e pode não existir em algumas builds.
+                            fontName = null;
+                        }
+
+                        result.Add(new PdfiumCharacterInfo(
+                            pageIndex, index, character,
+                            left, bottom, right, top,
+                            fontSize, fontName, fontFlags));
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(fontBuffer);
                 }
 
                 return result;
