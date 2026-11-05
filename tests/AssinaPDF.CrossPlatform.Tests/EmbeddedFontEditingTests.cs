@@ -8,6 +8,50 @@ namespace AssinaPDF.CrossPlatform.Tests;
 public sealed class EmbeddedFontEditingTests
 {
     [Fact]
+    public void ApplyRichTextFormatting_PersistsBoldAndLargerFontAfterReopeningPdf()
+    {
+        using var document = new Document();
+        var page = document.Pages.Add();
+        var fragment = new TextFragment("Texto em negrito maior")
+        {
+            Position = new Position(50, 700)
+        };
+        fragment.TextState.Font = FontRepository.FindFont("Helvetica");
+        fragment.TextState.FontSize = 11;
+        new TextBuilder(page).AppendText(fragment);
+
+        EditorWindow.ApplyRichTextFormatting(
+            fragment,
+            new[]
+            {
+                new EditorWindow.EditedTextRun(
+                    0,
+                    fragment.Text.Length,
+                    "Helvetica",
+                    18,
+                    true,
+                    false,
+                    null,
+                    null)
+            },
+            "Helvetica",
+            originalFontEmbedded: false);
+
+        using var output = new MemoryStream();
+        document.Save(output);
+        Assert.True(output.Length > 0);
+        output.Position = 0;
+
+        using var reopened = Document.Open(output);
+        var absorber = new TextFragmentAbsorber("Texto em negrito maior");
+        reopened.Pages[1].Accept(absorber);
+        var saved = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
+
+        Assert.True(saved.TextState.IsBold);
+        Assert.Equal(18, saved.TextState.FontSize, precision: 1);
+    }
+
+    [Fact]
     public void ApplyRichTextFormatting_PreservesOriginalFaceWhenEmbeddedFontIsUnchanged()
     {
         using var document = new Document();
