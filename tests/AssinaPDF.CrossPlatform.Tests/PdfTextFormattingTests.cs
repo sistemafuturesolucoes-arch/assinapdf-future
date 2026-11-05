@@ -4,16 +4,11 @@ using Aspose.Pdf.Text;
 using AssinaPDF.MacPrototype;
 using AssinaPDF.MacPrototype.Services;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace AssinaPDF.CrossPlatform.Tests;
 
 public sealed class PdfTextFormattingTests
 {
-    private readonly ITestOutputHelper _output;
-
-    public PdfTextFormattingTests(ITestOutputHelper output) => _output = output;
-
     [Fact]
     public void ApplyRichTextFormatting_PersistsCombinedStyleAfterSaveAndReload()
     {
@@ -189,14 +184,6 @@ public sealed class PdfTextFormattingTests
             beforeSaveOffset = end;
         }
         Assert.Equal(text.Length, beforeSaveOffset);
-        _output.WriteLine($"Fragmento antes de salvar: FontSize={target.TextState.FontSize:0.##}; FontName={target.TextState.FontName}; FontSizeTouched={ReadInternalFlag(target.TextState, "FontSizeTouched")}; FontStyleTouched={ReadInternalFlag(target.TextState, "FontStyleTouched")}");
-        _output.WriteLine($"FONTE DO FRAGMENTO: FontName={target.TextState.FontName}; Font={target.TextState.Font?.FontName}; BaseFont={target.TextState.Font?.BaseFont}; FontData={target.TextState.FontData?.FontName}");
-        foreach (var item in beforeSaveOffsets)
-        {
-            var ownerProperty = typeof(TextState).GetProperty("OwnerSegment", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            var owner = ownerProperty?.GetValue(item.Segment.TextState);
-            _output.WriteLine($"ANTES [{item.Start},{item.End}): {DescribeSegment(item.Segment)}; StateRef={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(item.Segment.TextState)}; OwnerMatches={ReferenceEquals(owner, item.Segment)}; Font={item.Segment.TextState.Font?.FontName}; BaseFont={item.Segment.TextState.Font?.BaseFont}; FontData={item.Segment.TextState.FontData?.FontName}");
-        }
         AssertRun(beforeSaveOffsets, 0, 5, 20, bold: true, italic: false);
         AssertRun(beforeSaveOffsets, 5, 6, 10, bold: false, italic: false);
         AssertRun(beforeSaveOffsets, 6, 11, 12, bold: false, italic: true);
@@ -210,18 +197,6 @@ public sealed class PdfTextFormattingTests
         output.Position = 0;
 
         using var reopened = Document.Open(output);
-        foreach (var op in reopened.Pages[1].Contents.Commands)
-        {
-            var pdfOp = op.ToPdf();
-            if (pdfOp.Contains(" Tf", StringComparison.Ordinal) ||
-                pdfOp.Contains(" Tj", StringComparison.Ordinal) ||
-                pdfOp.Contains(" TJ", StringComparison.Ordinal) ||
-                pdfOp.Contains(" Td", StringComparison.Ordinal) ||
-                pdfOp.Contains(" rg", StringComparison.Ordinal))
-            {
-                _output.WriteLine("PDF OP: " + pdfOp);
-            }
-        }
         var absorber = new TextFragmentAbsorber(text);
         reopened.Pages[1].Accept(absorber);
         var savedFragment = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
@@ -272,7 +247,6 @@ public sealed class PdfTextFormattingTests
                 }
             }
 
-            _output.WriteLine($"PDFium: {yellowPixels} pixels amarelos detectados ({context}).");
             Assert.True(
                 yellowPixels > 0,
                 $"O fundo amarelo não apareceu na renderização PDFium ({context}).");
