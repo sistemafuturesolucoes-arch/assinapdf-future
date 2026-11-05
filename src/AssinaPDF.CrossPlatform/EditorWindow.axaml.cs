@@ -541,10 +541,10 @@ public partial class EditorWindow : Window
             var dialog = new Window
             {
                 Title = originalText == null ? "Inserir texto no PDF" : "Editar texto do PDF",
-                Width = 760,
-                Height = 640,
-                MinWidth = 620,
-                MinHeight = 520,
+                Width = 700,
+                Height = 560,
+                MinWidth = 540,
+                MinHeight = 420,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 CanResize = true,
                 Content = new StackPanel
