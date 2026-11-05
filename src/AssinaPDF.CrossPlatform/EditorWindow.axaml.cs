@@ -9,6 +9,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using AvaloniaImage = Avalonia.Controls.Image;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
@@ -504,7 +505,7 @@ public partial class EditorWindow : Window
         if (!PdfiumPageCoordinateMapper.TryViewToPdf(point.X, point.Y, image.Bounds.Width, image.Bounds.Height,
             pageInfo.WidthPoints, pageInfo.HeightPoints, out double pdfX, out double pdfY))
             return;
-        var input = new TextBox { Watermark = "Digite o texto que deseja inserir", AcceptsReturn = true,
+        var input = new TextBox { PlaceholderText = "Digite o texto que deseja inserir", AcceptsReturn = true,
             TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 90 };
         var confirm = new Button { Content = "Inserir texto", MinWidth = 110 };
         var cancel = new Button { Content = "Cancelar", MinWidth = 90 };
