@@ -1170,9 +1170,19 @@ public partial class EditorWindow : Window
                 if (run.FontSize > 0 && Math.Abs(state.FontSize - run.FontSize) > 0.75)
                     return Fail($"tamanho da fonte divergente na posição {run.Start}: esperado {run.FontSize:0.##} pt, salvo {state.FontSize:0.##} pt.");
                 if (state.IsBold != run.IsBold)
-                    return Fail($"negrito divergente na posição {run.Start}: esperado {run.IsBold}, salvo {state.IsBold}.");
+                {
+                    string actualFontName = state.Font?.FontName ?? "(sem objeto Font)";
+                    string actualBaseFont = state.Font?.BaseFont ?? "(sem BaseFont)";
+                    return Fail(
+                        $"negrito divergente na posição {run.Start}: esperado {run.IsBold}, " +
+                        $"IsBold salvo={state.IsBold}; FontStyle salvo={state.FontStyle}; " +
+                        $"FontName salvo='{state.FontName ?? "(nulo")}'; " +
+                        $"Font.FontName='{actualFontName}'; Font.BaseFont='{actualBaseFont}'.");
+                }
                 if (state.IsItalic != run.IsItalic)
-                    return Fail($"itálico divergente na posição {run.Start}: esperado {run.IsItalic}, salvo {state.IsItalic}.");
+                    return Fail(
+                        $"itálico divergente na posição {run.Start}: esperado {run.IsItalic}, " +
+                        $"salvo {state.IsItalic}; FontStyle={state.FontStyle}; FontName='{state.FontName ?? "(nulo")}'.");
 
                 if (!string.IsNullOrWhiteSpace(run.FontFamily) &&
                     !(originalFontEmbedded && string.Equals(
