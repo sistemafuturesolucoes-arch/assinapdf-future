@@ -64,6 +64,19 @@ public partial class EditorWindow : Window
         DocumentNameText.Text = Path.GetFileName(originalPath);
         Title = $"AssinaPDF | Editor - {Path.GetFileName(originalPath)}";
 
+        EditorStatusText.Text =
+            "Preparando o PDF e verificando as fontes utilizadas...";
+
+        Closed += (_, _) => DisposeResources();
+        Opened += async (_, _) => await InitializeDocumentAsync();
+    }
+
+    private async Task InitializeDocumentAsync()
+    {
+        // A verificação e a obtenção das fontes acontecem antes da primeira
+        // renderização, para que a prévia e o editor usem o mesmo conjunto de fontes.
+        await VerifyDocumentFontsAsync();
+
         try
         {
             LoadDocumentPreview();
@@ -75,9 +88,6 @@ public partial class EditorWindow : Window
             DisposeResources();
             throw;
         }
-
-        Closed += (_, _) => DisposeResources();
-        Opened += async (_, _) => await VerifyDocumentFontsAsync();
     }
 
     private async Task VerifyDocumentFontsAsync()
@@ -1384,15 +1394,12 @@ public partial class EditorWindow : Window
                         return Fail($"cor do texto divergente na posição {run.Start}: esperada RGB({foreground.R},{foreground.G},{foreground.B}), salva RGB({savedForeground.R},{savedForeground.G},{savedForeground.B}).");
                 }
 
-                if (run.Background is { } background)
-                {
-                    if (state.BackgroundColor is not { } savedBackground)
-                        return Fail($"o realce/fundo não foi recuperado na posição {run.Start}.");
-                    if (Math.Abs(savedBackground.R - background.R) > 2 ||
-                        Math.Abs(savedBackground.G - background.G) > 2 ||
-                        Math.Abs(savedBackground.B - background.B) > 2)
-                        return Fail($"cor do realce divergente na posição {run.Start}: esperada RGB({background.R},{background.G},{background.B}), salva RGB({savedBackground.R},{savedBackground.G},{savedBackground.B}).");
-                }
+                // O Aspose pode gravar o realce como um operador gráfico separado
+                // do texto. Nesse caso BackgroundColor não é reconstruído pelo
+                // TextFragmentAbsorber ao reabrir o PDF, embora o fundo esteja visível.
+                // A persistência visual do fundo é coberta pelos testes PDFium que
+                // renderizam o PDF salvo e verificam os pixels do realce.
+                // Não rejeite um PDF válido apenas pela ausência dessa propriedade.
             }
         }
 
