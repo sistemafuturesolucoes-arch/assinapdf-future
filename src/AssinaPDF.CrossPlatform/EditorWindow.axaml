@@ -2,56 +2,84 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.EditorWindow"
         Title="AssinaPDF | Editor de PDF"
-        Width="900" Height="640"
-        MinWidth="680" MinHeight="500"
+        Width="1180" Height="820"
+        MinWidth="900" MinHeight="650"
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
-  <Grid RowDefinitions="64,48,*,38">
-    <Border Grid.Row="0" Background="#292D36" Padding="18,8">
-      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+  <Grid RowDefinitions="68,82,*,42">
+    <Border Grid.Row="0" Background="#292D36" Padding="20,8">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
         <StackPanel VerticalAlignment="Center" Spacing="2">
-          <TextBlock Text="Editor de PDF" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
-          <TextBlock x:Name="DocumentNameText" Text="Cópia de trabalho" FontSize="11" Foreground="#D5D8DE"/>
+          <TextBlock Text="AssinaPDF  /  Editor de documentos" FontSize="18"
+                     FontWeight="SemiBold" Foreground="White"/>
+          <TextBlock x:Name="DocumentNameText" Text="Cópia de trabalho"
+                     FontSize="11" Foreground="#D5D8DE"/>
         </StackPanel>
-        <Button Grid.Column="1" Content="Salvar como novo PDF..." Click="SaveAs_Click"
-                VerticalAlignment="Center" Padding="16,9"
+        <Button Grid.Column="1" Content="Salvar como novo PDF" Click="SaveAs_Click"
+                VerticalAlignment="Center" Padding="18,10"
                 Background="#FFFFFF" Foreground="#292D36" BorderThickness="0"/>
-        <Button Grid.Column="2" Content="Fechar editor" Click="CloseEditor_Click"
-                VerticalAlignment="Center" Padding="16,9"
+        <Button Grid.Column="2" Content="Fechar" Click="CloseEditor_Click"
+                VerticalAlignment="Center" Padding="18,10"
                 Background="#555C68" Foreground="White" BorderThickness="0"/>
       </Grid>
     </Border>
 
-    <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,5">
+    <!-- Faixa de ferramentas inspirada no Word: somente ações já funcionais. -->
+    <Border Grid.Row="1" Background="#FFFFFF"
+            BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="14,8">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-          <Button Content="↶" FontSize="20" Width="38" Height="32" Click="Undo_Click" ToolTip.Tip="Desfazer"/>
-          <Button Content="↷" FontSize="20" Width="38" Height="32" Click="Redo_Click" ToolTip.Tip="Refazer"/>
-          <Border Width="1" Height="25" Background="#D9DCE0" Margin="3,0"/>
-          <TextBlock Text="Localizar:" VerticalAlignment="Center" Foreground="#555B63"/>
-          <TextBox x:Name="SearchTextBox" Width="170" PlaceholderText="Texto existente"/>
-          <TextBox x:Name="ReplaceTextBox" Width="170" PlaceholderText="Substituir por"/>
-          <Button Content="Substituir tudo" Click="ReplaceText_Click" Padding="12,6"/>
-          <TextBlock Text="Clique uma vez em um texto para selecioná-lo."
-                     VerticalAlignment="Center" Foreground="#666D77" Margin="8,0,0,0"/>
-          <TextBlock x:Name="SelectedTextLabel" Text="" IsVisible="False"
-                     VerticalAlignment="Center" Foreground="#292D36" FontWeight="SemiBold"/>
-          <Button x:Name="EditSelectedTextButton" Content="Editar seleção"
-                  IsVisible="False" Click="EditSelectedText_Click" Padding="12,6"/>
+        <StackPanel Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
+          <StackPanel Spacing="5" VerticalAlignment="Center">
+            <TextBlock Text="HISTÓRICO" FontSize="9" FontWeight="Bold"
+                       Foreground="#7A808A" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button Content="↶ Desfazer" Click="Undo_Click" Padding="12,8"
+                      Background="#F0F1F4" BorderBrush="#D9DCE0"
+                      ToolTip.Tip="Desfazer última alteração"/>
+              <Button Content="↷ Refazer" Click="Redo_Click" Padding="12,8"
+                      Background="#F0F1F4" BorderBrush="#D9DCE0"
+                      ToolTip.Tip="Refazer alteração"/>
+            </StackPanel>
+          </StackPanel>
+
+          <Border Width="1" Height="48" Background="#E0E2E6"/>
+
+          <StackPanel Spacing="5" VerticalAlignment="Center">
+            <TextBlock Text="EDIÇÃO DE TEXTO" FontSize="9" FontWeight="Bold"
+                       Foreground="#7A808A" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <TextBlock x:Name="SelectedTextLabel" Text="" IsVisible="False"
+                         VerticalAlignment="Center" Foreground="#292D36"
+                         FontWeight="SemiBold" MaxWidth="320"
+                         TextTrimming="CharacterEllipsis"/>
+              <Button x:Name="EditSelectedTextButton" Content="Editar texto selecionado"
+                      IsVisible="False" Click="EditSelectedText_Click"
+                      Padding="14,8" Background="#E9E3F5"
+                      Foreground="#4C3482" BorderBrush="#D5C9EA"/>
+            </StackPanel>
+          </StackPanel>
         </StackPanel>
       </ScrollViewer>
     </Border>
 
-    <Border Grid.Row="2" Background="#D9DCE0" Padding="12">
+    <Border Grid.Row="2" Background="#D9DCE0" Padding="18">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-        <StackPanel x:Name="EditorPagesPanel" Spacing="18" HorizontalAlignment="Center"/>
+        <StackPanel x:Name="EditorPagesPanel" Spacing="20"
+                    HorizontalAlignment="Center"/>
       </ScrollViewer>
     </Border>
 
-    <Border Grid.Row="3" Background="#E7E9ED" Padding="12,4">
+    <Border Grid.Row="3" Background="#E7E9ED" Padding="14,5">
       <TextBlock x:Name="EditorStatusText"
-                 Text="O documento está aberto em uma cópia de trabalho permanente. O original permanece preservado."
-                 FontSize="11" Foreground="#555B63" VerticalAlignment="Center"/>
+                 Text="Documento aberto em uma cópia de trabalho. O arquivo original permanece preservado."
+                 FontSize="11" Foreground="#555B63" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis"/>
     </Border>
+
+    <!-- Mantém os campos ligados ao código legado sem exibi-los na nova interface. -->
+    <StackPanel IsVisible="False">
+      <TextBox x:Name="SearchTextBox"/>
+      <TextBox x:Name="ReplaceTextBox"/>
+    </StackPanel>
   </Grid>
 </Window>
