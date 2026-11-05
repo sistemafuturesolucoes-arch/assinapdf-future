@@ -1108,7 +1108,7 @@ public partial class EditorWindow : Window
                     // Standard 14 fonts are PDF resource names, not embedded font programs.
                     // For absorbed text, write the face name directly so the content stream
                     // switches its Tf resource instead of retaining the source CID font.
-                    state.FontName = fontFamily;
+                    state.FontName = faceName;
                 }
                 else
                 {
