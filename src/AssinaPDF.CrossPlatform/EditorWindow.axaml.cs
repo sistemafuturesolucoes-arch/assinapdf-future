@@ -787,10 +787,13 @@ public partial class EditorWindow : Window
             Text = dialogText,
             IsReadOnly = true,
             AcceptsReturn = true,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+            Height = 430,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
         };
+        ScrollViewer.SetVerticalScrollBarVisibility(
+            detailsBox, Avalonia.Controls.Primitives.ScrollBarVisibility.Auto);
+        ScrollViewer.SetHorizontalScrollBarVisibility(
+            detailsBox, Avalonia.Controls.Primitives.ScrollBarVisibility.Auto);
 
         var closeButton = new Button
         {
@@ -819,12 +822,7 @@ public partial class EditorWindow : Window
                         Text = "A mensagem completa está abaixo. Você pode rolar, selecionar e copiar o texto.",
                         TextWrapping = Avalonia.Media.TextWrapping.Wrap
                     },
-                    new ScrollViewer
-                    {
-                        Content = detailsBox,
-                        VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-                        HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
-                    },
+                    detailsBox,
                     closeButton
                 }
             }
