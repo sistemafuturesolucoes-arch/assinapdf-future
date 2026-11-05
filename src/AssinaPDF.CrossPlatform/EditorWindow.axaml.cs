@@ -741,7 +741,8 @@ public partial class EditorWindow : Window
 
                     string? formattingFailure = VerifyRichTextFormatting(
                         savedDocument, pageIndex, replacementText, editedRuns,
-                        originalFontName, originalFontEmbedded, expectedBounds);
+                        originalFontName, originalFontEmbedded,
+                        originalBold, originalItalic, expectedBounds);
                     if (formattingFailure != null)
                         throw new InvalidOperationException("Diagnóstico da formatação: " + formattingFailure);
 
@@ -1170,6 +1171,26 @@ public partial class EditorWindow : Window
         return normalized;
     }
 
+    internal static bool IsUnchangedEmbeddedFontStyle(
+        bool originalFontEmbedded,
+        string? requestedFontFamily,
+        string? originalFontFamily,
+        bool originalBold,
+        bool originalItalic,
+        bool requestedBold,
+        bool requestedItalic,
+        bool savedFontEmbedded)
+    {
+        return originalFontEmbedded &&
+               savedFontEmbedded &&
+               string.Equals(
+                   NormalizePdfFontFamily(requestedFontFamily),
+                   NormalizePdfFontFamily(originalFontFamily),
+                   StringComparison.OrdinalIgnoreCase) &&
+               requestedBold == originalBold &&
+               requestedItalic == originalItalic;
+    }
+
     private static string? VerifyRichTextFormatting(
         Document document,
         int pageIndex,
@@ -1177,6 +1198,8 @@ public partial class EditorWindow : Window
         IReadOnlyList<EditedTextRun> expectedRuns,
         string? originalFontName,
         bool originalFontEmbedded,
+        bool originalBold,
+        bool originalItalic,
         Aspose.Pdf.Rectangle? expectedBounds)
     {
         string Fail(string reason) => reason;
@@ -1251,7 +1274,16 @@ public partial class EditorWindow : Window
                 var state = item.Segment.TextState;
                 if (run.FontSize > 0 && Math.Abs(state.FontSize - run.FontSize) > 0.75)
                     return Fail($"tamanho da fonte divergente na posição {run.Start}: esperado {run.FontSize:0.##} pt, salvo {state.FontSize:0.##} pt.");
-                if (state.IsBold != run.IsBold)
+                bool unchangedEmbeddedFace = IsUnchangedEmbeddedFontStyle(
+                    originalFontEmbedded,
+                    run.FontFamily,
+                    originalFontName,
+                    originalBold,
+                    originalItalic,
+                    run.IsBold,
+                    run.IsItalic,
+                    state.Font?.IsEmbedded == true);
+                if (state.IsBold != run.IsBold && !unchangedEmbeddedFace)
                 {
                     var actualFont = state.Font;
                     string actualFontName = actualFont?.FontName ?? "(sem objeto Font)";
@@ -1272,7 +1304,7 @@ public partial class EditorWindow : Window
                         $"Font.FontName='{actualFontName}'; Font.BaseFont='{actualBaseFont}'; " +
                         fontDetails);
                 }
-                if (state.IsItalic != run.IsItalic)
+                if (state.IsItalic != run.IsItalic && !unchangedEmbeddedFace)
                 {
                     string savedFontName = state.FontName ?? "(nulo)";
                     return Fail(
