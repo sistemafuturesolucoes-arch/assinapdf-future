@@ -37,6 +37,11 @@ public partial class MainWindow : Window
     private readonly List<Image> _thumbnailImages = new();
     private readonly List<Border> _pageCards = new();
     private readonly List<Canvas> _signatureOverlays = new();
+    private readonly List<Canvas> _textSelectionOverlays = new();
+    private readonly List<Border> _textSelectionMarkers = new();
+    private readonly List<PdfiumTextWordInfo?> _selectedTextWords = new();
+    private readonly List<IReadOnlyList<PdfiumTextLineInfo>> _pageTextLines = new();
+    private readonly List<(double Width, double Height)> _pageDimensions = new();
     private IReadOnlyList<SignatureWidgetInfo> _signatureWidgets = Array.Empty<SignatureWidgetInfo>();
     private string? _currentPdfPath;
 
@@ -150,6 +155,8 @@ public partial class MainWindow : Window
 
             var newDocument = new PdfiumDocument(path);
             var newBitmaps = new List<WriteableBitmap>();
+            var newPageDimensions = new List<(double Width, double Height)>();
+            var newPageTextLines = new List<IReadOnlyList<PdfiumTextLineInfo>>();
 
             try
             {
@@ -157,6 +164,18 @@ public partial class MainWindow : Window
                 {
                     var renderedPage = newDocument.RenderPage(i, 1.5f);
                     newBitmaps.Add(CreateBitmap(renderedPage));
+                    newPageDimensions.Add((renderedPage.PageWidthPoints, renderedPage.PageHeightPoints));
+
+                    try
+                    {
+                        var characters = newDocument.InspectPageCharacters(i);
+                        newPageTextLines.Add(PdfiumTextGrouping.GroupIntoLines(characters, i));
+                    }
+                    catch (Exception textReadError)
+                    {
+                        Debug.WriteLine($"Não foi possível preparar a seleção de texto da página {i + 1}: {textReadError}");
+                        newPageTextLines.Add(Array.Empty<PdfiumTextLineInfo>());
+                    }
                 }
 
                 var oldDocument = _pdfDocument;
@@ -174,6 +193,10 @@ public partial class MainWindow : Window
                 _pdfDocument = newDocument;
                 _renderScale = 1.5f;
                 _currentPdfPath = path;
+                _pageDimensions.Clear();
+                _pageDimensions.AddRange(newPageDimensions);
+                _pageTextLines.Clear();
+                _pageTextLines.AddRange(newPageTextLines);
                 _signaturePlacements.Clear();
 
                 _pageBitmaps.Clear();
@@ -327,6 +350,9 @@ public partial class MainWindow : Window
         _thumbnailImages.Clear();
         _pageCards.Clear();
         _signatureOverlays.Clear();
+        _textSelectionOverlays.Clear();
+        _textSelectionMarkers.Clear();
+        _selectedTextWords.Clear();
 
         for (int i = 0; i < _pageBitmaps.Count; i++)
         {
@@ -374,14 +400,37 @@ public partial class MainWindow : Window
                 signatureOverlay.Children.Add(marker);
             }
 
+            var selectionOverlay = new Canvas
+            {
+                IsHitTestVisible = true,
+                Background = Brushes.Transparent,
+                ClipToBounds = true
+            };
+            var selectionMarker = new Border
+            {
+                IsVisible = false,
+                IsHitTestVisible = false,
+                Background = new SolidColorBrush(Color.FromArgb(48, 35, 115, 205)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(35, 115, 205)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(2)
+            };
+            selectionOverlay.Children.Add(selectionMarker);
+            selectionOverlay.PointerPressed += (_, args) =>
+                SelectTextAtPoint(pageIndex, selectionOverlay, args);
+
             var pageVisual = new Grid();
             pageVisual.Children.Add(image);
+            pageVisual.Children.Add(selectionOverlay);
             pageVisual.Children.Add(signatureOverlay);
 
             var pageContent = new StackPanel { Spacing = 4 };
             pageContent.Children.Add(pageLabel);
             pageContent.Children.Add(pageVisual);
             _signatureOverlays.Add(signatureOverlay);
+            _textSelectionOverlays.Add(selectionOverlay);
+            _textSelectionMarkers.Add(selectionMarker);
+            _selectedTextWords.Add(null);
 
             var pageCard = new Border
             {
@@ -442,6 +491,119 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private void SelectTextAtPoint(
+        int pageIndex,
+        Canvas selectionOverlay,
+        PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(selectionOverlay).Properties.IsLeftButtonPressed ||
+            pageIndex < 0 ||
+            pageIndex >= _pageTextLines.Count ||
+            pageIndex >= _pageDimensions.Count ||
+            pageIndex >= _selectedTextWords.Count)
+            return;
+
+        var dimensions = _pageDimensions[pageIndex];
+        var point = e.GetPosition(selectionOverlay);
+
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+            point.X,
+            point.Y,
+            selectionOverlay.Bounds.Width,
+            selectionOverlay.Bounds.Height,
+            dimensions.Width,
+            dimensions.Height,
+            out double pdfX,
+            out double pdfY))
+            return;
+
+        var selected = PdfiumTextHitTest.FindWordAtPoint(
+            _pageTextLines[pageIndex], pageIndex, pdfX, pdfY);
+
+        bool selectedLine = false;
+        if (selected == null)
+        {
+            var line = PdfiumTextHitTest.FindLineAtPoint(
+                _pageTextLines[pageIndex], pageIndex, pdfX, pdfY);
+
+            if (line != null)
+            {
+                selected = new PdfiumTextWordInfo(
+                    line.PageIndex,
+                    line.LineIndex,
+                    -1,
+                    line.Text,
+                    line.Left,
+                    line.Bottom,
+                    line.Right,
+                    line.Top,
+                    line.Characters.Where(character => character.FontSize > 0)
+                        .Select(character => character.FontSize)
+                        .DefaultIfEmpty(0)
+                        .Average(),
+                    line.Characters.Select(character => character.FontName)
+                        .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)),
+                    line.Characters);
+                selectedLine = true;
+            }
+        }
+
+        _selectedTextWords[pageIndex] = selected;
+        UpdateTextSelectionMarker(pageIndex);
+
+        if (selected == null)
+        {
+            StatusText.Text = "Nenhuma palavra ou linha de texto foi encontrada nesse ponto.";
+        }
+        else
+        {
+            string kind = selectedLine ? "Bloco selecionado" : "Palavra selecionada";
+            StatusText.Text = $"Página {pageIndex + 1} | {kind}: “{selected.Text}”";
+        }
+
+        e.Handled = true;
+    }
+
+    private void UpdateTextSelectionMarker(int pageIndex)
+    {
+        if (pageIndex < 0 ||
+            pageIndex >= _textSelectionMarkers.Count ||
+            pageIndex >= _textSelectionOverlays.Count ||
+            pageIndex >= _pageDimensions.Count ||
+            pageIndex >= _selectedTextWords.Count)
+            return;
+
+        var marker = _textSelectionMarkers[pageIndex];
+        var word = _selectedTextWords[pageIndex];
+        var overlay = _textSelectionOverlays[pageIndex];
+        var dimensions = _pageDimensions[pageIndex];
+
+        if (word == null ||
+            overlay.Bounds.Width <= 0 ||
+            overlay.Bounds.Height <= 0)
+        {
+            marker.IsVisible = false;
+            return;
+        }
+
+        var rect = PdfiumPageCoordinateMapper.PdfToViewRect(
+            word.Left,
+            word.Bottom,
+            word.Right,
+            word.Top,
+            overlay.Bounds.Width,
+            overlay.Bounds.Height,
+            dimensions.Width,
+            dimensions.Height);
+
+        Canvas.SetLeft(marker, rect.X);
+        Canvas.SetTop(marker, rect.Y);
+        marker.Width = Math.Max(2, rect.Width);
+        marker.Height = Math.Max(2, rect.Height);
+        marker.IsVisible = true;
+    }
+
     private void ApplyZoom()
     {
         if (_pageImages.Count == 0 || PdfScrollViewer.Bounds.Width <= 0 ||
@@ -462,6 +624,9 @@ public partial class MainWindow : Window
             _pageImages[i].Height = size.Height * scale;
             _signatureOverlays[i].Width = size.Width * scale;
             _signatureOverlays[i].Height = size.Height * scale;
+            _textSelectionOverlays[i].Width = size.Width * scale;
+            _textSelectionOverlays[i].Height = size.Height * scale;
+            UpdateTextSelectionMarker(i);
             foreach (var child in _signatureOverlays[i].Children)
             {
                 if (child is not Button marker || marker.Tag is not SignatureWidgetInfo widget)
@@ -564,8 +729,8 @@ public partial class MainWindow : Window
         object? sender,
         PointerPressedEventArgs e)
     {
-        // Cliques nos marcadores de assinatura não devem iniciar o arraste da página.
-        if (e.Source is Button)
+        // Cliques em controles ou na camada de seleção não devem iniciar o arraste da página.
+        if (e.Source is Button || e.Source is Canvas)
             return;
 
         if (_zoom <= 1.001 ||
