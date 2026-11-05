@@ -187,7 +187,7 @@
           <Button Content="Atualizar certificados" Padding="12,8"
                   Background="#5C626C" Foreground="White" Click="RefreshCertificates_Click"/>
           <TextBox x:Name="SigningReasonTextBox" Width="250"
-                   VerticalAlignment="Center" Watermark="Motivo da assinatura (opcional)"/>
+                   VerticalAlignment="Center" PlaceholderText="Motivo da assinatura (opcional)"/>
         </StackPanel>
       </Border>
 
