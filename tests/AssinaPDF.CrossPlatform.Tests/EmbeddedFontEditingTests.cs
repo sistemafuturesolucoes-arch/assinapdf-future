@@ -47,7 +47,13 @@ public sealed class EmbeddedFontEditingTests
         reopened.Pages[1].Accept(absorber);
         var saved = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
 
-        Assert.True(saved.TextState.IsBold);
+        Assert.True(saved.TextState.IsBold,
+            $"Helvetica bold não persistiu. IsBold={saved.TextState.IsBold}; " +
+            $"IsItalic={saved.TextState.IsItalic}; FontStyle={saved.TextState.FontStyle}; " +
+            $"FontName='{saved.TextState.FontName}'; Font.FontName='{saved.TextState.Font?.FontName}'; " +
+            $"BaseFont='{saved.TextState.Font?.BaseFont}'; DecodedFontName='{saved.TextState.Font?.DecodedFontName}'; " +
+            $"Font.IsBold={saved.TextState.Font?.IsBold}; Font.IsItalic={saved.TextState.Font?.IsItalic}; " +
+            $"Subtype='{saved.TextState.Font?.Subtype}'; IsEmbedded={saved.TextState.Font?.IsEmbedded}");
         Assert.Equal(18, saved.TextState.FontSize, precision: 1);
     }
 
