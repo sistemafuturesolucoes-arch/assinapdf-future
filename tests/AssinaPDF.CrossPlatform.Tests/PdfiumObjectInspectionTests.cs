@@ -53,6 +53,54 @@ public sealed class PdfiumObjectInspectionTests
                 characters, pageIndex: 0, x: 10, y: 10);
 
             Assert.Null(miss);
+
+            var secondLine = new TextFragment("Outra linha")
+            {
+                Position = new Position(72, 670)
+            };
+            secondLine.TextState.FontName = "Helvetica";
+            secondLine.TextState.FontSize = 16;
+            using (var source = new Document())
+            {
+                var page = source.Pages.Add();
+                var firstLine = new TextFragment("Future PDF 123")
+                {
+                    Position = new Position(72, 700)
+                };
+                firstLine.TextState.FontName = "Helvetica";
+                firstLine.TextState.FontSize = 16;
+                new TextBuilder(page).AppendText(firstLine);
+                new TextBuilder(page).AppendText(secondLine);
+                source.Save(path);
+            }
+
+            using var multilinePdf = new PdfiumDocument(path);
+            var multilineCharacters = multilinePdf.InspectPageCharacters(0);
+            var lines = PdfiumTextGrouping.GroupIntoLines(multilineCharacters, pageIndex: 0);
+
+            Assert.Equal(2, lines.Count);
+            Assert.Contains(lines, line => line.Words.Select(word => word.Text)
+                .SequenceEqual(new[] { "Future", "PDF", "123" }));
+            Assert.Contains(lines, line => line.Words.Select(word => word.Text)
+                .SequenceEqual(new[] { "Outra", "linha" }));
+
+            var selectedWord = PdfiumTextHitTest.FindWordAtPoint(
+                lines,
+                pageIndex: 0,
+                x: (letterF.Left + letterF.Right) / 2,
+                y: (letterF.Bottom + letterF.Top) / 2);
+
+            Assert.NotNull(selectedWord);
+            Assert.Equal("Future", selectedWord.Text);
+
+            var selectedLine = PdfiumTextHitTest.FindLineAtPoint(
+                lines,
+                pageIndex: 0,
+                x: (letterF.Left + letterF.Right) / 2,
+                y: (letterF.Bottom + letterF.Top) / 2);
+
+            Assert.NotNull(selectedLine);
+            Assert.Contains("Future", selectedLine.Text);
         }
         finally
         {
