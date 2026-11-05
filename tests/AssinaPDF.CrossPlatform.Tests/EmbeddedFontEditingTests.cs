@@ -157,4 +157,47 @@ public sealed class EmbeddedFontEditingTests
         var saved = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
         Assert.Equal(13, saved.TextState.FontSize);
     }
+
+    [Fact]
+    public void IsUnchangedEmbeddedFontStyle_AllowsOpaqueStyleMetadataWhenOriginalStyleIsUnchanged()
+    {
+        Assert.True(EditorWindow.IsUnchangedEmbeddedFontStyle(
+            originalFontEmbedded: true,
+            requestedFontFamily: "Helvetica",
+            originalFontFamily: "Helvetica",
+            originalBold: true,
+            originalItalic: false,
+            requestedBold: true,
+            requestedItalic: false,
+            savedFontEmbedded: true));
+    }
+
+    [Fact]
+    public void IsUnchangedEmbeddedFontStyle_DoesNotIgnoreAnExplicitStyleChange()
+    {
+        Assert.False(EditorWindow.IsUnchangedEmbeddedFontStyle(
+            originalFontEmbedded: true,
+            requestedFontFamily: "Helvetica",
+            originalFontFamily: "Helvetica",
+            originalBold: false,
+            originalItalic: false,
+            requestedBold: true,
+            requestedItalic: false,
+            savedFontEmbedded: true));
+    }
+
+    [Fact]
+    public void IsUnchangedEmbeddedFontStyle_DoesNotIgnoreAFontFamilyChange()
+    {
+        Assert.False(EditorWindow.IsUnchangedEmbeddedFontStyle(
+            originalFontEmbedded: true,
+            requestedFontFamily: "Arial",
+            originalFontFamily: "Helvetica",
+            originalBold: false,
+            originalItalic: false,
+            requestedBold: false,
+            requestedItalic: false,
+            savedFontEmbedded: true));
+    }
+
 }
