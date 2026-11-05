@@ -29,14 +29,14 @@ public sealed class PdfiumObjectInspectionTests
 
             using var pdf = new PdfiumDocument(path);
             var characters = pdf.InspectPageCharacters(0);
-            var letterF = Assert.Single(characters, item => item.Text == "F");
+            var letterF = Assert.Single(characters, item => item.CharacterIndex == 0 && item.Text == "F");
 
             Assert.True(characters.Count >= 10);
             Assert.True(letterF.Right > letterF.Left);
             Assert.True(letterF.Top > letterF.Bottom);
             Assert.InRange(letterF.FontSize, 15.5, 16.5);
 
-            var following = Assert.Single(characters, item => item.Text == "u");
+            var following = Assert.Single(characters, item => item.CharacterIndex == 1 && item.Text == "u");
             Assert.True(following.Left >= letterF.Left);
             Assert.True(following.CharacterIndex > letterF.CharacterIndex);
         }
