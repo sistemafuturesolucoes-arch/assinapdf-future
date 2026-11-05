@@ -52,7 +52,7 @@ public sealed class EmbeddedFontEditingTests
     }
 
     [Fact]
-    public void ApplyRichTextFormatting_ReplacesEmbeddedFallbackWithExplicitHelveticaBoldFace()
+    public void ApplyRichTextFormatting_UsesExplicitHelveticaBoldFaceWhenSourceFontIsNotEmbedded()
     {
         using var document = new Document();
         var page = document.Pages.Add();
@@ -60,7 +60,7 @@ public sealed class EmbeddedFontEditingTests
         {
             Position = new Position(50, 700)
         };
-        fragment.TextState.FontName = "Helvetica";
+        fragment.TextState.Font = FontRepository.FindFont("Helvetica");
         fragment.TextState.FontSize = 11;
         new TextBuilder(page).AppendText(fragment);
 
@@ -79,7 +79,7 @@ public sealed class EmbeddedFontEditingTests
                     null)
             },
             "Helvetica",
-            originalFontEmbedded: true);
+            originalFontEmbedded: false);
 
         using var output = new MemoryStream();
         document.Save(output);
