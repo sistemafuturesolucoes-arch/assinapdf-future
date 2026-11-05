@@ -351,7 +351,8 @@ public partial class EditorWindow : Window
         {
             if (string.IsNullOrWhiteSpace(_selectedText))
                 SelectTextAtPoint(image, pageInfo, point);
-            e.Handled = !string.IsNullOrWhiteSpace(_selectedText);
+            // Não marcar o evento como tratado: o ContextMenu do Avalonia
+            // precisa receber o clique direito para exibir Editar/Copiar.
             return;
         }
         if (!e.GetCurrentPoint(image).Properties.IsLeftButtonPressed)
