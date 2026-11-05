@@ -274,7 +274,7 @@ public partial class EditorWindow : Window
                                 {
                                     HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
                                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch,
-                                    IsHitTestVisible = false
+                                    IsHitTestVisible = true
                                 }
                             }
                         }
@@ -386,10 +386,22 @@ public partial class EditorWindow : Window
         if (!_isDraggingSelection || sender is not AvaloniaImage image ||
             _activeSelectionPage is not PagePreviewInfo pageInfo)
             return;
+
         _selectionEnd = e.GetPosition(image);
         _isDraggingSelection = false;
         e.Pointer.Capture(null);
+
+        double width = Math.Abs(_selectionEnd.X - _selectionStart.X);
+        double height = Math.Abs(_selectionEnd.Y - _selectionStart.Y);
+        bool isClick = width < 4 && height < 4;
+
         SelectTextInRectangle(image, pageInfo, _selectionStart, _selectionEnd);
+
+        // Um clique simples abre a edição diretamente sobre a página.
+        // Arrastar continua permitindo selecionar um trecho maior antes de editar.
+        if (isClick && _selectedPageIndex is int pageIndex)
+            _ = EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY);
+
         _activeSelectionImage = null;
         _activeSelectionPage = null;
         e.Handled = true;
@@ -714,19 +726,7 @@ public partial class EditorWindow : Window
                 ToolbarLevel = RichToolbarLevel.Normal
             };
 
-            var editorSurface = new Border
-            {
-                Background = Avalonia.Media.Brushes.White,
-                BorderBrush = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.FromRgb(205, 209, 216)),
-                BorderThickness = new Thickness(1),
-                Child = new ScrollViewer
-                {
-                    Content = richEditor,
-                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
-                }
-            };
+            EditorFormattingToolbarHost.Content = toolbar;
 
             var actionPanel = new StackPanel
             {
@@ -745,58 +745,114 @@ public partial class EditorWindow : Window
                     {
                         Content = originalText == null ? "Inserir texto" : "Aplicar alteração",
                         MinWidth = 140,
-                        Padding = new Thickness(12, 8)
-                    }
-                }
-            };
-
-            var dialog = new Window
-            {
-                Title = originalText == null ? "Inserir texto no PDF" : "Editar texto do PDF",
-                Width = 700,
-                Height = 560,
-                MinWidth = 540,
-                MinHeight = 420,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                CanResize = true,
-                Content = new StackPanel
-                {
-                    Margin = new Thickness(18),
-                    Spacing = 10,
-                    Children =
-                    {
-                        new TextBlock
-                        {
-                            Text = originalText == null
-                                ? $"Novo texto na página {pageIndex + 1}"
-                                : "Edite o texto e aplique a formatação diretamente neste campo",
-                            FontSize = 14,
-                            FontWeight = Avalonia.Media.FontWeight.SemiBold
-                        },
-                        toolbar,
-                        editorSurface,
-                        new TextBlock
-                        {
-                            Text = "Selecione uma palavra ou trecho e use a barra de formatação. As alterações ficam nesta janela até você confirmar.",
-                            FontSize = 11,
-                            Foreground = new Avalonia.Media.SolidColorBrush(
-                                Avalonia.Media.Color.FromRgb(95, 101, 111)),
-                            TextWrapping = Avalonia.Media.TextWrapping.Wrap
-                        },
-                        actionPanel
+                        Padding = new Thickness(12, 8),
+                        Background = new Avalonia.Media.SolidColorBrush(
+                            Avalonia.Media.Color.FromRgb(76, 52, 130)),
+                        Foreground = Avalonia.Media.Brushes.White
                     }
                 }
             };
 
             var cancelButton = (Button)actionPanel.Children[0];
             var applyButton = (Button)actionPanel.Children[1];
-            applyButton.Click += (_, _) => dialog.Close(true);
-            cancelButton.Click += (_, _) => dialog.Close(false);
-            dialog.Opened += (_, _) => richEditor.Focus();
 
-            bool accepted = await dialog.ShowDialog<bool>(this);
-            if (!accepted)
+            var editorSurface = new Border
+            {
+                Background = Avalonia.Media.Brushes.White,
+                BorderBrush = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(205, 209, 216)),
+                BorderThickness = new Thickness(1),
+                Child = new ScrollViewer
+                {
+                    Content = richEditor,
+                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+                },
+                Height = 220
+            };
+
+            if (!_pageSurfaces.TryGetValue(pageIndex, out var pageSurface) ||
+                pageSurface.Image.Tag is not PagePreviewInfo inlinePageInfo)
+            {
+                EditorFormattingToolbarHost.Content = null;
                 return;
+            }
+
+            double editorWidth = Math.Max(280, Math.Min(560, pageSurface.Image.Bounds.Width - 20));
+            var anchor = originalBounds != null
+                ? PdfiumPageCoordinateMapper.PdfToViewRect(
+                    originalBounds.LLX, originalBounds.LLY,
+                    originalBounds.URX, originalBounds.URY,
+                    pageSurface.Image.Bounds.Width, pageSurface.Image.Bounds.Height,
+                    inlinePageInfo.WidthPoints, inlinePageInfo.HeightPoints)
+                : PdfiumPageCoordinateMapper.PdfToViewRect(
+                    x - 3, y - 3, x + 3, y + 3,
+                    pageSurface.Image.Bounds.Width, pageSurface.Image.Bounds.Height,
+                    inlinePageInfo.WidthPoints, inlinePageInfo.HeightPoints);
+
+            double editorLeft = Math.Clamp(
+                anchor.X, 8, Math.Max(8, pageSurface.Image.Bounds.Width - editorWidth - 8));
+            double editorTop = anchor.Y + anchor.Height + 8;
+            if (editorTop + 250 > pageSurface.Image.Bounds.Height)
+                editorTop = Math.Max(8, anchor.Y - 250);
+
+            var inlineEditor = new Border
+            {
+                Width = editorWidth,
+                Background = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(255, 255, 255)),
+                BorderBrush = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(76, 52, 130)),
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(7),
+                BoxShadow = new Avalonia.Media.BoxShadows(
+                    new Avalonia.Media.BoxShadow
+                    {
+                        Blur = 14,
+                        Spread = 1,
+                        OffsetY = 3,
+                        Color = Avalonia.Media.Color.FromArgb(65, 0, 0, 0)
+                    }),
+                Child = new StackPanel
+                {
+                    Spacing = 7,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = originalText == null
+                                ? "Novo texto"
+                                : "Editando texto selecionado",
+                            FontSize = 11,
+                            FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                            Foreground = new Avalonia.Media.SolidColorBrush(
+                                Avalonia.Media.Color.FromRgb(76, 52, 130))
+                        },
+                        editorSurface,
+                        actionPanel
+                    }
+                }
+            };
+
+            Canvas.SetLeft(inlineEditor, editorLeft);
+            Canvas.SetTop(inlineEditor, editorTop);
+            pageSurface.Overlay.Children.Add(inlineEditor);
+            pageSurface.Overlay.IsHitTestVisible = true;
+            EditorStatusText.Text = "Edite o trecho diretamente na página. A barra superior permanece disponível para formatação.";
+
+            var completion = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            applyButton.Click += (_, _) => completion.TrySetResult(true);
+            cancelButton.Click += (_, _) => completion.TrySetResult(false);
+            richEditor.Focus();
+
+            bool accepted = await completion.Task;
+
+            pageSurface.Overlay.Children.Remove(inlineEditor);
+            pageSurface.Overlay.IsHitTestVisible = false;
+            EditorFormattingToolbarHost.Content = null;
+
 
             var editedRuns = new List<EditedTextRun>();
             var replacementBuilder = new System.Text.StringBuilder();
