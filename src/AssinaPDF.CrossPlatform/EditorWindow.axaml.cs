@@ -37,6 +37,10 @@ public partial class EditorWindow : Window
     private readonly List<WriteableBitmap> _bitmaps = new();
     private readonly Stack<byte[]> _undoStack = new();
     private readonly Stack<byte[]> _redoStack = new();
+    private readonly Dictionary<int, (AvaloniaImage Image, Canvas Overlay)> _pageSurfaces = new();
+    private int? _selectedPageIndex;
+    private double _selectedPdfX;
+    private double _selectedPdfY;
 
     // Construtor sem parâmetros usado pelo carregador XAML do Avalonia.
     // A janela funcional é criada pelo fluxo do editor com os caminhos explícitos.
@@ -84,6 +88,8 @@ public partial class EditorWindow : Window
             bitmap.Dispose();
         _bitmaps.Clear();
         EditorPagesPanel.Children.Clear();
+        _pageSurfaces.Clear();
+        ClearTextSelection();
 
         _document = new PdfiumDocument(_workingCopyPath);
         for (int i = 0; i < _document.PageCount; i++)
@@ -111,19 +117,35 @@ public partial class EditorWindow : Window
                             Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(75, 80, 89)),
                             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
                         },
-                        new AvaloniaImage
+                        new Grid
                         {
-                            Source = bitmap,
-                            Stretch = Avalonia.Media.Stretch.Uniform,
-                            Tag = new PagePreviewInfo(i, rendered.PageWidthPoints, rendered.PageHeightPoints)
+                            Children =
+                            {
+                                new AvaloniaImage
+                                {
+                                    Source = bitmap,
+                                    Stretch = Avalonia.Media.Stretch.Uniform,
+                                    Tag = new PagePreviewInfo(i, rendered.PageWidthPoints, rendered.PageHeightPoints)
+                                },
+                                new Canvas
+                                {
+                                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch,
+                                    IsHitTestVisible = false
+                                }
+                            }
                         }
                     }
                 }
             };
-            if (page.Child is not StackPanel pageContent)
+            if (page.Child is not StackPanel pageContent ||
+                pageContent.Children.OfType<Grid>().SingleOrDefault() is not Grid pageSurface)
                 throw new InvalidOperationException("Não foi possível preparar a visualização da página.");
-            var pageImage = pageContent.Children.OfType<AvaloniaImage>().Single();
+
+            var pageImage = pageSurface.Children.OfType<AvaloniaImage>().Single();
+            var overlay = pageSurface.Children.OfType<Canvas>().Single();
             pageImage.PointerPressed += PageImage_PointerPressed;
+            _pageSurfaces[i] = (pageImage, overlay);
             EditorPagesPanel.Children.Add(page);
         }
     }
@@ -154,9 +176,9 @@ public partial class EditorWindow : Window
         }
     }
 
-    private async void PageImage_PointerPressed(object? sender, PointerPressedEventArgs e)
+    private void PageImage_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (e.ClickCount != 2 || sender is not AvaloniaImage image ||
+        if (e.ClickCount != 1 || sender is not AvaloniaImage image ||
             image.Tag is not PagePreviewInfo pageInfo)
             return;
 
@@ -170,8 +192,105 @@ public partial class EditorWindow : Window
         double pdfY = pageInfo.HeightPoints -
             point.Y / image.Bounds.Height * pageInfo.HeightPoints;
 
-        e.Handled = true;
-        await EditTextAtPointAsync(pageInfo.PageIndex, pdfX, pdfY);
+        try
+        {
+            using var document = Document.Open(_workingCopyPath);
+            var absorber = new TextFragmentAbsorber();
+            document.Pages[pageInfo.PageIndex + 1].Accept(absorber);
+
+            TextFragment? selected = null;
+            double bestDistance = double.MaxValue;
+            foreach (TextFragment fragment in absorber.TextFragments)
+            {
+                var bounds = fragment.Rectangle;
+                if (bounds == null || string.IsNullOrWhiteSpace(fragment.Text))
+                    continue;
+
+                double dx = pdfX < bounds.LLX ? bounds.LLX - pdfX :
+                    pdfX > bounds.URX ? pdfX - bounds.URX : 0;
+                double dy = pdfY < bounds.LLY ? bounds.LLY - pdfY :
+                    pdfY > bounds.URY ? pdfY - bounds.URY : 0;
+                double distance = Math.Sqrt(dx * dx + dy * dy);
+
+                if (distance <= 5.0 && distance < bestDistance)
+                {
+                    selected = fragment;
+                    bestDistance = distance;
+                }
+            }
+
+            ClearTextSelection();
+            if (selected?.Rectangle is not { } selectedBounds)
+            {
+                EditorStatusText.Text =
+                    "Nenhum texto selecionável nesse ponto. PDFs digitalizados ou textos convertidos em imagem precisam de OCR.";
+                return;
+            }
+
+            _selectedPageIndex = pageInfo.PageIndex;
+            _selectedPdfX = (selectedBounds.LLX + selectedBounds.URX) / 2;
+            _selectedPdfY = (selectedBounds.LLY + selectedBounds.URY) / 2;
+
+            if (!_pageSurfaces.TryGetValue(pageInfo.PageIndex, out var surface))
+                return;
+
+            double left = selectedBounds.LLX / pageInfo.WidthPoints * image.Bounds.Width;
+            double top = (pageInfo.HeightPoints - selectedBounds.URY) /
+                         pageInfo.HeightPoints * image.Bounds.Height;
+            double width = (selectedBounds.URX - selectedBounds.LLX) /
+                           pageInfo.WidthPoints * image.Bounds.Width;
+            double height = (selectedBounds.URY - selectedBounds.LLY) /
+                            pageInfo.HeightPoints * image.Bounds.Height;
+
+            var highlight = new Border
+            {
+                BorderBrush = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(35, 116, 220)),
+                BorderThickness = new Thickness(2),
+                Background = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromArgb(28, 35, 116, 220)),
+                Width = Math.Max(4, width),
+                Height = Math.Max(4, height),
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(highlight, left);
+            Canvas.SetTop(highlight, top);
+            surface.Overlay.Children.Add(highlight);
+
+            SelectedTextLabel.Text = selected.Text.Length > 70
+                ? selected.Text[..67] + "..."
+                : selected.Text;
+            SelectedTextLabel.IsVisible = true;
+            EditSelectedTextButton.IsVisible = true;
+            EditorStatusText.Text = "Texto selecionado. Use “Editar seleção” para alterar o conteúdo e a formatação.";
+            e.Handled = true;
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text = $"Não foi possível selecionar o texto: {ex.Message}";
+        }
+    }
+
+    private void ClearTextSelection()
+    {
+        foreach (var surface in _pageSurfaces.Values)
+            surface.Overlay.Children.Clear();
+
+        _selectedPageIndex = null;
+        SelectedTextLabel.Text = string.Empty;
+        SelectedTextLabel.IsVisible = false;
+        EditSelectedTextButton.IsVisible = false;
+    }
+
+    private async void EditSelectedText_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_selectedPageIndex is not int pageIndex)
+            return;
+
+        await EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY);
+        ClearTextSelection();
     }
 
     private async Task EditTextAtPointAsync(int pageIndex, double x, double y)
