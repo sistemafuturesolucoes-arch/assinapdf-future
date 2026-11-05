@@ -580,8 +580,8 @@ public partial class MainWindow : Window
         var dimensions = _pageDimensions[pageIndex];
 
         if (word == null ||
-            overlay.Bounds.Width <= 0 ||
-            overlay.Bounds.Height <= 0)
+            overlay.Width <= 0 ||
+            overlay.Height <= 0)
         {
             marker.IsVisible = false;
             return;
@@ -592,8 +592,8 @@ public partial class MainWindow : Window
             word.Bottom,
             word.Right,
             word.Top,
-            overlay.Bounds.Width,
-            overlay.Bounds.Height,
+            overlay.Width,
+            overlay.Height,
             dimensions.Width,
             dimensions.Height);
 
