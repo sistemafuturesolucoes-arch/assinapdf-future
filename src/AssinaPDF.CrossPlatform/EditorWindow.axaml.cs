@@ -37,6 +37,8 @@ public partial class EditorWindow : Window
     private readonly List<WriteableBitmap> _bitmaps = new();
     private readonly Stack<byte[]> _undoStack = new();
     private readonly Stack<byte[]> _redoStack = new();
+    private readonly EditorHistoryService _history = new();
+    private string? _historyEntryId;
     private readonly Dictionary<int, (AvaloniaImage Image, Canvas Overlay)> _pageSurfaces = new();
     private int? _selectedPageIndex;
     private double _selectedPdfX;
@@ -56,8 +58,13 @@ public partial class EditorWindow : Window
     {
         _workingCopyPath = string.Empty;
         _originalPath = string.Empty;
-        _sessionDirectory = string.Empty;
+        _sessionDirectory = Path.Combine(
+            Path.GetTempPath(), "FutureSolucoes", "AssinaPDF", "EditorSessions",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_sessionDirectory);
         InitializeComponent();
+        Closed += (_, _) => DisposeResources();
+        EditorStatusText.Text = "Clique em “Abrir PDF” para começar. O documento original será preservado.";
     }
 
     public EditorWindow(string workingCopyPath, string originalPath, string sessionDirectory)
@@ -545,22 +552,21 @@ public partial class EditorWindow : Window
             });
             if (files.Count == 0) return;
             string source = Path.GetFullPath(files[0].Path.LocalPath);
-            string newSession = Path.Combine(_sessionDirectory, "abertos", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(newSession);
-            string copy = Path.Combine(newSession, Path.GetFileName(source));
-            File.Copy(source, copy, overwrite: false);
+            var entry = _history.CreateWorkingCopy(source);
             _document?.Dispose();
             _document = null;
-            _workingCopyPath = copy;
-            _originalPath = source;
-            _sessionDirectory = newSession;
+            _workingCopyPath = entry.WorkingCopyPath;
+            _originalPath = entry.OriginalPath;
+            _sessionDirectory = Path.GetDirectoryName(entry.WorkingCopyPath)
+                ?? throw new InvalidOperationException("Não foi possível localizar a pasta de trabalho.");
+            _historyEntryId = entry.Id;
             _undoStack.Clear();
             _redoStack.Clear();
             DocumentNameText.Text = Path.GetFileName(source);
             Title = $"AssinaPDF | Editor - {Path.GetFileName(source)}";
             await VerifyDocumentFontsAsync();
             LoadDocumentPreview();
-            EditorStatusText.Text = "PDF aberto em uma cópia de trabalho. O arquivo original permanece preservado.";
+            EditorStatusText.Text = "PDF aberto em uma cópia de trabalho e adicionado às edições recentes. O arquivo original permanece preservado.";
         }
         catch (Exception ex) { EditorStatusText.Text = $"Não foi possível abrir o PDF: {ex.Message}"; }
     }
@@ -1773,6 +1779,8 @@ public partial class EditorWindow : Window
 
             // A substituição ocorre somente depois da validação do arquivo de saída.
             File.Move(outputPath, _workingCopyPath, true);
+            if (!string.IsNullOrWhiteSpace(_historyEntryId))
+                _history.Touch(_historyEntryId);
             PushHistory(_undoStack, before);
             _redoStack.Clear();
             LoadDocumentPreview();
