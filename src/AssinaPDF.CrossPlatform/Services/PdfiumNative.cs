@@ -259,6 +259,22 @@ internal static class PdfiumNative
     [DllImport(LibraryName, EntryPoint = "FPDFTextObj_GetFontSize", CallingConvention = NativeCallingConvention)]
     internal static extern int TextObjectGetFontSize(IntPtr textObject, out float fontSize);
 
+    [DllImport(LibraryName, EntryPoint = "FPDFText_CountChars", CallingConvention = NativeCallingConvention)]
+    internal static extern int TextCountChars(IntPtr textPage);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFText_GetUnicode", CallingConvention = NativeCallingConvention)]
+    internal static extern uint TextGetUnicode(IntPtr textPage, int index);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFText_GetFontSize", CallingConvention = NativeCallingConvention)]
+    internal static extern double TextGetCharacterFontSize(IntPtr textPage, int index);
+
+    [DllImport(LibraryName, EntryPoint = "FPDFText_GetCharBox", CallingConvention = NativeCallingConvention)]
+    internal static extern void TextGetCharBox(IntPtr textPage, int index, out double left, out double right, out double bottom, out double top);
+
+    // API experimental do PDFium: alguns builds podem não exportá-la.
+    [DllImport(LibraryName, EntryPoint = "FPDFText_GetFontInfo", CallingConvention = NativeCallingConvention)]
+    internal static extern nuint TextGetFontInfo(IntPtr textPage, int index, IntPtr buffer, nuint bufferLength, out int flags);
+
     [DllImport(
         LibraryName,
         EntryPoint = "FPDF_ClosePage",
