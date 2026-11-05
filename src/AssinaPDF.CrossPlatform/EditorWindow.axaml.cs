@@ -485,12 +485,7 @@ public partial class EditorWindow : Window
                 }
             }
 
-            var installedFonts = Avalonia.Media.FontManager.Current.SystemFonts
-                .Select(fontFamily => fontFamily.Name)
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
-                .ToArray();
+            var installedFonts = InstalledFontCatalogService.GetInstalledFamilyNames();
 
             var richDocument = new RichFlowDocument();
             var initialParagraph = new RichParagraph();
