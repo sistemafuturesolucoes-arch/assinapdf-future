@@ -27,7 +27,7 @@
     <!-- Barra de formatação persistente do editor inline. -->
     <Border Grid.Row="1" Background="#FFFFFF"
             BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,6">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="9">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="9">
         <Button Grid.Column="0" Content="Abrir PDF" Click="OpenPdf_Click"
                 Padding="13,8" Background="#292D36" Foreground="White"
                 BorderThickness="0" VerticalAlignment="Center"/>
@@ -37,12 +37,18 @@
         <Button Grid.Column="2" Content="↷" Click="Redo_Click"
                 Padding="12,8" Background="#F0F1F4" BorderBrush="#D9DCE0"
                 ToolTip.Tip="Refazer alteração" VerticalAlignment="Center"/>
-        <ScrollViewer Grid.Column="3" HorizontalScrollBarVisibility="Auto"
+        <Button x:Name="TextToolButton" Grid.Column="3" Content="T"
+                Click="TextTool_Click" Padding="12,8"
+                Background="#E9E3F5" Foreground="#4C3482"
+                BorderBrush="#CFC3E8" FontWeight="Bold"
+                ToolTip.Tip="Ferramenta de texto: clique na página para inserir e arraste o cabeçalho para posicionar"
+                VerticalAlignment="Center"/>
+        <ScrollViewer Grid.Column="4" HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Disabled">
           <ContentControl x:Name="EditorFormattingToolbarHost"
                           VerticalAlignment="Center"/>
         </ScrollViewer>
-        <TextBlock Grid.Column="4" Text="Clique no texto para editar"
+        <TextBlock Grid.Column="5" Text="Selecione o texto ou use T para inserir"
                    FontSize="10" Foreground="#737B87"
                    VerticalAlignment="Center"/>
       </Grid>
