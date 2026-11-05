@@ -1304,54 +1304,90 @@ public partial class EditorWindow : Window
         document.Pages[pageIndex + 1].Accept(absorber);
 
         string normalizedExpected = NormalizePdfText(expectedText);
-        var candidates = absorber.TextFragments
-            .Where(item => NormalizePdfText(item.Text) == normalizedExpected)
+        var orderedFragments = absorber.TextFragments
+            .Cast<TextFragment>()
+            .Where(item => !string.IsNullOrEmpty(item.Text))
+            .OrderByDescending(item => item.Rectangle == null
+                ? double.MinValue
+                : (item.Rectangle.LLY + item.Rectangle.URY) / 2)
+            .ThenBy(item => item.Rectangle?.LLX ?? double.MaxValue)
             .ToArray();
 
-        if (candidates.Length == 0)
-            return Fail("o texto editado não foi encontrado como um único bloco após reabrir o PDF.");
+        // A troca de fonte pode dividir um único trecho em vários TextFragments.
+        // Procure uma sequência contígua cuja concatenação corresponda ao texto
+        // editado, em vez de exigir que o Aspose devolva um único bloco.
+        var matchingGroups = new List<TextFragment[]>();
+        for (int start = 0; start < orderedFragments.Length; start++)
+        {
+            var group = new List<TextFragment>();
+            var combined = new System.Text.StringBuilder();
+            for (int end = start; end < orderedFragments.Length; end++)
+            {
+                group.Add(orderedFragments[end]);
+                combined.Append(orderedFragments[end].Text);
+                string normalizedCombined = NormalizePdfText(combined.ToString());
 
-        // A mesma frase pode aparecer mais de uma vez na página. Verificar sempre
-        // a primeira ocorrência pode inspecionar um trecho intocado e rejeitar uma
-        // edição que foi gravada corretamente. Use a posição editada como referência.
-        TextFragment fragment;
+                if (normalizedCombined == normalizedExpected)
+                {
+                    matchingGroups.Add(group.ToArray());
+                    break;
+                }
+
+                if (normalizedCombined.Length >= normalizedExpected.Length)
+                    break;
+            }
+        }
+
+        if (matchingGroups.Count == 0)
+            return Fail("o texto editado não foi encontrado após reabrir o PDF, mesmo considerando blocos divididos.");
+
+        // Se a mesma frase aparecer mais de uma vez, escolha o grupo mais próximo
+        // da posição editada. Sem posição, só aceite uma ocorrência inequívoca.
+        TextFragment[] selectedGroup;
         if (expectedBounds != null)
         {
             double expectedX = (expectedBounds.LLX + expectedBounds.URX) / 2;
             double expectedY = (expectedBounds.LLY + expectedBounds.URY) / 2;
-            fragment = candidates
-                .Where(item => item.Rectangle != null)
-                .OrderBy(item =>
+            selectedGroup = matchingGroups
+                .OrderBy(group =>
                 {
-                    var bounds = item.Rectangle!;
-                    double dx = (bounds.LLX + bounds.URX) / 2 - expectedX;
-                    double dy = (bounds.LLY + bounds.URY) / 2 - expectedY;
+                    var rectangles = group.Where(item => item.Rectangle != null)
+                        .Select(item => item.Rectangle!).ToArray();
+                    if (rectangles.Length == 0)
+                        return double.MaxValue;
+                    double centerX = rectangles.Average(bounds => (bounds.LLX + bounds.URX) / 2);
+                    double centerY = rectangles.Average(bounds => (bounds.LLY + bounds.URY) / 2);
+                    double dx = centerX - expectedX;
+                    double dy = centerY - expectedY;
                     return (dx * dx) + (dy * dy);
                 })
-                .FirstOrDefault() ?? candidates[0];
+                .First();
         }
-        else if (candidates.Length == 1)
+        else if (matchingGroups.Count == 1)
         {
-            fragment = candidates[0];
+            selectedGroup = matchingGroups[0];
         }
         else
         {
             return Fail("o texto aparece em mais de uma posição e não foi possível identificar com segurança o trecho editado.");
         }
-        if (fragment.Segments.Count == 0)
-            return Fail("o texto foi encontrado, mas o Aspose não retornou segmentos para verificar.");
 
         var savedSegments = new List<(int Start, int End, TextSegment Segment)>();
         int offset = 0;
-        foreach (TextSegment segment in fragment.Segments)
+        foreach (TextFragment selectedFragment in selectedGroup)
         {
-            int end = offset + (segment.Text?.Length ?? 0);
-            savedSegments.Add((offset, end, segment));
-            offset = end;
+            foreach (TextSegment segment in selectedFragment.Segments)
+            {
+                int end = offset + (segment.Text?.Length ?? 0);
+                savedSegments.Add((offset, end, segment));
+                offset = end;
+            }
         }
 
+        if (NormalizePdfText(string.Concat(selectedGroup.Select(item => item.Text))) != normalizedExpected)
+            return Fail("os blocos recuperados não correspondem ao texto editado.");
         if (offset != expectedText.Length)
-            return Fail($"o texto relido tem {offset} caracteres, mas a prévia enviou {expectedText.Length}; não foi possível mapear os estilos por posição.");
+            return Fail($"os blocos relidos totalizam {offset} caracteres, mas a prévia enviou {expectedText.Length}; não foi possível mapear os estilos por posição.");
 
         foreach (var run in expectedRuns.Where(item => item.Length > 0))
         {
