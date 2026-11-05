@@ -55,6 +55,7 @@ public partial class EditorWindow : Window
         _workingCopyPath = workingCopyPath;
         _originalPath = originalPath;
         _sessionDirectory = sessionDirectory;
+        Directory.CreateDirectory(_sessionDirectory);
 
         DocumentNameText.Text = Path.GetFileName(originalPath);
         Title = $"AssinaPDF | Editor - {Path.GetFileName(originalPath)}";
@@ -63,20 +64,15 @@ public partial class EditorWindow : Window
         {
             LoadDocumentPreview();
             EditorStatusText.Text =
-                "Documento aberto em uma cópia temporária. Edite o texto localizado ou insira novos textos; o original não será alterado.";
+                "Documento aberto em uma cópia de trabalho salva neste computador. O PDF original permanece intacto.";
         }
         catch
         {
             DisposeResources();
-            TryDeleteSessionDirectory();
             throw;
         }
 
-        Closed += (_, _) =>
-        {
-            DisposeResources();
-            TryDeleteSessionDirectory();
-        };
+        Closed += (_, _) => DisposeResources();
     }
 
     private void LoadDocumentPreview()
@@ -1190,7 +1186,7 @@ public partial class EditorWindow : Window
             string targetPath = Path.GetFullPath(destination.Path.LocalPath);
             if (SamePath(targetPath, _originalPath) || SamePath(targetPath, _workingCopyPath))
             {
-                EditorStatusText.Text = "Escolha outro nome/local. O PDF original e a cópia temporária não podem ser sobrescritos.";
+                EditorStatusText.Text = "Escolha outro nome/local. O PDF original e a cópia de trabalho permanente não podem ser sobrescritos.";
                 return;
             }
 
@@ -1237,16 +1233,4 @@ public partial class EditorWindow : Window
         _bitmaps.Clear();
     }
 
-    private void TryDeleteSessionDirectory()
-    {
-        try
-        {
-            if (Directory.Exists(_sessionDirectory))
-                Directory.Delete(_sessionDirectory, true);
-        }
-        catch
-        {
-            // A limpeza temporária é best-effort; nunca altera o PDF original.
-        }
-    }
 }
