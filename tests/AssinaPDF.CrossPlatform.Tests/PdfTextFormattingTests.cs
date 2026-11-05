@@ -9,6 +9,17 @@ namespace AssinaPDF.CrossPlatform.Tests;
 
 public sealed class PdfTextFormattingTests
 {
+    [Theory]
+    [InlineData("BQVIXP+VerdanaBold", "Verdana")]
+    [InlineData("Verdana-Bold", "Verdana")]
+    [InlineData("Verdana-BoldItalic", "Verdana")]
+    [InlineData("Helvetica-Bold", "Helvetica")]
+    [InlineData("ABCDEF+Times-BoldItalic", "Times")]
+    public void NormalizePdfFontFamily_RemovesEmbeddedFaceStyleSuffix(string pdfFontName, string expectedFamily)
+    {
+        Assert.Equal(expectedFamily, EditorWindow.NormalizePdfFontFamily(pdfFontName));
+    }
+
     [Fact]
     public void ApplyRichTextFormatting_PersistsCombinedStyleAfterSaveAndReload()
     {
