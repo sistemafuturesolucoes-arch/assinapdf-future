@@ -108,6 +108,58 @@ public sealed class EmbeddedFontEditingTests
     }
 
     [Fact]
+    public void ApplyRichTextFormatting_ReplacesEmbeddedFaceWhenRequestedBoldDiffersFromOriginalStyle()
+    {
+        using var document = new Document();
+        var page = document.Pages.Add();
+        var fragment = new TextFragment("CID bold style replacement")
+        {
+            Position = new Position(50, 700)
+        };
+        fragment.TextState.Font = FontRepository.FindFont("Helvetica");
+        fragment.TextState.FontSize = 11;
+        new TextBuilder(page).AppendText(fragment);
+
+        // Simula o estado interno da fonte CID: o segmento aparenta estar em
+        // negrito, mas a face incorporada não declara metadados de negrito.
+        fragment.TextState.IsBold = true;
+
+        EditorWindow.ApplyRichTextFormatting(
+            fragment,
+            new[]
+            {
+                new EditorWindow.EditedTextRun(
+                    0,
+                    fragment.Text.Length,
+                    "Helvetica",
+                    18,
+                    true,
+                    false,
+                    null,
+                    null)
+            },
+            "Helvetica",
+            originalFontEmbedded: true,
+            originalBold: false,
+            originalItalic: false);
+
+        using var output = new MemoryStream();
+        document.Save(output);
+        output.Position = 0;
+
+        using var reopened = Document.Open(output);
+        var absorber = new TextFragmentAbsorber("CID bold style replacement");
+        reopened.Pages[1].Accept(absorber);
+        var saved = Assert.Single(absorber.TextFragments.Cast<TextFragment>());
+
+        Assert.True(saved.TextState.IsBold);
+        Assert.Contains(
+            "Helvetica-Bold",
+            saved.TextState.FontName ?? saved.TextState.Font?.FontName ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ApplyRichTextFormatting_PreservesOriginalFaceWhenEmbeddedFontIsUnchanged()
     {
         using var document = new Document();
