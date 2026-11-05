@@ -136,6 +136,45 @@ internal sealed class EditorHistoryService
         WriteEntries(entries);
     }
 
+
+    public void DeleteEntry(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) ||
+            id.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            id.Contains(Path.DirectorySeparatorChar) ||
+            id.Contains(Path.AltDirectorySeparatorChar))
+            throw new InvalidOperationException("Identificador de documento inválido.");
+
+        List<EditedPdfEntry> entries = ReadEntries();
+        EditedPdfEntry? entry = entries.FirstOrDefault(item =>
+            string.Equals(item.Id, id, StringComparison.Ordinal));
+
+        if (entry == null)
+            return;
+
+        string documentDirectory = Path.GetFullPath(Path.Combine(_rootDirectory, id));
+        string root = Path.GetFullPath(_rootDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        if (!documentDirectory.StartsWith(root,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            throw new InvalidOperationException("O caminho do documento está fora da pasta de trabalhos do AssinaPDF.");
+
+        string expectedWorkingCopy = Path.GetFullPath(entry.WorkingCopyPath);
+        string documentPrefix = documentDirectory.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        if (!expectedWorkingCopy.StartsWith(documentPrefix,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            throw new InvalidOperationException("A cópia de trabalho não pertence à pasta deste registro.");
+
+        if (Directory.Exists(documentDirectory))
+            Directory.Delete(documentDirectory, recursive: true);
+
+        entries.RemoveAll(item => string.Equals(item.Id, id, StringComparison.Ordinal));
+        WriteEntries(entries);
+    }
+
     private List<EditedPdfEntry> ReadEntries()
     {
         if (!File.Exists(_historyFilePath))
