@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Aspose.Pdf.Text;
 
 namespace AssinaPDF.MacPrototype.Services;
@@ -98,14 +99,79 @@ internal static class FontDownloadService
                 failures.Add("Google Fonts: " + ex.Message);
             }
 
+            // Se os catálogos automáticos não tiverem uma versão compatível,
+            // permita que o usuário selecione os arquivos que baixou manualmente.
+            bool imported = await ImportFontFilesManuallyAsync(owner, family);
+            if (imported)
+            {
+                FontRepository.LoadFonts();
+                if (IsAvailable(family))
+                    return true;
+            }
+
             throw new InvalidOperationException(
                 $"Não foi possível localizar uma versão compatível da fonte '{family}'. " +
+                "Baixe a família em formato .TTF ou .OTF e selecione os arquivos quando solicitado. " +
                 string.Join(" | ", failures));
         }
         finally
         {
             Gate.Release();
         }
+    }
+
+    private static async Task<bool> ImportFontFilesManuallyAsync(Window owner, string family)
+    {
+        var selectedFiles = await owner.StorageProvider.OpenFilePickerAsync(
+            new FilePickerOpenOptions
+            {
+                Title = $"Selecione os arquivos TTF/OTF da fonte {family}",
+                AllowMultiple = true,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("Fontes TrueType/OpenType")
+                    {
+                        Patterns = ["*.ttf", "*.otf"]
+                    }
+                ]
+            });
+
+        if (selectedFiles.Count == 0)
+            return false;
+
+        Directory.CreateDirectory(CacheDirectory);
+        RegisterCacheFolder();
+        int importedCount = 0;
+
+        foreach (var selectedFile in selectedFiles)
+        {
+            string extension = Path.GetExtension(selectedFile.Name);
+            if (!extension.Equals(".ttf", StringComparison.OrdinalIgnoreCase) &&
+                !extension.Equals(".otf", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            await using var input = await selectedFile.OpenReadAsync();
+            using var buffer = new MemoryStream();
+            await input.CopyToAsync(buffer);
+
+            if (buffer.Length < 1024 || buffer.Length > 20_000_000)
+                continue;
+
+            string safeName = string.Concat(
+                Path.GetFileNameWithoutExtension(selectedFile.Name).Select(character =>
+                    char.IsLetterOrDigit(character) || character is '-' or '_' ? character : '_'));
+            string destination = Path.Combine(
+                CacheDirectory, $"{Guid.NewGuid():N}-{safeName}{extension}");
+
+            await File.WriteAllBytesAsync(destination, buffer.ToArray());
+            importedCount++;
+        }
+
+        if (importedCount == 0)
+            return false;
+
+        FontRepository.LoadFonts();
+        return IsAvailable(family);
     }
 
     private static string CleanFamilyName(string? value)
