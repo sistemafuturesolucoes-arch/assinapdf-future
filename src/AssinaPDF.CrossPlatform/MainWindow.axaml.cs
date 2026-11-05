@@ -28,6 +28,7 @@ namespace AssinaPDF.MacPrototype;
 public partial class MainWindow : Window
 {
     private readonly CertificateStoreService _certificateStore = new();
+    private readonly EditorHistoryService _editorHistory = new();
     private readonly List<CertificateInfo> _certificates = new();
 
     private Bitmap? _futureLogo;
@@ -246,11 +247,48 @@ public partial class MainWindow : Window
             : $"Último documento aberto: {System.IO.Path.GetFileName(_currentPdfPath)}";
     }
 
-    private void DashboardOpen_Click(
+    private async void DashboardOpen_Click(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
-        OpenPdf_Click(sender, e);
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(
+                new FilePickerOpenOptions
+                {
+                    Title = "Selecionar PDF para edição",
+                    AllowMultiple = false,
+                    FileTypeFilter = new[]
+                    {
+                        new FilePickerFileType("Documentos PDF")
+                        {
+                            Patterns = new[] { "*.pdf", "*.PDF" }
+                        }
+                    }
+                });
+
+            if (files.Count == 0)
+                return;
+
+            var entry = _editorHistory.CreateWorkingCopy(files[0].Path.LocalPath);
+            string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
+                ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
+
+            DashboardStatusText.Text = $"Abrindo {entry.OriginalFileName} diretamente no editor...";
+            var editor = new EditorWindow(
+                entry.WorkingCopyPath,
+                entry.OriginalPath,
+                documentDirectory);
+
+            await editor.ShowDialog(this);
+            _editorHistory.Touch(entry.Id);
+            DashboardStatusText.Text =
+                $"Edição encerrada. “{entry.OriginalFileName}” permanece no histórico.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir o editor: {ex.Message}";
+        }
     }
 
     private void DashboardSign_Click(
