@@ -1135,11 +1135,9 @@ public partial class EditorWindow : Window
                     ex);
             }
 
-            // O Aspose.PDF FOSS expõe IsBold/IsItalic como propriedades
-            // próprias que selecionam a variante correta da família atual.
-            // Definir apenas FontStyle pode deixar o sinalizador de estilo
-            // diferente do estado efetivamente serializado no PDF.
-            // FontStyle is the explicit-style API consumed by the PDF writer.
+            // IsBold/IsItalic alteram apenas os valores em memória.
+            // FontStyle também marca o estilo como explícito para o serializador
+            // e aciona a atualização do fluxo de conteúdo quando aplicável.
             // Assigning IsBold/IsItalic alone changes the in-memory flags but leaves
             // FontStyleTouched false, so absorbed text is serialized with its old face.
             state.FontStyle = requestedStyle;
