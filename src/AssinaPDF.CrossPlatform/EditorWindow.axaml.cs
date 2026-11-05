@@ -711,7 +711,9 @@ public partial class EditorWindow : Window
                 if (originalText == null)
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
 
-                ApplyRichTextFormatting(target, editedRuns, originalFontName, originalFontEmbedded);
+                ApplyRichTextFormatting(
+                    target, editedRuns, originalFontName, originalFontEmbedded,
+                    originalBold, originalItalic);
 
                 var editedRectangle = target.Rectangle;
                 if (editedRectangle != null)
@@ -908,7 +910,9 @@ public partial class EditorWindow : Window
         TextFragment fragment,
         IReadOnlyList<EditedTextRun> runs,
         string? originalFontName,
-        bool originalFontEmbedded)
+        bool originalFontEmbedded,
+        bool originalBold = false,
+        bool originalItalic = false)
     {
         var orderedRuns = runs
             .Where(item => item.Length > 0)
@@ -989,7 +993,9 @@ public partial class EditorWindow : Window
                 segment.TextState,
                 orderedRuns[runIndex],
                 originalFontName,
-                originalFontEmbedded);
+                originalFontEmbedded,
+                originalBold,
+                originalItalic);
             appliedRuns[runIndex] = true;
             offset = segmentEnd;
         }
@@ -1024,7 +1030,9 @@ public partial class EditorWindow : Window
                 fragment.TextState,
                 orderedRuns[0],
                 originalFontName,
-                originalFontEmbedded);
+                originalFontEmbedded,
+                originalBold,
+                originalItalic);
         }
     }
 
@@ -1032,7 +1040,9 @@ public partial class EditorWindow : Window
         Aspose.Pdf.Text.TextState state,
         EditedTextRun run,
         string? originalFontName,
-        bool originalFontEmbedded)
+        bool originalFontEmbedded,
+        bool originalBold,
+        bool originalItalic)
     {
         // Apply directly to the state owned by the final TextSegment/TextFragment.
         // A detached TextState followed by ApplyChangesFrom loses FontStyleTouched
@@ -1068,8 +1078,8 @@ public partial class EditorWindow : Window
                 NormalizePdfFontFamily(fontFamily),
                 NormalizePdfFontFamily(originalFontName),
                 StringComparison.OrdinalIgnoreCase) &&
-            state.IsBold == run.IsBold &&
-            state.IsItalic == run.IsItalic;
+            run.IsBold == originalBold &&
+            run.IsItalic == originalItalic;
 
         if (!preserveEmbeddedFace)
         {
