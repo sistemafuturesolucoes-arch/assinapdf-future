@@ -806,14 +806,6 @@ public partial class EditorWindow : Window
                 BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(5),
                 Padding = new Thickness(7),
-                BoxShadow = new Avalonia.Media.BoxShadows(
-                    new Avalonia.Media.BoxShadow
-                    {
-                        Blur = 14,
-                        Spread = 1,
-                        OffsetY = 3,
-                        Color = Avalonia.Media.Color.FromArgb(65, 0, 0, 0)
-                    }),
                 Child = new StackPanel
                 {
                     Spacing = 7,
