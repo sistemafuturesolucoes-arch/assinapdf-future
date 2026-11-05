@@ -6,7 +6,7 @@
         MinWidth="820" MinHeight="560"
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
-  <Grid RowDefinitions="64,112,*,42">
+  <Grid RowDefinitions="64,76,*,42">
     <Border Grid.Row="0" Background="#292D36" Padding="20,8">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
         <StackPanel VerticalAlignment="Center" Spacing="2">
@@ -24,67 +24,28 @@
       </Grid>
     </Border>
 
-    <!-- Faixa permanente de opções, inspirada no Microsoft Word. -->
+    <!-- Barra de formatação persistente do editor inline. -->
     <Border Grid.Row="1" Background="#FFFFFF"
-            BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="12,7">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-          <StackPanel Spacing="5" VerticalAlignment="Center">
-            <TextBlock Text="ARQUIVO" FontSize="9" FontWeight="Bold"
-                       Foreground="#7A808A" HorizontalAlignment="Center"/>
-            <Button Content="Abrir PDF" Click="OpenPdf_Click" Padding="16,9"
-                    Background="#292D36" Foreground="White" BorderThickness="0"/>
-          </StackPanel>
-
-          <Border Width="1" Height="58" Background="#E0E2E6"/>
-
-          <StackPanel Spacing="5" VerticalAlignment="Center">
-            <TextBlock Text="HISTÓRICO" FontSize="9" FontWeight="Bold"
-                       Foreground="#7A808A" HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Button Content="↶ Desfazer" Click="Undo_Click" Padding="12,8"
-                      Background="#F0F1F4" BorderBrush="#D9DCE0"
-                      ToolTip.Tip="Desfazer última alteração"/>
-              <Button Content="↷ Refazer" Click="Redo_Click" Padding="12,8"
-                      Background="#F0F1F4" BorderBrush="#D9DCE0"
-                      ToolTip.Tip="Refazer alteração"/>
-            </StackPanel>
-          </StackPanel>
-
-          <Border Width="1" Height="58" Background="#E0E2E6"/>
-
-          <StackPanel Spacing="5" VerticalAlignment="Center">
-            <TextBlock Text="FERRAMENTAS" FontSize="9" FontWeight="Bold"
-                       Foreground="#7A808A" HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Button x:Name="SelectModeButton" Content="↖ Selecionar"
-                      Click="SelectMode_Click" Padding="14,9"
-                      Background="#E9E3F5" Foreground="#4C3482"
-                      BorderBrush="#D5C9EA" FontWeight="SemiBold"/>
-              <Button x:Name="AddTextModeButton" Content="T Adicionar texto"
-                      Click="AddTextMode_Click" Padding="14,9"
-                      Background="#F0F1F4" Foreground="#34383E"
-                      BorderBrush="#D9DCE0"/>
-            </StackPanel>
-          </StackPanel>
-
-          <Border Width="1" Height="58" Background="#E0E2E6"/>
-
-          <StackPanel Spacing="5" VerticalAlignment="Center">
-            <TextBlock Text="TEXTO SELECIONADO" FontSize="9" FontWeight="Bold"
-                       Foreground="#7A808A" HorizontalAlignment="Center"/>
-            <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-              <TextBlock x:Name="SelectedTextLabel" Text="Selecione um trecho no PDF"
-                         VerticalAlignment="Center" Foreground="#737B87"
-                         MaxWidth="240" TextTrimming="CharacterEllipsis"/>
-              <Button x:Name="EditSelectedTextButton" Content="Editar"
-                      IsVisible="False" Click="EditSelectedText_Click"
-                      Padding="13,8" Background="#E9E3F5"
-                      Foreground="#4C3482" BorderBrush="#D5C9EA"/>
-            </StackPanel>
-          </StackPanel>
-        </StackPanel>
-      </ScrollViewer>
+            BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,6">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="9">
+        <Button Grid.Column="0" Content="Abrir PDF" Click="OpenPdf_Click"
+                Padding="13,8" Background="#292D36" Foreground="White"
+                BorderThickness="0" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Content="↶" Click="Undo_Click"
+                Padding="12,8" Background="#F0F1F4" BorderBrush="#D9DCE0"
+                ToolTip.Tip="Desfazer última alteração" VerticalAlignment="Center"/>
+        <Button Grid.Column="2" Content="↷" Click="Redo_Click"
+                Padding="12,8" Background="#F0F1F4" BorderBrush="#D9DCE0"
+                ToolTip.Tip="Refazer alteração" VerticalAlignment="Center"/>
+        <ScrollViewer Grid.Column="3" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled">
+          <ContentControl x:Name="EditorFormattingToolbarHost"
+                          VerticalAlignment="Center"/>
+        </ScrollViewer>
+        <TextBlock Grid.Column="4" Text="Clique no texto para editar"
+                   FontSize="10" Foreground="#737B87"
+                   VerticalAlignment="Center"/>
+      </Grid>
     </Border>
 
     <Border Grid.Row="2" Background="#D9DCE0" Padding="18">
@@ -101,10 +62,15 @@
                  TextTrimming="CharacterEllipsis"/>
     </Border>
 
-    <!-- Campos usados pelos comandos internos de localizar/substituir. -->
+    <!-- Compatibilidade temporária com comandos internos já existentes. -->
     <StackPanel IsVisible="False">
+      <Button x:Name="SelectModeButton"/>
+      <Button x:Name="AddTextModeButton"/>
+      <TextBlock x:Name="SelectedTextLabel"/>
+      <Button x:Name="EditSelectedTextButton"/>
       <TextBox x:Name="SearchTextBox"/>
       <TextBox x:Name="ReplaceTextBox"/>
     </StackPanel>
+
   </Grid>
 </Window>
