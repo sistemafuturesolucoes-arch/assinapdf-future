@@ -973,29 +973,44 @@ public partial class EditorWindow : Window
             (run.IsBold ? FontStyles.Bold : FontStyles.Regular) |
             (run.IsItalic ? FontStyles.Italic : FontStyles.Regular);
 
-        try
-        {
-            string faceName = GetPdfFontFaceName(fontFamily, run.IsBold, run.IsItalic);
-            // Assign even when the family appears unchanged. This marks the face
-            // as explicitly owned by this segment and makes the PDF writer emit
-            // the correct Tf for regular runs as well as styled runs.
-            state.Font = IsStandard14Family(fontFamily)
-                ? FontRepository.FindFont(faceName)
-                : FontRepository.FindFont(fontFamily, requestedStyle);
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
-                $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : requestedStyle.ToString())}. " +
-                "Escolha outra família de fonte antes de aplicar a edição.",
-                ex);
-        }
+        // Quando o PDF já contém a fonte incorporada, não force uma busca
+        // no catálogo local para reaplicar a mesma família/estilo. O arquivo
+        // original já possui os dados necessários e FindFont pode falhar
+        // mesmo que a fonte esteja perfeitamente utilizável dentro do PDF.
+        // Só preservamos a face incorporada quando o usuário não mudou família,
+        // negrito ou itálico; alterações explícitas continuam exigindo uma face
+        // instalada/baixada e validada antes da gravação.
+        bool preserveEmbeddedFace =
+            originalFontEmbedded &&
+            string.Equals(
+                NormalizePdfFontFamily(fontFamily),
+                NormalizePdfFontFamily(originalFontName),
+                StringComparison.OrdinalIgnoreCase) &&
+            state.IsBold == run.IsBold &&
+            state.IsItalic == run.IsItalic;
 
-        // Set FontStyle on the owned state (not on a detached clone). For
-        // absorbed text this also lets Aspose attempt a source-font swap;
-        // for TextBuilder-owned text it records the flags for serialization.
-        state.FontStyle = requestedStyle;
+        if (!preserveEmbeddedFace)
+        {
+            try
+            {
+                string faceName = GetPdfFontFaceName(fontFamily, run.IsBold, run.IsItalic);
+                state.Font = IsStandard14Family(fontFamily)
+                    ? FontRepository.FindFont(faceName)
+                    : FontRepository.FindFont(fontFamily, requestedStyle);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"Não foi possível localizar a fonte '{fontFamily}' no estilo " +
+                    $"{(run.IsBold && run.IsItalic ? "negrito e itálico" : requestedStyle.ToString())}. " +
+                    "Escolha outra família de fonte antes de aplicar a edição.",
+                    ex);
+            }
+
+            // Só altere o estilo do objeto-fonte quando uma nova face foi
+            // resolvida. Na preservação, o estilo original já é o desejado.
+            state.FontStyle = requestedStyle;
+        }
 
         // Assign colours directly to the final owned state. The setters retain the
         // values consumed by the PDF writer; on absorbed text they also perform the
