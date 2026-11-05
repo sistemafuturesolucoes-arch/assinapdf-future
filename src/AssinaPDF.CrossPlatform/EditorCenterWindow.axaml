@@ -30,7 +30,7 @@
           <TextBlock Text="Os arquivos de trabalho ficam salvos neste computador."
                      FontSize="12" Foreground="#FFFFFF"/>
         </StackPanel>
-        <Button Grid.Column="1" Content="+ Editar novo PDF"
+        <Button Grid.Column="1" Content="+ Editar documento"
                 Click="NewPdf_Click" Padding="18,10"
                 Background="#FFFFFF" Foreground="#292D36"
                 BorderThickness="0" FontWeight="SemiBold"/>
