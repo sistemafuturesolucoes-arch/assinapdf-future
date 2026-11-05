@@ -751,7 +751,90 @@ public partial class EditorWindow : Window
         catch (Exception ex)
         {
             EditorStatusText.Text = $"Não foi possível concluir a edição: {ex.Message}";
+            await ShowEditingDiagnosticAsync(ex);
         }
+    }
+
+    private async Task ShowEditingDiagnosticAsync(Exception exception)
+    {
+        string diagnostic = exception.ToString();
+        string? diagnosticPath = null;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_sessionDirectory))
+            {
+                Directory.CreateDirectory(_sessionDirectory);
+                diagnosticPath = Path.Combine(
+                    _sessionDirectory,
+                    $"diagnostico-edicao-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+                await File.WriteAllTextAsync(diagnosticPath, diagnostic);
+            }
+        }
+        catch (Exception logException)
+        {
+            diagnostic += Environment.NewLine + Environment.NewLine +
+                "Não foi possível salvar o arquivo de diagnóstico: " + logException;
+        }
+
+        string dialogText = diagnosticPath == null
+            ? diagnostic
+            : diagnostic + Environment.NewLine + Environment.NewLine +
+              "Arquivo completo: " + diagnosticPath;
+
+        var detailsBox = new TextBox
+        {
+            Text = dialogText,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+        };
+
+        var closeButton = new Button
+        {
+            Content = "Fechar",
+            MinWidth = 110,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
+        };
+
+        var dialog = new Window
+        {
+            Title = "Diagnóstico completo da edição",
+            Width = 780,
+            Height = 560,
+            MinWidth = 520,
+            MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "A mensagem completa está abaixo. Você pode rolar, selecionar e copiar o texto.",
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                    },
+                    new ScrollViewer
+                    {
+                        Content = detailsBox,
+                        VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                        HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+                    },
+                    closeButton
+                }
+            }
+        };
+
+        closeButton.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
+
+        if (diagnosticPath != null)
+            EditorStatusText.Text += " Diagnóstico completo salvo em: " + diagnosticPath;
     }
 
     internal sealed record EditedTextRun(
@@ -1171,14 +1254,24 @@ public partial class EditorWindow : Window
                     return Fail($"tamanho da fonte divergente na posição {run.Start}: esperado {run.FontSize:0.##} pt, salvo {state.FontSize:0.##} pt.");
                 if (state.IsBold != run.IsBold)
                 {
-                    string actualFontName = state.Font?.FontName ?? "(sem objeto Font)";
-                    string actualBaseFont = state.Font?.BaseFont ?? "(sem BaseFont)";
+                    var actualFont = state.Font;
+                    string actualFontName = actualFont?.FontName ?? "(sem objeto Font)";
+                    string actualBaseFont = actualFont?.BaseFont ?? "(sem BaseFont)";
                     string savedFontName = state.FontName ?? "(nulo)";
+                    string fontDetails = actualFont == null
+                        ? "Font=null"
+                        : $"DecodedFontName='{actualFont.DecodedFontName}'; " +
+                          $"ResourceName='{actualFont.ResourceName}'; " +
+                          $"Subtype='{actualFont.Subtype}'; " +
+                          $"Font.IsBold={actualFont.IsBold}; Font.IsItalic={actualFont.IsItalic}; " +
+                          $"Font.IsCid={actualFont.IsCid}; Font.IsEmbedded={actualFont.IsEmbedded}; " +
+                          $"Font.IsAccessible={actualFont.IsAccessible}";
                     return Fail(
                         $"negrito divergente na posição {run.Start}: esperado {run.IsBold}, " +
                         $"IsBold salvo={state.IsBold}; FontStyle salvo={state.FontStyle}; " +
                         $"FontName salvo='{savedFontName}'; " +
-                        $"Font.FontName='{actualFontName}'; Font.BaseFont='{actualBaseFont}'.");
+                        $"Font.FontName='{actualFontName}'; Font.BaseFont='{actualBaseFont}'; " +
+                        fontDetails);
                 }
                 if (state.IsItalic != run.IsItalic)
                 {
