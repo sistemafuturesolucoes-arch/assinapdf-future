@@ -368,7 +368,7 @@ public partial class EditorWindow : Window
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
-        var cancel = new Button { Content = "Continuar sem substituir", MinWidth = 160 };
+        var cancel = new Button { Content = "Não substituir (obter fonte original)", MinWidth = 220 };
         var apply = new Button { Content = "Usar fonte selecionada", MinWidth = 160 };
         cancel.Click += (_, _) => dialog.Close((string?)null);
         apply.Click += (_, _) => dialog.Close(selector.SelectedItem as string);
@@ -380,7 +380,7 @@ public partial class EditorWindow : Window
             {
                 new TextBlock
                 {
-                    Text = $"A fonte '{missingFamily}' não está disponível ou seu nome original não pôde ser identificado. Escolha uma fonte instalada para usar como substituta. A aparência, o espaçamento e as quebras de linha podem mudar.",
+                    Text = $"FONTE DO PDF: '{missingFamily}'.\n\nDeseja substituir esta fonte por uma fonte instalada? Se escolher não substituir, a edição deste trecho será cancelada sem alterar o PDF. Você poderá baixar/instalar a fonte original e abrir o PDF novamente para que o AssinaPDF a carregue.\n\nAtenção: quando o nome exibido começar com CIDFont+, ele é um identificador interno do PDF e não revela, por si só, o nome comercial da fonte.",
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap
                 },
                 selector,
@@ -395,6 +395,46 @@ public partial class EditorWindow : Window
         };
 
         return await dialog.ShowDialog<string?>(this);
+    }
+
+    private async Task ShowFontDownloadInstructionAsync(string fontName)
+    {
+        string detail = fontName.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase)
+            ? $"O PDF informou o identificador interno '{fontName}', não o nome real da família. Consulte o criador do documento ou obtenha a fonte original usada na geração do PDF."
+            : $"A fonte original identificada é '{fontName}'. Baixe-a de uma fonte confiável e instale-a no computador.";
+
+        var close = new Button
+        {
+            Content = "Entendi",
+            MinWidth = 110,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
+        };
+        var dialog = new Window
+        {
+            Title = "Fonte original necessária",
+            Width = 540,
+            Height = 250,
+            MinWidth = 480,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(20),
+                Spacing = 14,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = detail + Environment.NewLine + Environment.NewLine +
+                               "Depois de obter a fonte, feche este editor e abra o PDF novamente. O AssinaPDF fará uma nova leitura das fontes. A edição foi cancelada e o arquivo original permanece preservado.",
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                    },
+                    close
+                }
+            }
+        };
+        close.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
     }
 
     private void LoadDocumentPreview()
@@ -843,7 +883,8 @@ public partial class EditorWindow : Window
                     if (string.IsNullOrWhiteSpace(replacement))
                     {
                         EditorStatusText.Text =
-                            "Edição cancelada. Escolha uma fonte substituta para editar este texto CID.";
+                            $"Edição cancelada sem substituir a fonte '{resourceKey}'. O PDF não foi alterado. Baixe/instale a fonte original e abra o PDF novamente para carregá-la antes de editar este trecho.";
+                        await ShowFontDownloadInstructionAsync(resourceKey);
                         return;
                     }
                     _fontSubstitutions[resourceKey] = replacement;
