@@ -1244,6 +1244,14 @@ public partial class EditorWindow : Window
                     if (target == null || closest > 8.0)
                         throw new InvalidOperationException("O texto selecionado não foi localizado novamente no PDF.");
 
+                    // O TextFragment possui opções próprias para operações de
+                    // substituição de texto/fonte. Configurá-las no fragmento antes
+                    // de alterar o conteúdo permite que o Aspose trate a troca da
+                    // fonte CID/Type0 no caminho de edição, em vez de apenas alterar
+                    // o TextState em memória. RemoveUnusedFonts também limpa recursos
+                    // que deixarem de ser referenciados após a substituição.
+                    target.TextEditOptions = new TextEditOptions(
+                        TextEditOptions.FontReplace.RemoveUnusedFonts);
                     target.Text = replacementText;
                 }
                 else
