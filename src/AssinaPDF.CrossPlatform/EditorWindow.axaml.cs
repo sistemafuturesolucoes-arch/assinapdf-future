@@ -364,14 +364,27 @@ public partial class EditorWindow : Window
         var dialog = new Window
         {
             Title = "Escolher fonte substituta",
-            Width = 500,
-            Height = 245,
-            MinWidth = 440,
+            Width = 580,
+            Height = 360,
+            MinWidth = 540,
+            MinHeight = 340,
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
-        var cancel = new Button { Content = "Não substituir (obter fonte original)", MinWidth = 220 };
-        var apply = new Button { Content = "Usar fonte selecionada", MinWidth = 160 };
+        // A janela precisa reservar espaço para a mensagem, a lista e os dois
+        // botões. Com 245 px de altura, a linha de comandos ficava cortada.
+        var cancel = new Button
+        {
+            Content = "Continuar sem substituir",
+            MinWidth = 205,
+            Padding = new Thickness(12, 8)
+        };
+        var apply = new Button
+        {
+            Content = "Substituir pela fonte selecionada",
+            MinWidth = 220,
+            Padding = new Thickness(12, 8)
+        };
         cancel.Click += (_, _) => dialog.Close((string?)null);
         apply.Click += (_, _) => dialog.Close(selector.SelectedItem as string);
         dialog.Content = new StackPanel
@@ -382,7 +395,7 @@ public partial class EditorWindow : Window
             {
                 new TextBlock
                 {
-                    Text = $"FONTE DO PDF: '{missingFamily}'.\n\nDeseja substituir esta fonte por uma fonte instalada? Se escolher não substituir, a edição deste trecho será cancelada sem alterar o PDF. Você poderá baixar/instalar a fonte original e abrir o PDF novamente para que o AssinaPDF a carregue.\n\nAtenção: quando o nome exibido começar com CIDFont+, ele é um identificador interno do PDF e não revela, por si só, o nome comercial da fonte.",
+                    Text = $"A fonte utilizada neste PDF é: '{missingFamily}'.\n\nDeseja substituir essa fonte por uma fonte instalada?\n\nSe escolher \"Continuar sem substituir\", nenhuma substituição será aplicada e este trecho não será alterado. Você poderá baixar/instalar a fonte original e abrir o PDF novamente para que o AssinaPDF carregue a fonte correta.\n\nAtenção: nomes iniciados por CIDFont+ são identificadores internos do PDF e não revelam o nome comercial da fonte.",
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap
                 },
                 selector,
