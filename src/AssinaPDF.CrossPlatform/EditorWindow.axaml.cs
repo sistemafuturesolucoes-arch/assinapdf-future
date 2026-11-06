@@ -1841,6 +1841,27 @@ public partial class EditorWindow : Window
                requestedItalic == originalItalic;
     }
 
+    // Some embedded TrueType fonts are correctly saved as a bold face in the PDF
+    // resource name (for example, "Agency FB Bold" / "AgencyFBBold"), while
+    // Aspose.PDF reopens their TextState with IsBold=false and FontStyle=Regular.
+    // The selected PDF font program is authoritative for rendering in that case.
+    private static bool PdfFontFaceHasStyle(Aspose.Pdf.Text.Font? font, bool bold)
+    {
+        if (font == null)
+            return false;
+
+        string[] names = { font.BaseFont, font.FontName, font.DecodedFontName };
+        string[] suffixes = bold
+            ? new[] { "BoldItalic", "BoldOblique", "SemiBold", "DemiBold", "BoldMT", "Bold" }
+            : new[] { "BoldItalic", "BoldOblique", "ItalicMT", "Italic", "Oblique" };
+
+        return names
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!.Trim().Replace(" ", string.Empty, StringComparison.Ordinal))
+            .Any(name => suffixes.Any(suffix =>
+                name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)));
+    }
+
     private static string? VerifyRichTextFormatting(
         Document document,
         int pageIndex,
@@ -1969,7 +1990,9 @@ public partial class EditorWindow : Window
                     run.IsBold,
                     run.IsItalic,
                     state.Font?.IsEmbedded == true);
-                if (state.IsBold != run.IsBold && !unchangedEmbeddedFace)
+                bool savedBold = state.IsBold || PdfFontFaceHasStyle(state.Font, bold: true);
+                bool savedItalic = state.IsItalic || PdfFontFaceHasStyle(state.Font, bold: false);
+                if (savedBold != run.IsBold && !unchangedEmbeddedFace)
                 {
                     var actualFont = state.Font;
                     string actualFontName = actualFont?.FontName ?? "(sem objeto Font)";
@@ -1981,21 +2004,24 @@ public partial class EditorWindow : Window
                           $"ResourceName='{actualFont.ResourceName}'; " +
                           $"Subtype='{actualFont.Subtype}'; " +
                           $"Font.IsBold={actualFont.IsBold}; Font.IsItalic={actualFont.IsItalic}; " +
+                          $"FaceBold={PdfFontFaceHasStyle(actualFont, bold: true)}; " +
+                          $"FaceItalic={PdfFontFaceHasStyle(actualFont, bold: false)}; " +
                           $"Font.IsCid={actualFont.IsCid}; Font.IsEmbedded={actualFont.IsEmbedded}; " +
                           $"Font.IsAccessible={actualFont.IsAccessible}";
                     return Fail(
                         $"negrito divergente na posição {run.Start}: esperado {run.IsBold}, " +
-                        $"IsBold salvo={state.IsBold}; FontStyle salvo={state.FontStyle}; " +
-                        $"FontName salvo='{savedFontName}'; " +
+                        $"IsBold salvo={state.IsBold}; estilo efetivo salvo={savedBold}; " +
+                        $"FontStyle salvo={state.FontStyle}; FontName salvo='{savedFontName}'; " +
                         $"Font.FontName='{actualFontName}'; Font.BaseFont='{actualBaseFont}'; " +
                         fontDetails);
                 }
-                if (state.IsItalic != run.IsItalic && !unchangedEmbeddedFace)
+                if (savedItalic != run.IsItalic && !unchangedEmbeddedFace)
                 {
                     string savedFontName = state.FontName ?? "(nulo)";
                     return Fail(
                         $"itálico divergente na posição {run.Start}: esperado {run.IsItalic}, " +
-                        $"salvo {state.IsItalic}; FontStyle={state.FontStyle}; FontName='{savedFontName}'.");
+                        $"estilo efetivo salvo={savedItalic}; IsItalic={state.IsItalic}; " +
+                        $"FontStyle={state.FontStyle}; FontName='{savedFontName}'.");
                 }
 
                 bool expectsEmbeddedTrueTypeReplacement =
