@@ -279,6 +279,7 @@ public partial class EditorWindow : Window
                 if (string.IsNullOrWhiteSpace(substitute))
                 {
                     unavailable.Add(family);
+                    await ShowFontDownloadInstructionAsync(family);
                     continue;
                 }
 
@@ -298,6 +299,7 @@ public partial class EditorWindow : Window
                 if (string.IsNullOrWhiteSpace(substitute))
                 {
                     unavailable.Add(cidFont.Key + " (CID não incorporada)");
+                    await ShowFontDownloadInstructionAsync(cidFont.Key);
                     continue;
                 }
 
