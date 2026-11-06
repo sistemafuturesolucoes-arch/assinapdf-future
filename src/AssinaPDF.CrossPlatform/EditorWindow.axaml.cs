@@ -54,6 +54,8 @@ public partial class EditorWindow : Window
     private string _selectedText = string.Empty;
     private RichEditorControl? _defaultToolbarEditor;
     private RichEditorToolbar? _formattingToolbar;
+    private readonly Dictionary<string, string> _fontSubstitutions =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // Construtor sem parâmetros usado pelo carregador XAML do Avalonia.
     // A janela funcional é criada pelo fluxo do editor com os caminhos explícitos.
@@ -160,8 +162,10 @@ public partial class EditorWindow : Window
         // CIDFont+F2 is a PDF resource identifier, not a trustworthy family name.
         // Keep it in the audit instead of silently dropping it or trying to
         // download a fictitious family named after the internal PDF resource.
-        bool unidentifiedCid = font?.IsCid == true ||
-            family.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase);
+        bool unidentifiedCid =
+            family.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
+            (font?.IsCid == true &&
+             (string.IsNullOrWhiteSpace(family) || family.Length <= 2));
 
         if (unidentifiedCid)
         {
@@ -255,35 +259,109 @@ public partial class EditorWindow : Window
             }
 
             var unavailable = new List<string>();
+            var substitutions = new List<string>();
             foreach (string family in missing)
             {
+                bool downloaded = false;
                 try
                 {
-                    bool downloaded = await FontDownloadService.EnsureAvailableAsync(this, family);
-                    if (!downloaded)
-                        unavailable.Add(family);
+                    downloaded = await FontDownloadService.EnsureAvailableAsync(this, family);
                 }
                 catch (Exception ex)
                 {
-                    unavailable.Add(family);
                     System.Diagnostics.Debug.WriteLine(
                         $"AssinaPDF: não foi possível obter a fonte '{family}': {ex.Message}");
                 }
+
+                if (downloaded)
+                    continue;
+
+                string? substitute = await AskSubstituteFontAsync(family);
+                if (string.IsNullOrWhiteSpace(substitute))
+                {
+                    unavailable.Add(family);
+                    continue;
+                }
+
+                _fontSubstitutions[family] = substitute;
+                substitutions.Add($"{family} → {substitute}");
             }
 
             if (unavailable.Count == 0)
             {
-                EditorStatusText.Text = $"Verificação concluída: {fonts.Count} fonte(s) identificada(s). As fontes ausentes foram obtidas para uso interno do AssinaPDF; nenhuma foi instalada no sistema." + cidNote;
+                string substitutionNote = substitutions.Count == 0
+                    ? string.Empty
+                    : " Substituições escolhidas: " + string.Join(", ", substitutions) + ".";
+                EditorStatusText.Text = $"Verificação concluída: {fonts.Count} fonte(s) identificada(s). As fontes ausentes foram obtidas para uso interno do AssinaPDF; nenhuma foi instalada no sistema." +
+                    substitutionNote + cidNote;
                 return;
             }
 
             string names = string.Join(", ", unavailable);
-            EditorStatusText.Text = $"Atenção: {unavailable.Count} fonte(s) não estão disponíveis ({names}). O PDF continua aberto e será exibido com a substituição de fonte do mecanismo de visualização. Antes de editar, será necessário escolher uma família instalada ou obter a fonte original; espaçamento e quebras de linha podem mudar." + cidNote;
+            string substitutionsDone = substitutions.Count == 0
+                ? string.Empty
+                : " Substituições escolhidas: " + string.Join(", ", substitutions) + ".";
+            EditorStatusText.Text = $"Atenção: {unavailable.Count} fonte(s) não estão disponíveis ({names}). O PDF continua aberto e será exibido com a substituição de fonte do mecanismo de visualização. Não edite os trechos que usam essas fontes até obter a fonte original ou escolher uma substituta; espaçamento e quebras de linha podem mudar." +
+                substitutionsDone + cidNote;
         }
         catch (Exception ex)
         {
             EditorStatusText.Text = "Não foi possível concluir a verificação de fontes. O PDF continua aberto; a aparência original da visualização foi mantida. " + ex.Message;
         }
+    }
+
+    private async Task<string?> AskSubstituteFontAsync(string missingFamily)
+    {
+        var choices = InstalledFontCatalogService.GetInstalledFamilyNames();
+        if (choices.Count == 0)
+        {
+            EditorStatusText.Text =
+                $"Não há fontes instaladas disponíveis para substituir '{missingFamily}'.";
+            return null;
+        }
+
+        var selector = new ComboBox
+        {
+            ItemsSource = choices,
+            SelectedIndex = 0,
+            MinWidth = 280
+        };
+        var dialog = new Window
+        {
+            Title = "Escolher fonte substituta",
+            Width = 500,
+            Height = 245,
+            MinWidth = 440,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        var cancel = new Button { Content = "Continuar sem substituir", MinWidth = 160 };
+        var apply = new Button { Content = "Usar fonte selecionada", MinWidth = 160 };
+        cancel.Click += (_, _) => dialog.Close((string?)null);
+        apply.Click += (_, _) => dialog.Close(selector.SelectedItem as string);
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(18),
+            Spacing = 14,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"A fonte '{missingFamily}' não está disponível ou seu nome original não pôde ser identificado. Escolha uma fonte instalada para usar como substituta. A aparência, o espaçamento e as quebras de linha podem mudar.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                },
+                selector,
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancel, apply }
+                }
+            }
+        };
+
+        return await dialog.ShowDialog<string?>(this);
     }
 
     private void LoadDocumentPreview()
@@ -653,6 +731,8 @@ public partial class EditorWindow : Window
             double originalFontSize = 12;
             bool originalBold = false;
             bool originalItalic = false;
+            bool originalFontIsUnidentifiedCid = false;
+            string? originalPdfFontResourceName = null;
             Avalonia.Media.Color? originalForeground = null;
             Avalonia.Media.Color? originalBackground = null;
 
@@ -685,13 +765,18 @@ public partial class EditorWindow : Window
                                                   sourceFont?.BaseFont ??
                                                   fragment.TextState.FontName ??
                                                   string.Empty;
+                        originalPdfFontResourceName = decodedFontName;
                         originalFontName = NormalizePdfFontFamily(decodedFontName);
-                        // CIDFONT+F2 and similar resource labels are PDF internals, not family names.
-                        // Keep the original embedded CID font when its style is unchanged;
-                        // when the user changes style, use an embeddable TrueType family.
-                        if (string.IsNullOrWhiteSpace(originalFontName) ||
+                        originalFontIsUnidentifiedCid =
                             originalFontName.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
-                            originalFontName.Length <= 2)
+                            (sourceFont?.IsCid == true &&
+                             (string.IsNullOrWhiteSpace(originalFontName) || originalFontName.Length <= 2));
+
+                        // Do not silently assume Arial for an unidentified CID resource.
+                        // The user must explicitly choose a replacement before editing it.
+                        if (originalFontIsUnidentifiedCid)
+                            originalFontName = null;
+                        else if (string.IsNullOrWhiteSpace(originalFontName) || originalFontName.Length <= 2)
                             originalFontName = "Arial";
                         originalFontSize = fragment.TextState.FontSize > 0
                             ? fragment.TextState.FontSize
@@ -710,6 +795,30 @@ public partial class EditorWindow : Window
                             bounds.LLX, bounds.LLY, bounds.URX, bounds.URY);
                     }
                 }
+            }
+
+            if (originalFontIsUnidentifiedCid)
+            {
+                string resourceKey = string.IsNullOrWhiteSpace(originalPdfFontResourceName)
+                    ? "fonte CID sem identificação"
+                    : originalPdfFontResourceName;
+                if (!_fontSubstitutions.TryGetValue(resourceKey, out string? replacement))
+                {
+                    replacement = await AskSubstituteFontAsync(resourceKey);
+                    if (string.IsNullOrWhiteSpace(replacement))
+                    {
+                        EditorStatusText.Text =
+                            "Edição cancelada. Escolha uma fonte substituta para editar este texto CID.";
+                        return;
+                    }
+                    _fontSubstitutions[resourceKey] = replacement;
+                }
+                originalFontName = replacement;
+            }
+            else if (!string.IsNullOrWhiteSpace(originalFontName) &&
+                     _fontSubstitutions.TryGetValue(originalFontName, out string? mappedFamily))
+            {
+                originalFontName = mappedFamily;
             }
 
             var installedFonts = InstalledFontCatalogService.GetInstalledFamilyNames();
