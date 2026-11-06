@@ -147,20 +147,35 @@ public partial class EditorWindow : Window
     private static void RegisterDocumentFont(
         Aspose.Pdf.Text.Font? font,
         string? stateFontName,
-        IDictionary<string, bool> fonts)
+        IDictionary<string, bool> fonts,
+        ISet<string> unidentifiedCidFonts)
     {
         string rawName = font?.DecodedFontName ??
                          font?.BaseFont ??
                          stateFontName ??
                          string.Empty;
         string family = NormalizePdfFontFamily(rawName);
+        bool embedded = font?.IsEmbedded == true;
 
-        if (string.IsNullOrWhiteSpace(family) ||
-            family.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase) ||
-            family.Length <= 2)
+        // CIDFont+F2 is a PDF resource identifier, not a trustworthy family name.
+        // Keep it in the audit instead of silently dropping it or trying to
+        // download a fictitious family named after the internal PDF resource.
+        bool unidentifiedCid = font?.IsCid == true ||
+            family.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase);
+
+        if (unidentifiedCid)
+        {
+            string descriptor = string.IsNullOrWhiteSpace(rawName)
+                ? "fonte CID sem nome de família"
+                : rawName.Trim();
+            unidentifiedCidFonts.Add(
+                $"{descriptor} ({(embedded ? "incorporada no PDF" : "não incorporada")})");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(family) || family.Length <= 2)
             return;
 
-        bool embedded = font?.IsEmbedded == true;
         if (fonts.TryGetValue(family, out bool wasEmbedded))
             fonts[family] = wasEmbedded || embedded;
         else
@@ -181,6 +196,7 @@ public partial class EditorWindow : Window
         try
         {
             var fonts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            var unidentifiedCidFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using (var document = Document.Open(_workingCopyPath))
             {
                 foreach (Aspose.Pdf.Page page in document.Pages)
@@ -199,7 +215,8 @@ public partial class EditorWindow : Window
                             RegisterDocumentFont(
                                 fragment.TextState.Font,
                                 fragment.TextState.FontName,
-                                fonts);
+                                fonts,
+                                unidentifiedCidFonts);
                             continue;
                         }
 
@@ -208,7 +225,8 @@ public partial class EditorWindow : Window
                             RegisterDocumentFont(
                                 segment.TextState.Font,
                                 segment.TextState.FontName,
-                                fonts);
+                                fonts,
+                                unidentifiedCidFonts);
                         }
                     }
                 }
@@ -220,11 +238,19 @@ public partial class EditorWindow : Window
                 .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
 
+            string cidNote = unidentifiedCidFonts.Count == 0
+                ? string.Empty
+                : " Fontes CID sem família identificável: " +
+                  string.Join(", ", unidentifiedCidFonts) +
+                  ". Quando incorporadas, elas já acompanham o PDF e não precisam ser baixadas; " +
+                  "se não estiverem incorporadas, será necessário escolher uma fonte substituta antes de editar.";
+
             if (missing.Length == 0)
             {
-                EditorStatusText.Text = fonts.Count == 0
+                EditorStatusText.Text = fonts.Count == 0 && unidentifiedCidFonts.Count == 0
                     ? "PDF aberto. Não foram encontrados textos com fontes identificáveis."
-                    : $"Verificação concluída: {fonts.Count} família(s) de fonte identificada(s); nenhuma fonte ausente que precise ser baixada.";
+                    : $"Verificação concluída: {fonts.Count} família(s) identificada(s); nenhuma fonte conhecida ausente." +
+                      cidNote;
                 return;
             }
 
@@ -247,12 +273,12 @@ public partial class EditorWindow : Window
 
             if (unavailable.Count == 0)
             {
-                EditorStatusText.Text = $"Verificação concluída: {fonts.Count} fonte(s) identificada(s). As fontes ausentes foram obtidas para uso interno do AssinaPDF; nenhuma foi instalada no sistema.";
+                EditorStatusText.Text = $"Verificação concluída: {fonts.Count} fonte(s) identificada(s). As fontes ausentes foram obtidas para uso interno do AssinaPDF; nenhuma foi instalada no sistema." + cidNote;
                 return;
             }
 
             string names = string.Join(", ", unavailable);
-            EditorStatusText.Text = $"Atenção: {unavailable.Count} fonte(s) não estão disponíveis ({names}). O PDF continua aberto e será exibido com a substituição de fonte do mecanismo de visualização. Ao editar, selecione uma família instalada para substituir a original; espaçamento e quebras de linha podem mudar.";
+            EditorStatusText.Text = $"Atenção: {unavailable.Count} fonte(s) não estão disponíveis ({names}). O PDF continua aberto e será exibido com a substituição de fonte do mecanismo de visualização. Antes de editar, será necessário escolher uma família instalada ou obter a fonte original; espaçamento e quebras de linha podem mudar." + cidNote;
         }
         catch (Exception ex)
         {
@@ -986,14 +1012,12 @@ public partial class EditorWindow : Window
                 TextFragment target;
                 if (originalBounds != null && originalText != null)
                 {
-                    // A opção RemoveUnusedFonts instrui o mecanismo de edição a
-                    // substituir a referência de fonte do trecho absorvido e limpar
-                    // recursos antigos que deixarem de ser usados. Isso é essencial
-                    // quando o PDF original usa uma fonte CID Type0 incorporada e o
-                    // usuário escolhe uma face compatível (por exemplo, Helvetica-Bold).
-                    var fontEditOptions = new TextEditOptions(
-                        TextEditOptions.FontReplace.RemoveUnusedFonts);
-                    var pageAbsorber = new TextFragmentAbsorber(fontEditOptions);
+                    // Use o absorvedor padrão para preservar a associação entre
+                    // TextFragment, segmentos e operadores do fluxo PDF. O diagnóstico
+                    // mostra que a opção RemoveUnusedFonts pode deixar a saída ainda
+                    // vinculada ao recurso CID/Type0 original, mesmo após atribuir a
+                    // nova face TrueType incorporada.
+                    var pageAbsorber = new TextFragmentAbsorber();
                     document.Pages[pageIndex + 1].Accept(pageAbsorber);
 
                     target = null!;
