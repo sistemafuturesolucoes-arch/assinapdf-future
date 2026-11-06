@@ -725,7 +725,9 @@ public partial class EditorWindow : Window
             Title = $"AssinaPDF | Editor - {Path.GetFileName(source)}";
             await VerifyDocumentFontsAsync();
             LoadDocumentPreview();
-            EditorStatusText.Text = "PDF aberto em uma cópia de trabalho e adicionado às edições recentes. O arquivo original permanece preservado.";
+            // Keep the font-audit result (including download/substitution warnings)
+            // visible after the page preview is rendered. Do not overwrite it with
+            // a generic success message here.
         }
         catch (Exception ex) { EditorStatusText.Text = $"Não foi possível abrir o PDF: {ex.Message}"; }
     }
