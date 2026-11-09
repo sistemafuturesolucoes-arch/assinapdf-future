@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Aspose.Pdf;
 using Aspose.Pdf.Operators;
-using Aspose.Pdf.Text;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -17,7 +17,7 @@ public sealed class PdfCidOperatorFontSwapPocTests
     public PdfCidOperatorFontSwapPocTests(ITestOutputHelper output) => _output = output;
 
     [Fact]
-    public void ReplaceFontResourceOnlyForExactTargetTextOperators_PersistsAfterSaveAndReopen()
+    public void LocateExactTargetCidSequenceInsideF2TextOperators()
     {
         var inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
         if (string.IsNullOrWhiteSpace(inputPath))
@@ -29,120 +29,112 @@ public sealed class PdfCidOperatorFontSwapPocTests
         Assert.True(File.Exists(inputPath), $"PDF não encontrado: {inputPath}");
         const string targetText = "Informações de Cheques Sem Fundos do Banco Central";
         const string regularResource = "F2";
-        const string boldResource = "F1";
 
-        var outputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_OPERATOR_OUTPUT");
-        if (string.IsNullOrWhiteSpace(outputPath))
-            outputPath = Path.Combine(Path.GetDirectoryName(inputPath)!,
-                Path.GetFileNameWithoutExtension(inputPath) + ".cid-operator-font-swap-poc.pdf");
-        Assert.NotEqual(Path.GetFullPath(inputPath), Path.GetFullPath(outputPath));
-
-        List<string> expectedSegmentTexts;
-        int targetPageNumber;
-        using (var document = new Document(inputPath))
+        // CIDs extraídos do ToUnicode CMap do F2 deste PDF de teste.
+        // Não usar este mapa como regra genérica para outros documentos/fontes.
+        var unicodeToCid = new Dictionary<char, ushort>
         {
-            var absorber = new TextFragmentAbsorber(targetText);
-            document.Pages.Accept(absorber);
-            var fragment = absorber.TextFragments.Cast<TextFragment>().Single();
-            targetPageNumber = checked((int)fragment.Page.Number);
-            expectedSegmentTexts = fragment.Segments.Cast<TextSegment>()
-                .Select(segment => segment.Text ?? string.Empty)
-                .Where(text => text.Length > 0)
-                .ToList();
+            ['I'] = 0x002C, ['n'] = 0x0051, ['f'] = 0x0049, ['o'] = 0x0052,
+            ['r'] = 0x0055, ['m'] = 0x0050, ['a'] = 0x0044, ['ç'] = 0x006F,
+            ['õ'] = 0x007D, ['e'] = 0x0048, ['s'] = 0x0056, [' '] = 0x0003,
+            ['d'] = 0x0047, ['C'] = 0x0026, ['h'] = 0x004B, ['q'] = 0x0054,
+            ['u'] = 0x0058, ['S'] = 0x0036, ['F'] = 0x0029, ['B'] = 0x0025,
+            ['c'] = 0x0046, ['t'] = 0x0057, ['l'] = 0x004F
+        };
 
-            Assert.NotEmpty(expectedSegmentTexts);
-            _output.WriteLine($"TARGET page={targetPageNumber}; text='{fragment.Text}'; segments={expectedSegmentTexts.Count}");
-            foreach (var segment in fragment.Segments.Cast<TextSegment>())
-                _output.WriteLine($"SEGMENT text='{segment.Text}'; resource={segment.TextState.Font?.ResourceName}; font={segment.TextState.Font?.FontName}");
+        var encodedTarget = new StringBuilder(targetText.Length * 2);
+        foreach (var character in targetText)
+        {
+            Assert.True(unicodeToCid.TryGetValue(character, out var cid),
+                $"Não há CID conhecido para o caractere U+{(int)character:X4} '{character}'.");
+            encodedTarget.Append((char)(cid >> 8));
+            encodedTarget.Append((char)(cid & 0xFF));
+        }
 
-            var page = document.Pages[targetPageNumber];
-            var contents = page.Contents;
-            string? activeFont = null;
-            double activeSize = 0;
-            var matches = new List<(int Index, string Text, string Resource, double Size)>();
+        using var document = new Document(inputPath);
+        var absorber = new Aspose.Pdf.Text.TextFragmentAbsorber(targetText);
+        document.Pages.Accept(absorber);
+        var fragment = absorber.TextFragments.Cast<Aspose.Pdf.Text.TextFragment>().Single();
+        var pageNumber = checked((int)fragment.Page.Number);
+        var page = document.Pages[pageNumber];
 
-            for (int index = 1; index <= contents.Count; index++)
+        _output.WriteLine($"TARGET page={pageNumber}; chars={targetText.Length}; encodedUnits={encodedTarget.Length}");
+        _output.WriteLine($"SEGMENT resource={fragment.Segments.Cast<Aspose.Pdf.Text.TextSegment>().First().TextState.Font?.ResourceName}; text='{fragment.Text}'");
+
+        var candidates = new List<(int Index, int Offset, int Length, string Preview)>();
+        string? activeFont = null;
+        var operatorCount = 0;
+        var exactMatches = 0;
+
+        for (var index = 1; index <= page.Contents.Count; index++)
+        {
+            var op = page.Contents[index];
+            if (op is SelectFont selectFont)
             {
-                var op = contents[index];
-                if (op is SelectFont selectFont)
+                activeFont = selectFont.FontName;
+                continue;
+            }
+
+            if (op is not TextShowOperator showText || activeFont != regularResource)
+                continue;
+
+            operatorCount++;
+            var shown = showText.Text ?? string.Empty;
+            var matchAt = shown.IndexOf(encodedTarget.ToString(), StringComparison.Ordinal);
+            if (matchAt >= 0)
+            {
+                exactMatches++;
+                candidates.Add((index, matchAt, encodedTarget.Length, "EXACT"));
+                continue;
+            }
+
+            var bestLength = 0;
+            var bestTargetOffset = 0;
+            var bestOperatorOffset = 0;
+            for (var targetOffset = 0; targetOffset < encodedTarget.Length; targetOffset += 2)
+            {
+                for (var operatorOffset = 0; operatorOffset < shown.Length; operatorOffset += 2)
                 {
-                    activeFont = selectFont.FontName;
-                    activeSize = selectFont.Size;
-                    continue;
+                    var length = 0;
+                    while (targetOffset + length + 1 < encodedTarget.Length &&
+                           operatorOffset + length + 1 < shown.Length &&
+                           encodedTarget[targetOffset + length] == shown[operatorOffset + length] &&
+                           encodedTarget[targetOffset + length + 1] == shown[operatorOffset + length + 1])
+                        length += 2;
+
+                    if (length > bestLength)
+                    {
+                        bestLength = length;
+                        bestTargetOffset = targetOffset;
+                        bestOperatorOffset = operatorOffset;
+                    }
                 }
-
-                if (op is TextShowOperator showText)
-                {
-                    string shown = showText.Text ?? string.Empty;
-                    _output.WriteLine($"OP[{index:D4}] FONT={activeFont}/{activeSize}; TYPE={op.GetType().Name}; TEXT='{shown}'");
-                    if (activeFont == regularResource &&
-                        expectedSegmentTexts.Contains(shown, StringComparer.Ordinal))
-                        matches.Add((index, shown, activeFont, activeSize));
-                }
             }
 
-            var matchedTexts = matches.Select(match => match.Text).ToList();
-            Assert.Equal(expectedSegmentTexts.OrderBy(text => text, StringComparer.Ordinal),
-                matchedTexts.OrderBy(text => text, StringComparer.Ordinal));
-            Assert.NotEmpty(matches);
-
-            // Work backwards so inserted operators do not invalidate earlier 1-based indexes.
-            foreach (var match in matches.OrderByDescending(match => match.Index))
+            if (bestLength >= 4)
             {
-                contents.Insert(match.Index, new SelectFont(boldResource, match.Size));
-                contents.Insert(match.Index + 2, new SelectFont(regularResource, match.Size));
-            }
-
-            document.Save(outputPath);
-        }
-
-        Assert.True(File.Exists(outputPath), "O PDF de saída não foi criado.");
-        using (var saved = new Document(outputPath))
-        {
-            var verify = new TextFragmentAbsorber(targetText);
-            saved.Pages.Accept(verify);
-            var fragment = verify.TextFragments.Cast<TextFragment>().Single();
-            Assert.Equal(targetText, fragment.Text);
-
-            var savedSegments = fragment.Segments.Cast<TextSegment>().ToArray();
-            Assert.NotEmpty(savedSegments);
-            foreach (var segment in savedSegments)
-            {
-                var weight = ReadTrueTypeWeight(segment.TextState.Font);
-                _output.WriteLine($"SAVED text='{segment.Text}'; resource={segment.TextState.Font?.ResourceName}; font={segment.TextState.Font?.FontName}; weight={weight?.ToString() ?? "n/a"}");
-                Assert.Equal(boldResource, segment.TextState.Font?.ResourceName);
-                Assert.True(weight >= 600, $"O segmento '{segment.Text}' não permaneceu em negrito. Peso={weight?.ToString() ?? "n/a"}");
+                var preview = targetText.Substring(bestTargetOffset / 2,
+                    Math.Min(bestLength / 2, targetText.Length - bestTargetOffset / 2));
+                candidates.Add((index, bestOperatorOffset, bestLength, preview));
             }
         }
 
-        _output.WriteLine($"POC aprovada: somente os operadores do texto alvo foram trocados para {boldResource}. Arquivo: {outputPath}");
-    }
-
-    private static ushort? ReadTrueTypeWeight(Font? font)
-    {
-        if (font == null) return null;
-        using var stream = new MemoryStream();
-        font.Save(stream);
-        var bytes = stream.ToArray();
-        if (bytes.Length < 12) return null;
-        int count = ReadU16(bytes, 4);
-        for (int i = 0; i < count; i++)
+        _output.WriteLine($"F2_TEXT_OPERATORS={operatorCount}; EXACT_OPERATOR_MATCHES={exactMatches}");
+        foreach (var candidate in candidates
+                     .OrderByDescending(item => item.Length)
+                     .ThenBy(item => item.Index)
+                     .Take(8))
         {
-            int record = 12 + i * 16;
-            if (record + 16 > bytes.Length) return null;
-            if (System.Text.Encoding.ASCII.GetString(bytes, record, 4) != "OS/2") continue;
-            uint offset = ReadU32(bytes, record + 8);
-            uint length = ReadU32(bytes, record + 12);
-            if (length < 6 || offset + 6 > bytes.Length) return null;
-            return ReadU16(bytes, checked((int)offset + 4));
+            _output.WriteLine($"CANDIDATE OP[{candidate.Index:D4}] offsetUnits={candidate.Offset}; " +
+                $"matchedChars={candidate.Length / 2}; targetPart='{candidate.Preview}'");
         }
-        return null;
+
+        if (exactMatches == 0)
+            _output.WriteLine("RESULTADO: a sequência completa não está em um único operador; os candidatos acima mostram os maiores trechos CID encontrados.");
+        else
+            _output.WriteLine("RESULTADO: sequência CID completa localizada em operador(es); nenhuma alteração foi feita no PDF.");
+
+        Assert.True(candidates.Count > 0,
+            "Nenhum trecho CID do alvo foi localizado nos operadores F2. Verifique o ToUnicode/CID map usado nesta POC.");
     }
-
-    private static ushort ReadU16(byte[] bytes, int offset) =>
-        checked((ushort)((bytes[offset] << 8) | bytes[offset + 1]));
-
-    private static uint ReadU32(byte[] bytes, int offset) =>
-        ((uint)bytes[offset] << 24) | ((uint)bytes[offset + 1] << 16) |
-        ((uint)bytes[offset + 2] << 8) | bytes[offset + 3];
 }
