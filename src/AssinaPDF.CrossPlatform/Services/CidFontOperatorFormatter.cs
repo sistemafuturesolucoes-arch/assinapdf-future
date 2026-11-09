@@ -36,21 +36,22 @@ internal static class CidFontOperatorFormatter
         int pageNumber,
         TextFragment target,
         out string reason) =>
-        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: false, out reason);
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: false, foregroundOverride: null, out reason);
 
     internal static bool TryApplySyntheticBoldFallback(
         Document document,
         int pageNumber,
         TextFragment target,
         out string reason) =>
-        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: true, forceSyntheticItalic: false, out reason);
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: true, forceSyntheticItalic: false, foregroundOverride: null, out reason);
 
     internal static bool TryApplySyntheticItalicFallback(
         Document document,
         int pageNumber,
         TextFragment target,
+        Aspose.Pdf.Color? foregroundOverride,
         out string reason) =>
-        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: true, out reason);
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: true, foregroundOverride, out reason);
 
     internal static bool HasSyntheticItalicOperator(Page page)
     {
@@ -82,6 +83,7 @@ internal static class CidFontOperatorFormatter
         TextFragment target,
         bool forceSyntheticBold,
         bool forceSyntheticItalic,
+        Aspose.Pdf.Color? foregroundOverride,
         out string reason)
     {
         reason = string.Empty;
@@ -229,12 +231,20 @@ internal static class CidFontOperatorFormatter
             replacementOperators.Add(new ConcatenateMatrix(1, 0, 0.2126, 1, 0, 0));
         }
 
+        if (foregroundOverride is { } requestedForeground)
+        {
+            replacementOperators.Add(new SetRGBColor(
+                requestedForeground.R / 255d,
+                requestedForeground.G / 255d,
+                requestedForeground.B / 255d));
+        }
+
         if (syntheticBold)
         {
             // Keep the original CID font and glyph codes. Fill-and-stroke paints
             // the same embedded glyph outlines with a small pen, producing a
             // synthetic bold without substituting Arial or rebuilding text.
-            Aspose.Pdf.Color foreground =
+            Aspose.Pdf.Color foreground = foregroundOverride ??
                 segments[0].TextState.ForegroundColor ?? Aspose.Pdf.Color.FromRgb(0, 0, 0);
             replacementOperators.Add(new SetTextRenderingMode(2));
             replacementOperators.Add(new SetLineWidth(strokeWidth));
