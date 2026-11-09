@@ -157,7 +157,11 @@ public partial class EditorWindow : Window
                          stateFontName ??
                          string.Empty;
         string family = NormalizePdfFontFamily(rawName);
-        bool embedded = font?.IsEmbedded == true;
+        // IsEmbedded pode ser reportado como false por alguns leitores para fontes CID/Type0
+        // mesmo quando o programa TrueType está incorporado no PDF. IsAccessible também
+        // considera programas de fonte extraídos do próprio documento; evita pedir ao
+        // usuário uma fonte externa quando o PDF já contém os glifos necessários.
+        bool embedded = font?.IsEmbedded == true || font?.IsAccessible == true;
 
         // CIDFont+F2 is a PDF resource identifier, not a trustworthy family name.
         // Keep it in the audit instead of silently dropping it or trying to
