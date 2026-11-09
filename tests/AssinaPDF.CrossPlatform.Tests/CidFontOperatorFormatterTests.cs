@@ -194,7 +194,7 @@ public sealed class CidFontOperatorFormatterTests
                 BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(method);
 
-            object?[] arguments = { document, pageNumber, fragment, null, null };
+            object?[] arguments = { document, pageNumber, fragment, Aspose.Pdf.Color.FromRgb(1, 0, 0), null };
             bool applied = (bool)method!.Invoke(null, arguments)!;
             string reason = arguments[4]?.ToString() ?? "(sem diagnóstico)";
             _output.WriteLine($"SYNTHETIC CID ITALIC: RESULT={applied}; DETAIL={reason}");
@@ -225,8 +225,11 @@ public sealed class CidFontOperatorFormatterTests
         Assert.Contains(operators, operation => operation is GRestore);
         Assert.Contains(operators, operation =>
             operation is ConcatenateMatrix matrix &&
-            Math.Abs(matrix.Matrix.C) >= 0.05 &&
+            matrix.Matrix.C >= 0.05 &&
             Math.Abs(matrix.Matrix.B) < 0.0001);
+        Assert.Contains(operators, operation =>
+            operation is SetRGBColor color &&
+            color.R > 0.99 && color.G < 0.01 && color.B < 0.01);
 
         _output.WriteLine($"OUTPUT={outputPath}");
         _output.WriteLine($"REOPEN_TEXT='{savedFragment.Text}'; SEGMENTS={savedSegments.Length}");
