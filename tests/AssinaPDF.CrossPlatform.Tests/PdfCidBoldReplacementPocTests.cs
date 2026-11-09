@@ -175,6 +175,8 @@ public sealed class PdfCidBoldReplacementPocTests
             return;
         }
 
+        Assert.True(File.Exists(inputPath), $"PDF de teste não encontrado: {inputPath}");
+
         using var document = new Document(inputPath);
         var absorber = new TextFragmentAbsorber("Informações de Cheques Sem Fundos do Banco Central");
         document.Pages.Accept(absorber);
@@ -183,7 +185,7 @@ public sealed class PdfCidBoldReplacementPocTests
 
         var rect = fragment!.Rectangle;
         _output.WriteLine($"ALVO: página={fragment.Page.Number}; texto='{fragment.Text}'; " +
-            $"retângulo=({rect.Left:F3},{rect.Bottom:F3})-({rect.Right:F3},{rect.Top:F3})");
+            $"retângulo=({rect.LLX:F3},{rect.LLY:F3})-({rect.URX:F3},{rect.URY:F3})");
 
         var page = document.Pages[fragment.Page.Number];
         var selectedFont = "(fonte não identificada)";
