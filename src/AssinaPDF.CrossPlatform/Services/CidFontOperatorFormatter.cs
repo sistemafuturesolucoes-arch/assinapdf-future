@@ -178,6 +178,10 @@ internal static class CidFontOperatorFormatter
             return Fail("Os glifos selecionados não correspondem exatamente ao texto solicitado.", out reason);
 
         var replacementOperators = new List<Aspose.Pdf.Operator>(10);
+        double strokeWidth = syntheticBold
+            ? Math.Clamp(fontSize * 0.035, 0.20, 0.65)
+            : 0;
+
         if (prefix.Length > 0)
             replacementOperators.Add(new SetGlyphsPositionShowText(prefix));
 
@@ -189,7 +193,6 @@ internal static class CidFontOperatorFormatter
             // synthetic bold without substituting Arial or rebuilding text.
             Aspose.Pdf.Color foreground =
                 segments[0].TextState.ForegroundColor ?? Aspose.Pdf.Color.FromRgb(0, 0, 0);
-            double strokeWidth = Math.Clamp(fontSize * 0.035, 0.20, 0.65);
             replacementOperators.Add(new GSave());
             replacementOperators.Add(new SetTextRenderingMode(2));
             replacementOperators.Add(new SetLineWidth(strokeWidth));
