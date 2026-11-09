@@ -67,10 +67,9 @@ internal static class CidFontOperatorFormatter
         if (sourceWeight is null || sourceWeight.Value < 350 || sourceWeight.Value > 500)
             return Fail("Não foi possível confirmar que a fonte CID de origem é Regular.", out reason);
 
-        if (!TryReadToUnicodeMap(sourceFont, out var sourceMap))
+        if (!TryReadToUnicodeMap(sourceFont, out var sourceMap, out string cmapDiagnostic))
             return Fail(
-                $"Não foi possível ler o mapa ToUnicode da fonte CID {sourceFont.ResourceName}. " +
-                "A inspeção dos objetos internos do PDF não retornou um CMap válido.",
+                $"Não foi possível ler o mapa ToUnicode da fonte CID {sourceFont.ResourceName}: {cmapDiagnostic}",
                 out reason);
 
         if (!TryEncodeIdentityCidText(target.Text, sourceMap, out string encodedTarget, out reason))
@@ -92,7 +91,7 @@ internal static class CidFontOperatorFormatter
                 continue;
 
             if (!HasIdentityCidToGidMap(candidate) ||
-                !TryReadToUnicodeMap(candidate, out var candidateMap))
+                !TryReadToUnicodeMap(candidate, out var candidateMap, out _))
                 continue;
 
             bool sameMappings = true;
@@ -294,21 +293,51 @@ internal static class CidFontOperatorFormatter
 
     private static bool TryReadToUnicodeMap(
         Font font,
-        out Dictionary<ushort, string> map)
+        out Dictionary<ushort, string> map,
+        out string diagnostic)
     {
         map = new Dictionary<ushort, string>();
+        diagnostic = string.Empty;
         object? fontInfo = font.iPdfFont;
         object? fontDictionary = ReadField(fontInfo, "_fontDict");
         object? reader = ReadField(fontInfo, "_reader");
         if (fontDictionary == null || reader == null)
+        {
+            diagnostic = $"fontInfo={fontInfo?.GetType().FullName ?? "null"}; " +
+                $"fontDictionary={fontDictionary?.GetType().FullName ?? "null"}; " +
+                $"reader={reader?.GetType().FullName ?? "null"}";
             return false;
+        }
 
         object? entries = ReadField(fontDictionary, "_entries");
+        if (entries is not IDictionary dictionary)
+        {
+            diagnostic = $"_entries não é IDictionary: {entries?.GetType().FullName ?? "null"}";
+            return false;
+        }
+
         object? rawReference = GetDictionaryEntry(entries, "ToUnicode");
+        if (rawReference == null)
+        {
+            diagnostic = $"chave ToUnicode não localizada em _entries ({entries.GetType().FullName}); " +
+                $"quantidade de entradas={dictionary.Count}";
+            return false;
+        }
+
         object? stream = Resolve(reader, rawReference);
+        if (stream == null)
+        {
+            diagnostic = $"referência ToUnicode não resolvida; tipo bruto={rawReference.GetType().FullName}";
+            return false;
+        }
+
         byte[]? rawData = ReadRawStreamData(stream);
         if (rawData == null || rawData.Length == 0)
+        {
+            diagnostic = $"RawData ausente/vazio; stream={stream.GetType().FullName}; " +
+                $"referência={rawReference.GetType().FullName}";
             return false;
+        }
 
         string cmap = Encoding.ASCII.GetString(rawData);
         foreach (Match block in BfCharBlock.Matches(cmap))
@@ -335,7 +364,15 @@ internal static class CidFontOperatorFormatter
             }
         }
 
-        return map.Count > 0;
+        if (map.Count == 0)
+        {
+            diagnostic = $"CMap lido ({rawData.Length} bytes), mas nenhum par bfchar reconhecido; " +
+                $"início={Encoding.ASCII.GetString(rawData, 0, Math.Min(100, rawData.Length))}";
+            return false;
+        }
+
+        diagnostic = $"CMap válido: {map.Count} mapeamentos; {rawData.Length} bytes";
+        return true;
     }
 
     private static bool HasIdentityCidToGidMap(Font font)
