@@ -41,6 +41,7 @@ public partial class EditorWindow : Window
     private readonly EditorHistoryService _history = new();
     private string? _historyEntryId;
     private readonly Dictionary<int, (AvaloniaImage Image, Canvas Overlay)> _pageSurfaces = new();
+    private readonly Dictionary<int, Border> _pageCards = new();
     private int? _selectedPageIndex;
     private double _selectedPdfX;
     private double _selectedPdfY;
@@ -465,7 +466,9 @@ public partial class EditorWindow : Window
             bitmap.Dispose();
         _bitmaps.Clear();
         EditorPagesPanel.Children.Clear();
+        EditorThumbnailsPanel.Children.Clear();
         _pageSurfaces.Clear();
+        _pageCards.Clear();
         ClearTextSelection();
 
         _document = new PdfiumDocument(_workingCopyPath);
@@ -526,7 +529,59 @@ public partial class EditorWindow : Window
             pageImage.PointerReleased += PageImage_PointerReleased;
             pageImage.ContextMenu = CreateSelectionContextMenu();
             _pageSurfaces[i] = (pageImage, overlay);
+            _pageCards[i] = page;
             EditorPagesPanel.Children.Add(page);
+
+            // Miniatura reutiliza a mesma imagem renderizada da página principal.
+            // Isso evita duplicar a rasterização e mantém a navegação leve.
+            var thumbnailButton = new Button
+            {
+                Tag = i,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Padding = new Thickness(7),
+                Background = Avalonia.Media.Brushes.White,
+                BorderBrush = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(205, 209, 216)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(5),
+                Content = new StackPanel
+                {
+                    Spacing = 5,
+                    Children =
+                    {
+                        new AvaloniaImage
+                        {
+                            Source = bitmap,
+                            Width = 112,
+                            MaxHeight = 142,
+                            Stretch = Avalonia.Media.Stretch.Uniform
+                        },
+                        new TextBlock
+                        {
+                            Text = $"Página {i + 1}",
+                            FontSize = 10,
+                            Foreground = new Avalonia.Media.SolidColorBrush(
+                                Avalonia.Media.Color.FromRgb(76, 82, 92)),
+                            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+                        }
+                    }
+                }
+            };
+            thumbnailButton.Click += Thumbnail_Click;
+            EditorThumbnailsPanel.Children.Add(thumbnailButton);
+        }
+    }
+
+    private void Thumbnail_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int pageIndex)
+            return;
+
+        if (_pageCards.TryGetValue(pageIndex, out Border? pageCard))
+        {
+            pageCard.BringIntoView();
+            EditorStatusText.Text = $"Página {pageIndex + 1} de {_pageCards.Count}.";
         }
     }
 
