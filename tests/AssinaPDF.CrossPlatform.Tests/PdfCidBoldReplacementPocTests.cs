@@ -334,6 +334,46 @@ public sealed class PdfCidBoldReplacementPocTests
         var type = instance.GetType();
         _output.WriteLine($"{label}: {type.FullName}");
 
+        if (type.Name.Contains("PdfArray", StringComparison.Ordinal) ||
+            type.Name.Contains("PdfIndirectRef", StringComparison.Ordinal) ||
+            type.Name.Contains("PdfReader", StringComparison.Ordinal))
+        {
+            foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Instance |
+                         System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
+                         .Where(property => property.GetIndexParameters().Length == 0)
+                         .OrderBy(property => property.Name).Take(40))
+            {
+                try
+                {
+                    var propertyValue = property.GetValue(instance);
+                    if (propertyValue == null) continue;
+                    var propertyType = propertyValue.GetType();
+                    if (propertyValue is string || propertyType.IsPrimitive || propertyType.IsEnum)
+                        _output.WriteLine($"  PROPERTY {property.Name}={propertyValue}");
+                    else
+                        _output.WriteLine($"  PROPERTY {property.Name}=<{propertyType.FullName}>");
+                }
+                catch (Exception ex)
+                {
+                    _output.WriteLine($"  PROPERTY {property.Name}=<erro:{ex.GetType().Name}>");
+                }
+            }
+
+            foreach (var method in type.GetMethods(System.Reflection.BindingFlags.Instance |
+                         System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                         System.Reflection.BindingFlags.DeclaredOnly)
+                         .Where(method => method.Name.Contains("Get", StringComparison.OrdinalIgnoreCase) ||
+                                          method.Name.Contains("Resolve", StringComparison.OrdinalIgnoreCase) ||
+                                          method.Name.Contains("Object", StringComparison.OrdinalIgnoreCase) ||
+                                          method.Name.Contains("Load", StringComparison.OrdinalIgnoreCase))
+                         .OrderBy(method => method.Name).Take(50))
+            {
+                var parameters = string.Join(", ", method.GetParameters()
+                    .Select(parameter => parameter.ParameterType.Name + " " + parameter.Name));
+                _output.WriteLine($"  METHOD {method.ReturnType.Name} {method.Name}({parameters})");
+            }
+        }
+
         if (instance is System.Collections.IDictionary dictionary)
         {
             foreach (System.Collections.DictionaryEntry entry in dictionary)
@@ -395,7 +435,10 @@ public sealed class PdfCidBoldReplacementPocTests
                     valueType.Name.Contains("PdfDictionary", StringComparison.Ordinal) ||
                     valueType.Name.Contains("FontInfo", StringComparison.Ordinal) ||
                     value is System.Collections.IDictionary ||
+                    (value is System.Collections.IEnumerable && value is not string) ||
                     valueType.Name.Contains("PdfArray", StringComparison.Ordinal) ||
+                    valueType.Name.Contains("PdfIndirectRef", StringComparison.Ordinal) ||
+                    field.Name is "_reader" or "_data" ||
                     (isPdfCoreObject && depth < 5))
                 {
                     DumpPdfObjectTree(value, field.Name, depth + 1, visited);
