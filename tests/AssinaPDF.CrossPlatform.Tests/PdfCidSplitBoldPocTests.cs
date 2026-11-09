@@ -122,7 +122,7 @@ public sealed class PdfCidSplitBoldPocTests
             _output.WriteLine($"OUTPUT={outputPath}");
 
             contents.Delete(matchIndex);
-            contents.Insert(matchIndex, new Operator[]
+            contents.Insert(matchIndex, new Aspose.Pdf.Operator[]
             {
                 new SelectFont(boldResource, matchFontSize),
                 new SetGlyphsPositionShowText(targetGlyphs),
