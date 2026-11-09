@@ -235,9 +235,36 @@ public sealed class CidFontOperatorFormatterTests
             operation is SetRGBColor color &&
             color.R > 0.99 && color.G < 0.01 && color.B < 0.01);
 
+        Font? savedCidFont = savedSegments[0].TextState.Font;
+        Assert.True(
+            CidFontOperatorFormatter.HasSyntheticItalicOperator(
+                reopened.Pages[pageNumber], savedCidFont, savedFragment.Text),
+            "O detector não reconheceu o itálico sintético do próprio trecho editado.");
+
+        var pageAbsorber = new TextFragmentAbsorber();
+        reopened.Pages[pageNumber].Accept(pageAbsorber);
+        var unrelatedCidFragment = pageAbsorber.TextFragments
+            .Cast<TextFragment>()
+            .Where(fragment => !string.Equals(
+                fragment.Text, savedFragment.Text, StringComparison.Ordinal))
+            .FirstOrDefault(fragment => fragment.Segments
+                .Cast<TextSegment>()
+                .Any(segment => string.Equals(
+                    segment.TextState.Font?.ResourceName,
+                    savedCidFont?.ResourceName,
+                    StringComparison.Ordinal)));
+
+        if (unrelatedCidFragment != null)
+        {
+            Assert.False(
+                CidFontOperatorFormatter.HasSyntheticItalicOperator(
+                    reopened.Pages[pageNumber], savedCidFont, unrelatedCidFragment.Text),
+                "O itálico de um trecho não pode ser atribuído a outro texto da mesma página.");
+        }
+
         _output.WriteLine($"OUTPUT={outputPath}");
         _output.WriteLine($"REOPEN_TEXT='{savedFragment.Text}'; SEGMENTS={savedSegments.Length}");
-        _output.WriteLine("RESULTADO: o itálico sintético permaneceu como transformação local sem substituir a fonte CID.");
+        _output.WriteLine("RESULTADO: o itálico sintético foi detectado somente no trecho correspondente.");
     }
 
     private static ushort? ReadEmbeddedTrueTypeWeight(Font? font)
