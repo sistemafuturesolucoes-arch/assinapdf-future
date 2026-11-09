@@ -104,6 +104,7 @@ public sealed class CidFontOperatorFormatterTests
             File.Delete(outputPath);
 
         int pageNumber;
+        ushort? originalWeight = null;
         using (var document = new Document(inputPath))
         {
             var absorber = new TextFragmentAbsorber(targetText);
@@ -185,7 +186,7 @@ public sealed class CidFontOperatorFormatterTests
             document.Pages.Accept(absorber);
             var fragment = absorber.TextFragments.Cast<TextFragment>().Single();
             pageNumber = checked((int)fragment.Page.Number);
-            ushort? originalWeight = ReadEmbeddedTrueTypeWeight(
+            originalWeight = ReadEmbeddedTrueTypeWeight(
                 fragment.Segments.Cast<TextSegment>().First().TextState.Font);
 
             var formatterType = typeof(MainWindow).Assembly.GetType(
