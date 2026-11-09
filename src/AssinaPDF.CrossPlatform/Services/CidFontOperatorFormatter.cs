@@ -67,8 +67,13 @@ internal static class CidFontOperatorFormatter
         if (sourceWeight is null || sourceWeight.Value < 350 || sourceWeight.Value > 500)
             return Fail("Não foi possível confirmar que a fonte CID de origem é Regular.", out reason);
 
-        if (!TryReadToUnicodeMap(sourceFont, out var sourceMap) ||
-            !TryEncodeIdentityCidText(target.Text, sourceMap, out string encodedTarget, out reason))
+        if (!TryReadToUnicodeMap(sourceFont, out var sourceMap))
+            return Fail(
+                $"Não foi possível ler o mapa ToUnicode da fonte CID {sourceFont.ResourceName}. " +
+                "A inspeção dos objetos internos do PDF não retornou um CMap válido.",
+                out reason);
+
+        if (!TryEncodeIdentityCidText(target.Text, sourceMap, out string encodedTarget, out reason))
             return false;
 
         var page = document.Pages[pageNumber];
