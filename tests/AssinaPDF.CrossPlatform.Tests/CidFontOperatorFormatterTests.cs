@@ -148,7 +148,7 @@ public sealed class CidFontOperatorFormatterTests
                 segment.TextState.RenderingMode);
         });
 
-        var operators = reopened.Pages[pageNumber].Contents.Cast<Operator>().ToArray();
+        var operators = reopened.Pages[pageNumber].Contents.Cast<Aspose.Pdf.Operator>().ToArray();
         Assert.Contains(operators, operation =>
             operation is SetTextRenderingMode mode && mode.RenderingMode == 2);
         Assert.Contains(operators, operation =>
