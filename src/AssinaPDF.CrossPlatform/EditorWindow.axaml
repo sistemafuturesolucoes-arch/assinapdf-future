@@ -71,7 +71,6 @@
         <ScrollViewer x:Name="EditorDocumentScrollViewer"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Visible"
-                      PointerWheelChanged="EditorDocumentScrollViewer_PointerWheelChanged"
                       Focusable="True">
           <StackPanel x:Name="EditorPagesPanel" Spacing="20"
                       HorizontalAlignment="Center"
