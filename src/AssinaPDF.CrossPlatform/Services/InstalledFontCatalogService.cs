@@ -180,7 +180,8 @@ internal static class InstalledFontCatalogService
                 {
                     string extension = Path.GetExtension(file);
                     if (!extension.Equals(".ttf", StringComparison.OrdinalIgnoreCase) &&
-                        !extension.Equals(".otf", StringComparison.OrdinalIgnoreCase))
+                        !extension.Equals(".otf", StringComparison.OrdinalIgnoreCase) &&
+                        !extension.Equals(".ttc", StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     string token = NormalizeFontFileToken(Path.GetFileNameWithoutExtension(file));
