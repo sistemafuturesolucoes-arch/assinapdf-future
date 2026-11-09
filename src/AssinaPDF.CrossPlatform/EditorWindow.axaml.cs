@@ -528,7 +528,7 @@ public partial class EditorWindow : Window
             pageImage.PointerMoved += PageImage_PointerMoved;
             pageImage.PointerReleased += PageImage_PointerReleased;
             pageImage.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
-            pageCard.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
+            page.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
             pageImage.ContextMenu = CreateSelectionContextMenu();
             _pageSurfaces[i] = (pageImage, overlay);
             _pageCards[i] = page;
