@@ -161,6 +161,78 @@ public sealed class CidFontOperatorFormatterTests
         _output.WriteLine("RESULTADO: o negrito sintético permaneceu após salvar e reabrir sem substituir a fonte CID.");
     }
 
+    [Fact]
+    public void SyntheticItalicFallbackKeepsCidFontAndPersistsAfterReopen()
+    {
+        string? inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
+        if (string.IsNullOrWhiteSpace(inputPath))
+        {
+            _output.WriteLine("POC ignorada: defina ASSINAPDF_CID_TEST_PDF.");
+            return;
+        }
+
+        Assert.True(File.Exists(inputPath), $"PDF não encontrado: {inputPath}");
+        const string targetText = "Informações de Cheques Sem Fundos do Banco Central";
+        string outputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_ITALIC_OUTPUT")
+            ?? inputPath + ".cid-synthetic-italic-poc.pdf";
+        if (File.Exists(outputPath))
+            File.Delete(outputPath);
+
+        int pageNumber;
+        using (var document = new Document(inputPath))
+        {
+            var absorber = new TextFragmentAbsorber(targetText);
+            document.Pages.Accept(absorber);
+            var fragment = absorber.TextFragments.Cast<TextFragment>().Single();
+            pageNumber = checked((int)fragment.Page.Number);
+
+            var formatterType = typeof(MainWindow).Assembly.GetType(
+                "AssinaPDF.MacPrototype.Services.CidFontOperatorFormatter");
+            Assert.NotNull(formatterType);
+            MethodInfo? method = formatterType!.GetMethod(
+                "TryApplySyntheticItalicFallback",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(method);
+
+            object?[] arguments = { document, pageNumber, fragment, null };
+            bool applied = (bool)method!.Invoke(null, arguments)!;
+            string reason = arguments[3]?.ToString() ?? "(sem diagnóstico)";
+            _output.WriteLine($"SYNTHETIC CID ITALIC: RESULT={applied}; DETAIL={reason}");
+            Assert.True(applied, reason);
+
+            document.Save(outputPath);
+        }
+
+        Assert.True(File.Exists(outputPath), $"PDF de saída não criado: {outputPath}");
+        using var reopened = new Document(outputPath);
+        var verifyAbsorber = new TextFragmentAbsorber(targetText);
+        reopened.Pages.Accept(verifyAbsorber);
+        var savedFragment = verifyAbsorber.TextFragments.Cast<TextFragment>().Single();
+        var savedSegments = savedFragment.Segments.Cast<TextSegment>().ToArray();
+
+        Assert.Equal(targetText, savedFragment.Text);
+        Assert.NotEmpty(savedSegments);
+        Assert.All(savedSegments, segment =>
+        {
+            var font = segment.TextState.Font;
+            Assert.NotNull(font);
+            Assert.True(font!.IsCid, "A fonte CID original foi substituída.");
+            Assert.True(font.IsEmbedded, "A fonte CID deixou de estar incorporada.");
+        });
+
+        var operators = reopened.Pages[pageNumber].Contents.Cast<Aspose.Pdf.Operator>().ToArray();
+        Assert.Contains(operators, operation => operation is GSave);
+        Assert.Contains(operators, operation => operation is GRestore);
+        Assert.Contains(operators, operation =>
+            operation is ConcatenateMatrix matrix &&
+            Math.Abs(matrix.Matrix.C) >= 0.05 &&
+            Math.Abs(matrix.Matrix.B) < 0.0001);
+
+        _output.WriteLine($"OUTPUT={outputPath}");
+        _output.WriteLine($"REOPEN_TEXT='{savedFragment.Text}'; SEGMENTS={savedSegments.Length}");
+        _output.WriteLine("RESULTADO: o itálico sintético permaneceu como transformação local sem substituir a fonte CID.");
+    }
+
     private static ushort? ReadEmbeddedTrueTypeWeight(Font? font)
     {
         if (font == null)
