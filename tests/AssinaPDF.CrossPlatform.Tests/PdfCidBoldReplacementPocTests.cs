@@ -438,7 +438,7 @@ public sealed class PdfCidBoldReplacementPocTests
                     (value is System.Collections.IEnumerable && value is not string) ||
                     valueType.Name.Contains("PdfArray", StringComparison.Ordinal) ||
                     valueType.Name.Contains("PdfIndirectRef", StringComparison.Ordinal) ||
-                    field.Name is "_reader" or "_data" ||
+                    field.Name is "_reader" ||
                     (isPdfCoreObject && depth < 5))
                 {
                     DumpPdfObjectTree(value, field.Name, depth + 1, visited);
