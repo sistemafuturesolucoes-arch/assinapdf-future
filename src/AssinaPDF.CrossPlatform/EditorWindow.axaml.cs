@@ -1842,16 +1842,46 @@ public partial class EditorWindow : Window
         bool wantsBold = (requestedStyle & FontStyles.Bold) == FontStyles.Bold;
         bool wantsItalic = (requestedStyle & FontStyles.Italic) == FontStyles.Italic;
 
-        // FindFont(family, style) pode devolver uma face próxima em algumas
-        // coleções de fontes. Tente primeiro o nome explícito da face e, em
-        // seguida, a resolução por família/estilo. Nenhuma face é aceita sem
-        // conferir os metadados reais do programa de fonte.
+        var failures = new List<string>();
+        var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Aspose's FindFont can return the correct PostScript face name while
+        // exposing stale IsBold/IsItalic flags. Open the physical system font
+        // file directly first; the font program's internal names are used to
+        // verify family and style before it can be embedded.
+        foreach (string filePath in InstalledFontCatalogService.GetCandidateFontFiles(requestedFamily))
+        {
+            if (!attempted.Add(filePath))
+                continue;
+
+            try
+            {
+                Font physicalFont = FontRepository.OpenFont(filePath);
+                if (!FontProgramMatchesRequest(
+                        physicalFont, requestedFamily, wantsBold, wantsItalic))
+                {
+                    failures.Add(
+                        $"{Path.GetFileName(filePath)}: a face física não corresponde à família/estilo " +
+                        $"(BaseFont='{physicalFont.BaseFont}', FontName='{physicalFont.FontName}', " +
+                        $"Bold={physicalFont.IsBold}, Italic={physicalFont.IsItalic}).");
+                    continue;
+                }
+
+                return PrepareFontForEmbedding(physicalFont, filePath, requestedFamily, out resolvedFamily);
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{Path.GetFileName(filePath)}: {ex.Message}");
+            }
+        }
+
+        // Keep Aspose's indexed lookup as a secondary route for font sources
+        // that are not exposed as ordinary TTF/OTF files (for example, platform
+        // font collections). Never accept a face whose actual names contradict
+        // the requested family or style.
         var families = allowCidFallback
             ? new[] { requestedFamily, "Arial", "Helvetica Neue", "Noto Sans", "Liberation Sans", "DejaVu Sans" }
             : new[] { requestedFamily };
-
-        var failures = new List<string>();
-        var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (string family in families.Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -1870,7 +1900,7 @@ public partial class EditorWindow : Window
                 try
                 {
                     Font font = lookup.Resolve();
-                    if (font.IsBold != wantsBold || font.IsItalic != wantsItalic)
+                    if (!FontProgramMatchesRequest(font, family, wantsBold, wantsItalic))
                     {
                         throw new InvalidOperationException(
                             $"a face retornada não corresponde ao estilo solicitado " +
@@ -1879,22 +1909,7 @@ public partial class EditorWindow : Window
                             $"FontName='{font.FontName}', BaseFont='{font.BaseFont}').");
                     }
 
-                    font.IsEmbedded = true;
-                    using var embeddedProgram = new MemoryStream();
-                    font.Save(embeddedProgram);
-                    if (embeddedProgram.Length < 12)
-                    {
-                        string embeddingError = font.GetLastFontEmbeddingError()
-                            ?? "o mecanismo não forneceu o programa da fonte";
-                        throw new InvalidOperationException(
-                            "a fonte não pôde ser incorporada: " + embeddingError);
-                    }
-
-                    resolvedFamily = NormalizePdfFontFamily(font.FontName);
-                    if (string.IsNullOrWhiteSpace(resolvedFamily))
-                        resolvedFamily = family;
-
-                    return font;
+                    return PrepareFontForEmbedding(font, null, family, out resolvedFamily);
                 }
                 catch (Exception ex)
                 {
@@ -1908,6 +1923,78 @@ public partial class EditorWindow : Window
             $"Família='{requestedFamily}', negrito={wantsBold}, itálico={wantsItalic}. " +
             "A edição foi interrompida para não gravar uma fonte visualmente diferente da prévia. " +
             string.Join(" | ", failures));
+    }
+
+    private static Font PrepareFontForEmbedding(
+        Font font,
+        string? sourcePath,
+        string requestedFamily,
+        out string resolvedFamily)
+    {
+        font.IsEmbedded = true;
+        using var embeddedProgram = new MemoryStream();
+        font.Save(embeddedProgram);
+        if (embeddedProgram.Length < 12)
+        {
+            string embeddingError = font.GetLastFontEmbeddingError()
+                ?? "o mecanismo não forneceu o programa da fonte";
+            throw new InvalidOperationException(
+                $"A fonte '{requestedFamily}' não pôde ser incorporada: {embeddingError}" +
+                (sourcePath is null ? string.Empty : $" Arquivo: '{sourcePath}'."));
+        }
+
+        resolvedFamily = NormalizePdfFontFamily(font.FontName);
+        if (string.IsNullOrWhiteSpace(resolvedFamily))
+            resolvedFamily = requestedFamily;
+
+        return font;
+    }
+
+    private static bool FontProgramMatchesRequest(
+        Font font,
+        string requestedFamily,
+        bool wantsBold,
+        bool wantsItalic)
+    {
+        string requested = InstalledFontCatalogService.NormalizeFontFileToken(requestedFamily);
+        if (requested.Length == 0)
+            return false;
+
+        string[] names = { font.BaseFont, font.FontName, font.DecodedFontName };
+        foreach (string? name in names)
+        {
+            string normalized = InstalledFontCatalogService.NormalizeFontFileToken(name);
+            if (!normalized.StartsWith(requested, StringComparison.Ordinal))
+                continue;
+
+            string suffix = normalized[requested.Length..];
+            // Common PostScript foundry suffixes are not style indicators.
+            suffix = suffix.TrimEnd();
+            if (suffix.EndsWith("mt", StringComparison.Ordinal))
+                suffix = suffix[..^2];
+            if (suffix.EndsWith("ps", StringComparison.Ordinal))
+                suffix = suffix[..^2];
+
+            bool hasBoldMarker =
+                suffix.Contains("bold", StringComparison.Ordinal) ||
+                suffix.Contains("semibold", StringComparison.Ordinal) ||
+                suffix.Contains("demibold", StringComparison.Ordinal) ||
+                suffix.Contains("black", StringComparison.Ordinal) ||
+                suffix.Contains("heavy", StringComparison.Ordinal);
+            bool hasItalicMarker =
+                suffix.Contains("italic", StringComparison.Ordinal) ||
+                suffix.Contains("oblique", StringComparison.Ordinal) ||
+                suffix.Contains("kursiv", StringComparison.Ordinal);
+
+            bool hasExplicitStyle = hasBoldMarker || hasItalicMarker;
+            bool actualBold = hasExplicitStyle ? hasBoldMarker : font.IsBold;
+            bool actualItalic = hasExplicitStyle ? hasItalicMarker : font.IsItalic;
+
+            if (actualBold == wantsBold && actualItalic == wantsItalic)
+                return true;
+        }
+
+        return false;
     }
 
     private static void ApplyRunStyle(
