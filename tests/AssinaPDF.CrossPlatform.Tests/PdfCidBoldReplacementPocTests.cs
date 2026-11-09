@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Aspose.Pdf;
-using Aspose.Pdf.Facades;
 using Aspose.Pdf.Text;
 using Xunit;
 using Xunit.Abstractions;
@@ -20,7 +19,7 @@ public sealed class PdfCidBoldReplacementPocTests
     }
 
     [Fact]
-    public void ReplaceRegularCidTextWithExplicitBoldFont_EmbedsBoldProgramAfterSaveAndReopen()
+    public void SetTextFragmentFontToExplicitBold_EmbedsBoldProgramAfterSaveAndReopen()
     {
         // Opt-in: define ASSINAPDF_CID_TEST_PDF to run against the real sample PDF.
         var inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
@@ -76,25 +75,19 @@ public sealed class PdfCidBoldReplacementPocTests
             Assert.NotNull(boldFont);
             boldFont.IsEmbedded = true;
 
-            var replacementState = new TextState
-            {
-                Font = boldFont,
-                FontSize = fontSize,
-                ForegroundColor = foregroundColor,
-                FontStyle = FontStyles.Bold,
-                IsBold = true
-            };
+            // Apply the font to the absorbed TextFragment itself, not through
+            // PdfContentEditor.ReplaceText. Aspose documents this as the direct
+            // font-replacement path; TextFragment state changes may rebuild segments.
+            sourceFragment.TextState.Font = boldFont;
+            sourceFragment.TextState.FontStyle = FontStyles.Bold;
+            sourceFragment.TextState.IsBold = true;
 
-            using var editor = new PdfContentEditor();
-            editor.BindPdf(sourceDocument);
+            _output.WriteLine(
+                $"APLICADO: fonte='{sourceFragment.TextState.Font?.FontName}'; " +
+                $"recurso='{sourceFragment.TextState.Font?.ResourceName}'; " +
+                $"IsBold={sourceFragment.TextState.IsBold}; " +
+                $"peso TTF OS/2={ReadEmbeddedTrueTypeWeight(sourceFragment.TextState.Font)?.ToString() ?? "indisponível"}");
 
-            var replaced = editor.ReplaceText(
-                targetText,
-                pageNumber,
-                targetText,
-                replacementState);
-
-            Assert.True(replaced, "PdfContentEditor não encontrou/substituiu o texto-alvo.");
             sourceDocument.Save(outputPath);
         }
 
