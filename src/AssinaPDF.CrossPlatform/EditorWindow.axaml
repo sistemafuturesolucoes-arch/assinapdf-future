@@ -28,7 +28,7 @@
     <!-- Barra de formatação persistente do editor inline. -->
     <Border Grid.Row="1" Background="#FFFFFF"
             BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,6">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="9">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="9">
         <Button Grid.Column="0" Content="Abrir PDF" Click="OpenPdf_Click"
                 Padding="13,8" Background="#292D36" Foreground="White"
                 BorderThickness="0" VerticalAlignment="Center"/>
@@ -52,6 +52,9 @@
         <TextBlock Grid.Column="5" Text="Selecione o texto ou use T para inserir"
                    FontSize="10" Foreground="#737B87"
                    VerticalAlignment="Center"/>
+        <TextBlock x:Name="EditorZoomText" Grid.Column="6" Text="100%"
+                   FontSize="11" FontWeight="SemiBold" Foreground="#4C3482"
+                   VerticalAlignment="Center" ToolTip.Tip="Zoom: use Ctrl + rolagem do mouse"/>
       </Grid>
     </Border>
 
@@ -70,8 +73,9 @@
       </Border>
       <Border Grid.Column="1" Background="#D9DCE0" Padding="18">
         <ScrollViewer x:Name="EditorDocumentScrollViewer"
-                      HorizontalScrollBarVisibility="Disabled"
+                      HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Visible"
+                      PointerWheelChanged="EditorDocumentScrollViewer_PointerWheelChanged"
                       Focusable="True">
           <StackPanel x:Name="EditorPagesPanel" Spacing="20"
                       HorizontalAlignment="Center"
