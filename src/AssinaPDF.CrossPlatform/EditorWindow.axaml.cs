@@ -1255,7 +1255,14 @@ public partial class EditorWindow : Window
                     // o TextState em memória. RemoveUnusedFonts também limpa recursos
                     // que deixarem de ser referenciados após a substituição.
                     target.TextEditOptions = new TextEditOptions(
-                        TextEditOptions.FontReplace.RemoveUnusedFonts);
+                        TextEditOptions.FontReplace.RemoveUnusedFonts)
+                    {
+                        // A troca de face em texto CID/Type0 pode encontrar caracteres
+                        // ausentes no subconjunto da fonte Bold. Peça ao mecanismo para
+                        // escolher uma face que cubra esses caracteres, em vez de manter
+                        // silenciosamente a fonte antiga ou gravar glifos incorretos.
+                        NoCharacterBehavior = TextEditOptions.NoCharacterAction.ReplaceFonts
+                    };
                     // Não regrave o conteúdo quando o usuário alterou apenas a formatação.
                     // Em PDFs com fontes CID/Type0, atribuir o mesmo texto novamente faz
                     // o Aspose reconstruir os operadores Tj/TJ antes da troca de fonte.
