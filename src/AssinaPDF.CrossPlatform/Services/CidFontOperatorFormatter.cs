@@ -53,25 +53,61 @@ internal static class CidFontOperatorFormatter
         out string reason) =>
         TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: true, foregroundOverride, out reason);
 
-    internal static bool HasSyntheticItalicOperator(Page page)
+    internal static bool HasSyntheticItalicOperator(
+        Page page,
+        Font? sourceFont,
+        string targetText)
     {
-        bool insideSavedGraphicsState = false;
-        foreach (Aspose.Pdf.Operator operation in page.Contents)
+        // A page can contain many independent text objects. A shear matrix in
+        // any q/Q block is not evidence that this particular run is italic.
+        // Resolve the selected run back to its CID bytes and locate its exact
+        // TJ operator before inspecting the graphics-state scope around it.
+        if (sourceFont == null ||
+            !sourceFont.IsCid ||
+            string.IsNullOrWhiteSpace(sourceFont.ResourceName) ||
+            string.IsNullOrEmpty(targetText))
+            return false;
+
+        if (!TryReadToUnicodeMap(sourceFont, out var unicodeMap, out _) ||
+            !TryEncodeIdentityCidText(targetText, unicodeMap, out string encodedText, out _))
+            return false;
+
+        if (!TryFindOperator(
+                page,
+                sourceFont.ResourceName!,
+                encodedText,
+                out int targetOperatorIndex,
+                out _,
+                out _,
+                out _,
+                out _))
+            return false;
+
+        var italicScopes = new Stack<bool>();
+        for (int index = 1; index <= page.Contents.Count; index++)
         {
+            Aspose.Pdf.Operator operation = page.Contents[index];
+
             if (operation is GSave)
             {
-                insideSavedGraphicsState = true;
+                italicScopes.Push(false);
                 continue;
             }
 
-            if (insideSavedGraphicsState &&
-                operation is ConcatenateMatrix matrix &&
+            if (operation is ConcatenateMatrix matrix &&
                 Math.Abs(matrix.Matrix.C) >= 0.05 &&
-                Math.Abs(matrix.Matrix.B) < 0.0001)
-                return true;
+                Math.Abs(matrix.Matrix.B) < 0.0001 &&
+                italicScopes.Count > 0)
+            {
+                italicScopes.Pop();
+                italicScopes.Push(true);
+            }
 
-            if (operation is GRestore)
-                insideSavedGraphicsState = false;
+            if (index == targetOperatorIndex)
+                return italicScopes.Any(scopeHasShear => scopeHasShear);
+
+            if (operation is GRestore && italicScopes.Count > 0)
+                italicScopes.Pop();
         }
 
         return false;
