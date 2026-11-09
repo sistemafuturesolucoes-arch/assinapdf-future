@@ -197,6 +197,42 @@ internal static class InstalledFontCatalogService
         return files.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
+    internal static bool FontNameMatchesRequestedStyle(
+        string? fontName,
+        string requestedFamily,
+        bool wantsBold,
+        bool wantsItalic,
+        bool fallbackBold = false,
+        bool fallbackItalic = false)
+    {
+        string family = NormalizeFontFileToken(requestedFamily);
+        string normalized = NormalizeFontFileToken(fontName);
+        if (family.Length == 0 || !normalized.StartsWith(family, StringComparison.Ordinal))
+            return false;
+
+        string suffix = normalized[family.Length..];
+        if (suffix.EndsWith("mt", StringComparison.Ordinal))
+            suffix = suffix[..^2];
+        if (suffix.EndsWith("ps", StringComparison.Ordinal))
+            suffix = suffix[..^2];
+
+        bool hasBoldMarker =
+            suffix.Contains("bold", StringComparison.Ordinal) ||
+            suffix.Contains("semibold", StringComparison.Ordinal) ||
+            suffix.Contains("demibold", StringComparison.Ordinal) ||
+            suffix.Contains("black", StringComparison.Ordinal) ||
+            suffix.Contains("heavy", StringComparison.Ordinal);
+        bool hasItalicMarker =
+            suffix.Contains("italic", StringComparison.Ordinal) ||
+            suffix.Contains("oblique", StringComparison.Ordinal) ||
+            suffix.Contains("kursiv", StringComparison.Ordinal);
+
+        bool hasExplicitStyle = hasBoldMarker || hasItalicMarker;
+        bool actualBold = hasExplicitStyle ? hasBoldMarker : fallbackBold;
+        bool actualItalic = hasExplicitStyle ? hasItalicMarker : fallbackItalic;
+        return actualBold == wantsBold && actualItalic == wantsItalic;
+    }
+
     internal static string NormalizeFontFileToken(string? value) =>
         new((value ?? string.Empty).Where(char.IsLetterOrDigit)
             .Select(char.ToLowerInvariant).ToArray());
