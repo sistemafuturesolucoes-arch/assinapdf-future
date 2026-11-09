@@ -2250,9 +2250,6 @@ public partial class EditorWindow : Window
         if (pageIndex < 0 || pageIndex >= document.Pages.Count)
             return Fail($"página inválida ({pageIndex + 1}).");
 
-        bool pageHasSyntheticItalic =
-            CidFontOperatorFormatter.HasSyntheticItalicOperator(document.Pages[pageIndex + 1]);
-
         var absorber = new TextFragmentAbsorber();
         document.Pages[pageIndex + 1].Accept(absorber);
 
@@ -2345,6 +2342,10 @@ public partial class EditorWindow : Window
         foreach (var run in expectedRuns.Where(item => item.Length > 0))
         {
             int runEnd = run.Start + run.Length;
+            if (run.Start < 0 || runEnd > expectedText.Length)
+                return Fail($"intervalo de formatação inválido na posição {run.Start}.");
+
+            string runText = expectedText.Substring(run.Start, run.Length);
             var covered = savedSegments.Where(item =>
                 item.Start < runEnd && item.End > run.Start).ToArray();
 
@@ -2368,7 +2369,11 @@ public partial class EditorWindow : Window
                 bool savedBold = state.IsBold ||
                     PdfFontFaceHasStyle(state.Font, bold: true) ||
                     state.RenderingMode == Aspose.Pdf.Text.TextRenderingMode.FillThenStrokeText;
-                bool savedItalic = state.IsItalic || PdfFontFaceHasStyle(state.Font, bold: false) || (state.Font?.IsCid == true && pageHasSyntheticItalic);
+                bool savedItalic = state.IsItalic ||
+                    PdfFontFaceHasStyle(state.Font, bold: false) ||
+                    (state.Font?.IsCid == true &&
+                     CidFontOperatorFormatter.HasSyntheticItalicOperator(
+                         document.Pages[pageIndex + 1], state.Font, runText));
                 if (savedBold != run.IsBold && !unchangedEmbeddedFace)
                 {
                     var actualFont = state.Font;
