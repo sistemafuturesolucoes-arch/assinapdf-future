@@ -4,6 +4,7 @@
         Title="AssinaPDF | Editor de PDF"
         Width="1180" Height="780"
         MinWidth="820" MinHeight="560"
+        WindowState="Maximized"
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
   <Grid RowDefinitions="64,76,*,42">
