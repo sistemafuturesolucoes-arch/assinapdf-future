@@ -165,6 +165,48 @@ public sealed class PdfCidBoldReplacementPocTests
         _output.WriteLine("FIM DO DUMP DE OPERADORES (nenhuma alteração foi feita no PDF).");
     }
 
+    [Fact]
+    public void DumpCidTextRunsWithFontAndTextMatrix()
+    {
+        var inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
+        if (string.IsNullOrWhiteSpace(inputPath))
+        {
+            _output.WriteLine("Diagnóstico ignorado: defina ASSINAPDF_CID_TEST_PDF.");
+            return;
+        }
+
+        using var document = new Document(inputPath);
+        var absorber = new TextFragmentAbsorber("Informações de Cheques Sem Fundos do Banco Central");
+        document.Pages.Accept(absorber);
+        var fragment = absorber.TextFragments.Cast<TextFragment>().FirstOrDefault();
+        Assert.NotNull(fragment);
+
+        var rect = fragment!.Rectangle;
+        _output.WriteLine($"ALVO: página={fragment.Page.Number}; texto='{fragment.Text}'; " +
+            $"retângulo=({rect.Left:F3},{rect.Bottom:F3})-({rect.Right:F3},{rect.Top:F3})");
+
+        var page = document.Pages[fragment.Page.Number];
+        var selectedFont = "(fonte não identificada)";
+        var textMatrix = "(matriz não identificada)";
+        var index = 0;
+
+        foreach (var op in page.Contents)
+        {
+            index++;
+            var typeName = op.GetType().Name;
+            var value = op.ToString();
+
+            if (typeName.Contains("SelectFont", StringComparison.Ordinal))
+                selectedFont = value;
+            else if (typeName.Contains("SetTextMatrix", StringComparison.Ordinal))
+                textMatrix = value;
+            else if (typeName.Contains("SetGlyphsPositionShowText", StringComparison.Ordinal))
+                _output.WriteLine($"RUN OP[{index:D4}] FONT={selectedFont} MATRIX={textMatrix} TEXT={value}");
+        }
+
+        _output.WriteLine("FIM DOS RUNS DE TEXTO (somente leitura; PDF não foi alterado).");
+    }
+
     private static ushort? ReadEmbeddedTrueTypeWeight(Font? font)
     {
         if (font == null)
