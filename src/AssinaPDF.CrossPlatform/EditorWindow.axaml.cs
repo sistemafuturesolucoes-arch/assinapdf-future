@@ -407,8 +407,7 @@ public partial class EditorWindow : Window
         _pageLayouts.Clear();
         _pageCards.Clear();
         _zoomFactor = 1.0;
-        if (this.FindControl<TextBlock>("EditorZoomText") is { } zoomText)
-            zoomText.Text = "100%";
+        EditorZoomText.Text = "100%";
         ClearTextSelection();
 
         _document = new PdfiumDocument(_workingCopyPath);
@@ -599,8 +598,7 @@ public partial class EditorWindow : Window
             item.Surface.Height = item.Height * _zoomFactor;
         }
 
-        if (this.FindControl<TextBlock>("EditorZoomText") is { } zoomText)
-            zoomText.Text = $"{Math.Round(_zoomFactor * 100):0}%";
+        EditorZoomText.Text = $"{Math.Round(_zoomFactor * 100):0}%";
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
