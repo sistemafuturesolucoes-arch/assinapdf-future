@@ -388,11 +388,15 @@ public sealed class PdfCidBoldReplacementPocTests
                 }
 
                 _output.WriteLine($"{indent}{field.Name}: {valueType.FullName}");
-                if (field.Name == "_entries" || field.Name.Contains("fontDict", StringComparison.OrdinalIgnoreCase) ||
+                var isPdfCoreObject = valueType.Namespace?.StartsWith("Aspose.Pdf.Core", StringComparison.Ordinal) == true;
+                if (field.Name is "_font" or "_entries" ||
+                    field.Name.Contains("fontDict", StringComparison.OrdinalIgnoreCase) ||
                     field.Name.Contains("fontInfo", StringComparison.OrdinalIgnoreCase) ||
                     valueType.Name.Contains("PdfDictionary", StringComparison.Ordinal) ||
                     valueType.Name.Contains("FontInfo", StringComparison.Ordinal) ||
-                    value is System.Collections.IDictionary || valueType.Name.Contains("PdfArray", StringComparison.Ordinal))
+                    value is System.Collections.IDictionary ||
+                    valueType.Name.Contains("PdfArray", StringComparison.Ordinal) ||
+                    (isPdfCoreObject && depth < 5))
                 {
                     DumpPdfObjectTree(value, field.Name, depth + 1, visited);
                 }
