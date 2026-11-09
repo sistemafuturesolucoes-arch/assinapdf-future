@@ -54,6 +54,7 @@ public partial class EditorWindow : Window
     private AvaloniaImage? _activeSelectionImage;
     private PagePreviewInfo? _activeSelectionPage;
     private string _selectedText = string.Empty;
+    private (double Left, double Bottom, double Right, double Top)? _selectedTextBounds;
     private RichEditorControl? _defaultToolbarEditor;
     private RichEditorToolbar? _formattingToolbar;
     private readonly Dictionary<string, string> _fontSubstitutions =
@@ -673,7 +674,8 @@ public partial class EditorWindow : Window
         // Um clique simples abre a edição diretamente sobre a página.
         // Arrastar continua permitindo selecionar um trecho maior antes de editar.
         if (isClick && _selectedPageIndex is int pageIndex)
-            _ = EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY);
+            _ = EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY,
+                _selectedText, _selectedTextBounds);
 
         _activeSelectionImage = null;
         _activeSelectionPage = null;
@@ -745,7 +747,9 @@ public partial class EditorWindow : Window
                 EditorStatusText.Text = "Nenhum texto encontrado nessa área. PDFs digitalizados precisam de OCR.";
                 return;
             }
-            SetTextSelection(image, pageInfo, selected, string.Concat(selected.Select(ch => ch.Text)));
+            var selectedLines = PdfiumTextGrouping.GroupIntoLines(selected, pageInfo.PageIndex);
+            string selectedText = string.Join("\n", selectedLines.Select(line => line.Text.TrimEnd()));
+            SetTextSelection(image, pageInfo, selected, selectedText);
         }
         catch (Exception ex) { EditorStatusText.Text = $"Não foi possível selecionar o trecho: {ex.Message}"; }
     }
@@ -762,6 +766,7 @@ public partial class EditorWindow : Window
         _selectedPdfX = (left + right) / 2;
         _selectedPdfY = (bottom + top) / 2;
         _selectedText = text;
+        _selectedTextBounds = (left, bottom, right, top);
         var rect = PdfiumPageCoordinateMapper.PdfToViewRect(left, bottom, right, top,
             image.Bounds.Width, image.Bounds.Height, pageInfo.WidthPoints, pageInfo.HeightPoints);
         var highlight = new Border
@@ -856,6 +861,7 @@ public partial class EditorWindow : Window
         SelectedTextLabel.IsVisible = false;
         EditSelectedTextButton.IsVisible = false;
         _selectedText = string.Empty;
+        _selectedTextBounds = null;
     }
 
     private async void EditSelectedText_Click(
@@ -865,11 +871,17 @@ public partial class EditorWindow : Window
         if (_selectedPageIndex is not int pageIndex)
             return;
 
-        await EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY);
+        await EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY,
+            _selectedText, _selectedTextBounds);
         ClearTextSelection();
     }
 
-    private async Task EditTextAtPointAsync(int pageIndex, double x, double y)
+    private async Task EditTextAtPointAsync(
+        int pageIndex,
+        double x,
+        double y,
+        string? requestedSelection = null,
+        (double Left, double Bottom, double Right, double Top)? requestedBounds = null)
     {
         try
         {
@@ -894,8 +906,14 @@ public partial class EditorWindow : Window
                 foreach (TextFragment fragment in absorber.TextFragments)
                 {
                     var bounds = fragment.Rectangle;
-                    if (bounds == null)
+                    if (bounds == null || string.IsNullOrWhiteSpace(fragment.Text))
                         continue;
+
+                    bool intersectsSelection = requestedBounds is { } selectedBounds &&
+                        bounds.URX >= selectedBounds.Left &&
+                        bounds.LLX <= selectedBounds.Right &&
+                        bounds.URY >= selectedBounds.Bottom &&
+                        bounds.LLY <= selectedBounds.Top;
 
                     double dx = x < bounds.LLX ? bounds.LLX - x :
                         x > bounds.URX ? x - bounds.URX : 0;
@@ -903,11 +921,18 @@ public partial class EditorWindow : Window
                         y > bounds.URY ? y - bounds.URY : 0;
                     double distance = Math.Sqrt(dx * dx + dy * dy);
 
-                    if (distance <= 5.0 && distance < bestDistance &&
-                        !string.IsNullOrWhiteSpace(fragment.Text))
+                    // A seleção do PDFium é a fonte da verdade para o texto que
+                    // o usuário marcou. O Aspose é consultado apenas para recuperar
+                    // a fonte/estilo de origem, não para reduzir a seleção ao
+                    // fragmento mais próximo do clique.
+                    bool candidateMatches = requestedBounds.HasValue
+                        ? intersectsSelection
+                        : distance <= 5.0;
+
+                    if (candidateMatches && distance < bestDistance)
                     {
                         bestDistance = distance;
-                        originalText = fragment.Text;
+                        originalText = requestedSelection ?? fragment.Text;
                         var sourceFont = fragment.TextState.Font ??
                             fragment.Segments.Cast<TextSegment>()
                                 .Select(segment => segment.TextState.Font)
@@ -944,8 +969,12 @@ public partial class EditorWindow : Window
                             originalBackground = Avalonia.Media.Color.FromRgb(
                                 background.R, background.G, background.B);
 
-                        originalBounds = new Aspose.Pdf.Rectangle(
-                            bounds.LLX, bounds.LLY, bounds.URX, bounds.URY);
+                        originalBounds = requestedBounds is { } selectedRectangle
+                            ? new Aspose.Pdf.Rectangle(
+                                selectedRectangle.Left, selectedRectangle.Bottom,
+                                selectedRectangle.Right, selectedRectangle.Top)
+                            : new Aspose.Pdf.Rectangle(
+                                bounds.LLX, bounds.LLY, bounds.URX, bounds.URY);
                     }
                 }
             }
@@ -1361,7 +1390,33 @@ public partial class EditorWindow : Window
                     }
 
                     if (target == null || closest > 8.0)
-                        throw new InvalidOperationException("O texto selecionado não foi localizado novamente no PDF.");
+                    {
+                        // Tenta a busca textual do Aspose, que consegue localizar
+                        // ocorrências por conteúdo mesmo quando a seleção veio de
+                        // caracteres PDFium separados em objetos de texto diferentes.
+                        // Só prossegue se o resultado representar exatamente o texto
+                        // selecionado; não substitui fragmentos vizinhos por aproximação.
+                        var exactSearch = new TextFragmentAbsorber(originalText);
+                        document.Pages[pageIndex + 1].Accept(exactSearch);
+                        target = exactSearch.TextFragments
+                            .Where(fragment => string.Equals(
+                                fragment.Text, originalText, StringComparison.Ordinal))
+                            .OrderBy(fragment =>
+                            {
+                                var rectangle = fragment.Rectangle;
+                                if (rectangle == null || originalBounds == null)
+                                    return double.MaxValue;
+                                double dx = (rectangle.LLX + rectangle.URX - originalBounds.LLX - originalBounds.URX) / 2;
+                                double dy = (rectangle.LLY + rectangle.URY - originalBounds.LLY - originalBounds.URY) / 2;
+                                return dx * dx + dy * dy;
+                            })
+                            .FirstOrDefault()!;
+
+                        if (target == null)
+                            throw new InvalidOperationException(
+                                "O texto selecionado foi reconhecido pelo PDFium, mas o Aspose não encontrou um fragmento editável com o mesmo conteúdo. O PDF foi preservado sem alterações. " +
+                                "A seleção múltipla foi mantida para evitar substituir apenas uma letra ou apagar conteúdo vizinho.");
+                    }
 
                     if (cidBoldOnlyEdit)
                     {
