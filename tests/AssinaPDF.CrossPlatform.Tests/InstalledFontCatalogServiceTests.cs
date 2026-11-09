@@ -1,3 +1,4 @@
+using Aspose.Pdf.Text;
 using AssinaPDF.MacPrototype.Services;
 using Xunit;
 
@@ -92,5 +93,31 @@ public sealed class InstalledFontCatalogServiceTests
     {
         Assert.Equal("bellmt", InstalledFontCatalogService.NormalizeFontFileToken("Bell MT"));
         Assert.Equal("bellmtbolditalic", InstalledFontCatalogService.NormalizeFontFileToken("BellMT-BoldItalic"));
+    }
+
+    [Fact]
+    public void WindowsArialBoldItalicFile_CanBeOpenedAndEmbeddedWhenInstalled()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        string fontPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "arialbi.ttf");
+        if (!File.Exists(fontPath))
+            return;
+
+        Font font = FontRepository.OpenFont(fontPath);
+        Assert.True(
+            InstalledFontCatalogService.FontNameMatchesRequestedStyle(
+                font.BaseFont, "Arial", wantsBold: true, wantsItalic: true,
+                fallbackBold: font.IsBold, fallbackItalic: font.IsItalic) ||
+            InstalledFontCatalogService.FontNameMatchesRequestedStyle(
+                font.FontName, "Arial", wantsBold: true, wantsItalic: true,
+                fallbackBold: font.IsBold, fallbackItalic: font.IsItalic));
+
+        font.IsEmbedded = true;
+        using var output = new MemoryStream();
+        font.Save(output);
+        Assert.True(output.Length > 12, font.GetLastFontEmbeddingError());
     }
 }
