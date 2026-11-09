@@ -68,6 +68,7 @@ public sealed class PdfCidSplitBoldPocTests
 
             string? activeFont = null;
             var activeSize = 0d;
+            var matchFontSize = 0d;
             var matchIndex = -1;
             SetGlyphsPositionShowText? matchOperator = null;
             var matchOffset = -1;
@@ -92,12 +93,13 @@ public sealed class PdfCidSplitBoldPocTests
                     matchIndex = index;
                     matchOperator = tj;
                     matchOffset = offset;
+                    matchFontSize = activeSize;
                 }
             }
 
             Assert.NotNull(matchOperator);
             Assert.Equal(0, matchOffset);
-            Assert.True(activeSize > 0, "Não foi possível identificar o tamanho da fonte F2.");
+            Assert.True(matchFontSize > 0, "Não foi possível identificar o tamanho da fonte F2 no operador-alvo.");
 
             var glyphs = matchOperator!.GlyphPositions.ToArray();
             var joinedGlyphText = string.Concat(glyphs.Select(glyph => glyph.Text));
@@ -113,7 +115,7 @@ public sealed class PdfCidSplitBoldPocTests
             var tailGlyphs = glyphs.Skip(targetGlyphCount).Select(CloneGlyph).ToArray();
             Assert.Equal(encodedTarget.ToString(), string.Concat(targetGlyphs.Select(glyph => glyph.Text)));
 
-            _output.WriteLine($"MATCH page={pageNumber}; operator={matchIndex}; activeFont={regularResource}; fontSize={activeSize:F4}");
+            _output.WriteLine($"MATCH page={pageNumber}; operator={matchIndex}; activeFont={regularResource}; fontSize={matchFontSize:F4}");
             _output.WriteLine($"GLYPHS total={glyphs.Length}; target={targetGlyphs.Length}; tail={tailGlyphs.Length}");
             _output.WriteLine($"TARGET_CID_UNITS={string.Concat(targetGlyphs.Select(glyph => glyph.Text)).Length}; " +
                 $"TAIL_CID_UNITS={string.Concat(tailGlyphs.Select(glyph => glyph.Text)).Length}");
@@ -122,9 +124,9 @@ public sealed class PdfCidSplitBoldPocTests
             contents.Delete(matchIndex);
             contents.Insert(matchIndex, new Operator[]
             {
-                new SelectFont(boldResource, activeSize),
+                new SelectFont(boldResource, matchFontSize),
                 new SetGlyphsPositionShowText(targetGlyphs),
-                new SelectFont(regularResource, activeSize),
+                new SelectFont(regularResource, matchFontSize),
                 new SetGlyphsPositionShowText(tailGlyphs)
             });
 
