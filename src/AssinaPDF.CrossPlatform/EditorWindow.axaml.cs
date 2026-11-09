@@ -853,7 +853,10 @@ public partial class EditorWindow : Window
                     {
                         bestDistance = distance;
                         originalText = fragment.Text;
-                        var sourceFont = fragment.TextState.Font;
+                        var sourceFont = fragment.TextState.Font ??
+                            fragment.Segments.Cast<TextSegment>()
+                                .Select(segment => segment.TextState.Font)
+                                .FirstOrDefault(font => font != null);
                         originalFontEmbedded = sourceFont?.IsEmbedded == true;
                         string decodedFontName = sourceFont?.DecodedFontName ??
                                                   sourceFont?.BaseFont ??
@@ -869,13 +872,14 @@ public partial class EditorWindow : Window
                         // Do not silently assume Arial for an unidentified CID resource.
                         // The user must explicitly choose a replacement before editing it.
                         if (originalFontIsUnidentifiedCid)
-                            originalFontName = null;
+                            originalFontName = originalFontEmbedded ? "Arial" : null;
                         else if (string.IsNullOrWhiteSpace(originalFontName) || originalFontName.Length <= 2)
                             originalFontName = "Arial";
                         originalFontSize = fragment.TextState.FontSize > 0
                             ? fragment.TextState.FontSize
                             : 12;
-                        originalBold = fragment.TextState.IsBold;
+                        originalBold = fragment.TextState.IsBold ||
+                       CidFontOperatorFormatter.IsBoldFace(sourceFont);
                         originalItalic = fragment.TextState.IsItalic;
 
                         if (fragment.TextState.ForegroundColor is { } foreground)
@@ -891,7 +895,7 @@ public partial class EditorWindow : Window
                 }
             }
 
-            if (originalFontIsUnidentifiedCid)
+            if (originalFontIsUnidentifiedCid && !originalFontEmbedded)
             {
                 string resourceKey = string.IsNullOrWhiteSpace(originalPdfFontResourceName)
                     ? "fonte CID sem identificação"
@@ -909,6 +913,13 @@ public partial class EditorWindow : Window
                     _fontSubstitutions[resourceKey] = replacement;
                 }
                 originalFontName = replacement;
+            }
+            else if (originalFontIsUnidentifiedCid && originalFontEmbedded)
+            {
+                // O nome CID é um identificador interno, não uma família instalável.
+                // Arial é apenas a prévia do editor; a gravação preserva a fonte CID
+                // incorporada e, quando possível, alterna para a variante Bold já existente.
+                originalFontName = "Arial";
             }
             else if (!string.IsNullOrWhiteSpace(originalFontName) &&
                      _fontSubstitutions.TryGetValue(originalFontName, out string? mappedFamily))
@@ -1180,19 +1191,43 @@ public partial class EditorWindow : Window
                 return;
             }
 
-            // Antes de gravar, garanta que as fontes necessárias às novas faces/ famílias
+            // Para uma alteração exclusivamente Regular -> Bold em uma fonte CID
+            // incorporada, tentaremos reutilizar a variante Bold que já existe no PDF.
+            // Nesse caminho não é necessário baixar/instalar uma fonte substituta.
+            bool cidBoldOnlyEdit =
+                originalText != null &&
+                originalFontIsUnidentifiedCid &&
+                originalFontEmbedded &&
+                string.Equals(replacementText, originalText, StringComparison.Ordinal) &&
+                editedRuns.Count == 1 &&
+                editedRuns[0].Start == 0 &&
+                editedRuns[0].Length == replacementText.Length &&
+                editedRuns[0].IsBold &&
+                !originalBold &&
+                editedRuns[0].IsItalic == originalItalic &&
+                Math.Abs(editedRuns[0].FontSize - originalFontSize) <= 0.75 &&
+                editedRuns[0].Foreground == originalForeground &&
+                editedRuns[0].Background == originalBackground &&
+                string.Equals(
+                    NormalizePdfFontFamily(editedRuns[0].FontFamily),
+                    NormalizePdfFontFamily(originalFontName),
+                    StringComparison.OrdinalIgnoreCase);
+
+            // Antes de gravar, garanta que as fontes necessárias às novas faces/famílias
             // estejam disponíveis. O download exige autorização e nunca instala fontes no SO.
-            var requiredFonts = editedRuns
-                .Where(run => !string.IsNullOrWhiteSpace(run.FontFamily) &&
-                    (!string.Equals(
-                        NormalizePdfFontFamily(run.FontFamily),
-                        NormalizePdfFontFamily(originalFontName),
-                        StringComparison.OrdinalIgnoreCase) ||
-                     run.IsBold != originalBold ||
-                     run.IsItalic != originalItalic))
-                .Select(run => run.FontFamily!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            var requiredFonts = cidBoldOnlyEdit
+                ? Array.Empty<string>()
+                : editedRuns
+                    .Where(run => !string.IsNullOrWhiteSpace(run.FontFamily) &&
+                        (!string.Equals(
+                            NormalizePdfFontFamily(run.FontFamily),
+                            NormalizePdfFontFamily(originalFontName),
+                            StringComparison.OrdinalIgnoreCase) ||
+                         run.IsBold != originalBold ||
+                         run.IsItalic != originalItalic))
+                    .Select(run => run.FontFamily!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
             foreach (string fontFamily in requiredFonts)
             {
@@ -1248,30 +1283,35 @@ public partial class EditorWindow : Window
                     if (target == null || closest > 8.0)
                         throw new InvalidOperationException("O texto selecionado não foi localizado novamente no PDF.");
 
-                    // O TextFragment possui opções próprias para operações de
-                    // substituição de texto/fonte. Configurá-las no fragmento antes
-                    // de alterar o conteúdo permite que o Aspose trate a troca da
-                    // fonte CID/Type0 no caminho de edição, em vez de apenas alterar
-                    // o TextState em memória. RemoveUnusedFonts também limpa recursos
-                    // que deixarem de ser referenciados após a substituição.
-                    target.TextEditOptions = new TextEditOptions(
-                        TextEditOptions.FontReplace.RemoveUnusedFonts)
+                    bool cidFontSwapApplied = false;
+                    if (cidBoldOnlyEdit)
                     {
-                        // A troca de face em texto CID/Type0 pode encontrar caracteres
-                        // ausentes no subconjunto da fonte Bold. Peça ao mecanismo para
-                        // escolher uma face que cubra esses caracteres, em vez de manter
-                        // silenciosamente a fonte antiga ou gravar glifos incorretos.
-                        NoCharacterBehavior = TextEditOptions.NoCharacterAction.ReplaceFonts
-                    };
-                    // Não regrave o conteúdo quando o usuário alterou apenas a formatação.
-                    // Em PDFs com fontes CID/Type0, atribuir o mesmo texto novamente faz
-                    // o Aspose reconstruir os operadores Tj/TJ antes da troca de fonte.
-                    // Isso pode deixar o fluxo ainda apontando para o recurso CID regular,
-                    // embora TextState.Font passe a indicar Arial Bold em memória.
-                    // Preserve os bytes/operadores originais nesses casos para que
-                    // TextStateModifier.ModifyFont consiga localizar e reencodar o run.
-                    if (!string.Equals(target.Text, replacementText, StringComparison.Ordinal))
-                        target.Text = replacementText;
+                        cidFontSwapApplied = CidFontOperatorFormatter.TryApplyBoldVariant(
+                            document, pageIndex + 1, target, out string cidSwapReason);
+                        formattingTrace.Add(
+                            cidFontSwapApplied
+                                ? "FORMATAÇÃO CID: " + cidSwapReason
+                                : "FORMATAÇÃO CID não aplicada: " + cidSwapReason +
+                                  " Será tentada a substituição TrueType incorporada.");
+                    }
+
+                    if (!cidFontSwapApplied)
+                    {
+                        // O TextFragment possui opções próprias para operações de
+                        // substituição de texto/fonte. Configurá-las somente no caminho
+                        // Aspose evita reconstruir os operadores que a troca CID preserva.
+                        target.TextEditOptions = new TextEditOptions(
+                            TextEditOptions.FontReplace.RemoveUnusedFonts)
+                        {
+                            NoCharacterBehavior = TextEditOptions.NoCharacterAction.ReplaceFonts
+                        };
+
+                        // Não regrave o conteúdo quando o usuário alterou apenas a formatação.
+                        // Em PDFs com fontes CID/Type0, atribuir o mesmo texto novamente faz
+                        // o Aspose reconstruir os operadores Tj/TJ antes da troca de fonte.
+                        if (!string.Equals(target.Text, replacementText, StringComparison.Ordinal))
+                            target.Text = replacementText;
+                    }
                 }
                 else
                 {
@@ -1297,9 +1337,12 @@ public partial class EditorWindow : Window
                 if (originalText == null)
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
 
-                ApplyRichTextFormatting(
-                    target, editedRuns, originalFontName, originalFontEmbedded,
-                    originalBold, originalItalic, formattingTrace);
+                if (!cidFontSwapApplied)
+                {
+                    ApplyRichTextFormatting(
+                        target, editedRuns, originalFontName, originalFontEmbedded,
+                        originalBold, originalItalic, formattingTrace);
+                }
 
                 var editedRectangle = target.Rectangle;
                 if (editedRectangle != null)
@@ -1953,6 +1996,9 @@ public partial class EditorWindow : Window
     {
         if (font == null)
             return false;
+
+        if (bold && CidFontOperatorFormatter.IsBoldFace(font))
+            return true;
 
         string[] names = { font.BaseFont, font.FontName, font.DecodedFontName };
         string[] suffixes = bold
