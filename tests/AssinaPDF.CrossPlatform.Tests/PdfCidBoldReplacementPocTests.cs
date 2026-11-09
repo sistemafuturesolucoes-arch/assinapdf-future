@@ -209,6 +209,75 @@ public sealed class PdfCidBoldReplacementPocTests
         _output.WriteLine("FIM DOS RUNS DE TEXTO (somente leitura; PDF não foi alterado).");
     }
 
+
+    [Fact]
+    public void DumpCidFontResourceMetadataForF1AndF2()
+    {
+        var inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
+        if (string.IsNullOrWhiteSpace(inputPath))
+        {
+            _output.WriteLine("Diagnóstico ignorado: defina ASSINAPDF_CID_TEST_PDF.");
+            return;
+        }
+
+        Assert.True(File.Exists(inputPath), $"PDF de teste não encontrado: {inputPath}");
+
+        using var document = new Document(inputPath);
+        var page = document.Pages[1];
+        foreach (var font in page.Resources.Fonts
+                     .Where(font => font.ResourceName is "F1" or "F2")
+                     .OrderBy(font => font.ResourceName))
+        {
+            using var stream = new MemoryStream();
+            font.Save(stream);
+            var bytes = stream.ToArray();
+            var hash = bytes.Length == 0 ? "vazio" : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+
+            _output.WriteLine(
+                $"FONT {font.ResourceName}: BaseFont={font.BaseFont}; FontName={font.FontName}; " +
+                $"Decoded={font.DecodedFontName}; Subtype={font.Subtype}; Encoding={font.Encoding}; " +
+                $"CID={font.IsCid}; Embedded={font.IsEmbedded}; Subset={font.IsSubset}; " +
+                $"Bold={font.IsBold}; Italic={font.IsItalic}; Bytes={bytes.Length}; SHA256={hash}; " +
+                $"Weight={ReadEmbeddedTrueTypeWeight(font)?.ToString() ?? "indisponível"}");
+
+            DumpPublicScalarProperties(font.iPdfFont, $"  iPdfFont {font.ResourceName}");
+            DumpPublicScalarProperties(font.FontOptions, $"  FontOptions {font.ResourceName}");
+        }
+    }
+
+    private void DumpPublicScalarProperties(object? instance, string label)
+    {
+        if (instance == null)
+        {
+            _output.WriteLine($"{label}: null");
+            return;
+        }
+
+        var type = instance.GetType();
+        _output.WriteLine($"{label}: {type.FullName}");
+        foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                     .Where(property => property.GetIndexParameters().Length == 0)
+                     .OrderBy(property => property.Name))
+        {
+            try
+            {
+                var value = property.GetValue(instance);
+                if (value == null)
+                    continue;
+
+                var valueType = value.GetType();
+                if (value is string || valueType.IsPrimitive || valueType.IsEnum || value is decimal)
+                    _output.WriteLine($"    {property.Name}={value}");
+                else
+                    _output.WriteLine($"    {property.Name}=<{valueType.FullName}>");
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"    {property.Name}=<erro:{ex.GetType().Name}>");
+            }
+        }
+    }
+
     private static ushort? ReadEmbeddedTrueTypeWeight(Font? font)
     {
         if (font == null)
