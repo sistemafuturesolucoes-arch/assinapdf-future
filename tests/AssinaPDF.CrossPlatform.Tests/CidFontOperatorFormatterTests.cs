@@ -236,9 +236,17 @@ public sealed class CidFontOperatorFormatterTests
             color.R > 0.99 && color.G < 0.01 && color.B < 0.01);
 
         Font? savedCidFont = savedSegments[0].TextState.Font;
+        var detectorType = typeof(MainWindow).Assembly.GetType(
+            "AssinaPDF.MacPrototype.Services.CidFontOperatorFormatter");
+        Assert.NotNull(detectorType);
+        MethodInfo? detector = detectorType!.GetMethod(
+            "HasSyntheticItalicOperator",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(detector);
+
+        object?[] detectorArguments = { reopened.Pages[pageNumber], savedCidFont, savedFragment.Text };
         Assert.True(
-            CidFontOperatorFormatter.HasSyntheticItalicOperator(
-                reopened.Pages[pageNumber], savedCidFont, savedFragment.Text),
+            (bool)detector!.Invoke(null, detectorArguments)!,
             "O detector não reconheceu o itálico sintético do próprio trecho editado.");
 
         var pageAbsorber = new TextFragmentAbsorber();
@@ -256,9 +264,11 @@ public sealed class CidFontOperatorFormatterTests
 
         if (unrelatedCidFragment != null)
         {
+            object?[] unrelatedArguments = {
+                reopened.Pages[pageNumber], savedCidFont, unrelatedCidFragment.Text
+            };
             Assert.False(
-                CidFontOperatorFormatter.HasSyntheticItalicOperator(
-                    reopened.Pages[pageNumber], savedCidFont, unrelatedCidFragment.Text),
+                (bool)detector.Invoke(null, unrelatedArguments)!,
                 "O itálico de um trecho não pode ser atribuído a outro texto da mesma página.");
         }
 
