@@ -168,6 +168,18 @@ internal static class InstalledFontCatalogService
         if (!string.IsNullOrWhiteSpace(localAppData))
             directories.Add(Path.Combine(localAppData, "FutureSolucoes", "AssinaPDF", "Fonts"));
 
+        return EnumerateCandidateFontFiles(directories, familyName);
+    }
+
+    internal static IReadOnlyList<string> EnumerateCandidateFontFiles(
+        IEnumerable<string> directories,
+        string familyName)
+    {
+        string normalizedFamily = NormalizeFontFileToken(familyName);
+        if (normalizedFamily.Length < 2)
+            return Array.Empty<string>();
+
+        string prefix = normalizedFamily[..Math.Min(4, normalizedFamily.Length)];
         var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (string directory in directories.Distinct(StringComparer.OrdinalIgnoreCase))
         {
