@@ -538,11 +538,131 @@ internal static class CidFontOperatorFormatter
         if (stream == null)
             return null;
 
+        // Aspose may expose the decoded PDF stream separately from RawData.
+        // Prefer decoded members so Flate/LZW/ASCII85 filters are not parsed
+        // as if their compressed bytes were a textual CMap.
+        string[] decodedPropertyNames =
+        {
+            "DecodedData", "DecodedBytes", "DecodedStreamData", "Data"
+        };
+
+        foreach (string name in decodedPropertyNames)
+        {
+            object? value = ReadProperty(stream, name);
+            if (TryConvertStreamValue(value, out byte[]? decoded) &&
+                LooksLikeCMap(decoded))
+                return decoded;
+        }
+
+        string[] decodeMethodNames =
+        {
+            "Decode", "DecodeStream", "GetDecodedData", "GetDecodedBytes",
+            "Uncompress", "Decompress", "GetData"
+        };
+
+        for (Type? type = stream.GetType(); type != null; type = type.BaseType)
+        {
+            foreach (MethodInfo method in type.GetMethods(
+                         ReflectionFlags | BindingFlags.DeclaredOnly))
+            {
+                if (!decodeMethodNames.Contains(method.Name, StringComparer.Ordinal) ||
+                    method.GetParameters().Length != 0)
+                    continue;
+
+                try
+                {
+                    object? value = method.Invoke(stream, null);
+                    if (TryConvertStreamValue(value, out byte[]? decoded) &&
+                        LooksLikeCMap(decoded))
+                        return decoded;
+
+                    // Some stream APIs decode in place and return void/bool.
+                    if (method.ReturnType == typeof(void) || method.ReturnType == typeof(bool))
+                    {
+                        foreach (string propertyName in decodedPropertyNames)
+                        {
+                            value = ReadProperty(stream, propertyName);
+                            if (TryConvertStreamValue(value, out decoded) &&
+                                LooksLikeCMap(decoded))
+                                return decoded;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Try the next compatible API member. The caller fails
+                    // closed if no decoded CMap can be obtained.
+                }
+            }
+        }
+
+        byte[]? rawData = ReadRawData(stream);
+        return rawData != null && LooksLikeCMap(rawData) ? rawData : null;
+    }
+
+    private static byte[]? ReadRawData(object stream)
+    {
         PropertyInfo? property = stream.GetType().GetProperty("RawData", ReflectionFlags);
         if (property?.GetValue(stream) is byte[] data)
             return data;
 
         return ReadField(stream, "<RawData>k__BackingField") as byte[];
+    }
+
+    private static object? ReadProperty(object instance, string name)
+    {
+        for (Type? type = instance.GetType(); type != null; type = type.BaseType)
+        {
+            PropertyInfo? property = type.GetProperty(
+                name, ReflectionFlags | BindingFlags.DeclaredOnly);
+            if (property == null || property.GetIndexParameters().Length != 0)
+                continue;
+
+            try { return property.GetValue(instance); }
+            catch { }
+        }
+
+        return null;
+    }
+
+    private static bool TryConvertStreamValue(object? value, out byte[]? data)
+    {
+        switch (value)
+        {
+            case byte[] bytes when bytes.Length > 0:
+                data = bytes;
+                return true;
+            case Stream stream:
+                try
+                {
+                    using var copy = new MemoryStream();
+                    if (stream.CanSeek)
+                        stream.Position = 0;
+                    stream.CopyTo(copy);
+                    data = copy.ToArray();
+                    return data.Length > 0;
+                }
+                catch
+                {
+                    data = null;
+                    return false;
+                }
+            default:
+                data = null;
+                return false;
+        }
+    }
+
+    private static bool LooksLikeCMap(byte[] data)
+    {
+        if (data.Length == 0)
+            return false;
+
+        string prefix = Encoding.ASCII.GetString(data, 0, Math.Min(data.Length, 4096));
+        return prefix.Contains("begincmap", StringComparison.Ordinal) ||
+               prefix.Contains("beginbfchar", StringComparison.Ordinal) ||
+               prefix.Contains("beginbfrange", StringComparison.Ordinal) ||
+               prefix.Contains("begincodespacerange", StringComparison.Ordinal);
     }
 
     private static ushort? ReadEmbeddedTrueTypeWeight(Font? font)
