@@ -1608,8 +1608,19 @@ public partial class EditorWindow : Window
 
             if (runIndex < 0)
             {
+                // O editor representa quebras entre parágrafos como '\n', mas
+                // não cria um RichRun para esse separador. O PDF pode, por sua
+                // vez, expor esse caractere como um TextSegment independente.
+                // Preserve o estado original desse segmento estrutural e avance
+                // o cursor; não tente aplicar a ele o estilo do run vizinho.
+                if (string.IsNullOrWhiteSpace(segment.Text))
+                {
+                    offset = segmentEnd;
+                    continue;
+                }
+
                 throw new InvalidOperationException(
-                    $"O segmento PDF [{offset}, {segmentEnd}) não corresponde integralmente a um trecho formatado do editor. A edição foi cancelada para evitar estilos incorretos.");
+                    $"O segmento PDF [{offset}, {segmentEnd}) ('{segment.Text}') não corresponde integralmente a um trecho formatado do editor. A edição foi cancelada para evitar estilos incorretos.");
             }
 
             segmentsToFormat.Add((offset, segmentEnd, runIndex, segment));
