@@ -24,11 +24,11 @@ internal static class CidFontOperatorFormatter
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
     private static readonly Regex BfCharBlock = new(
-        @"\\d+\\s+beginbfchar(?<body>.*?)endbfchar",
+        @"\d+\s+beginbfchar(?<body>.*?)endbfchar",
         RegexOptions.Singleline | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex CMapPair = new(
-        @"<(?<cid>[0-9A-Fa-f]{4})>\\s*<(?<unicode>[0-9A-Fa-f]+)>",
+        @"<(?<cid>[0-9A-Fa-f]{4})>\s*<(?<unicode>[0-9A-Fa-f]+)>",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     internal static bool TryApplyBoldVariant(
