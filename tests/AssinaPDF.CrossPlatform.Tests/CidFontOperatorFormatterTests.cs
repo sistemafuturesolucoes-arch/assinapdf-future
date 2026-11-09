@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using Aspose.Pdf;
 using Aspose.Pdf.Text;
+using AssinaPDF.MacPrototype;
 using Xunit;
 using Xunit.Abstractions;
 
