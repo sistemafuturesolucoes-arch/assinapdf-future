@@ -54,12 +54,28 @@
       </Grid>
     </Border>
 
-    <Border Grid.Row="2" Background="#D9DCE0" Padding="18">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-        <StackPanel x:Name="EditorPagesPanel" Spacing="20"
-                    HorizontalAlignment="Center"/>
-      </ScrollViewer>
-    </Border>
+    <Grid Grid.Row="2" ColumnDefinitions="156,*" Background="#D9DCE0">
+      <Border Grid.Column="0" Background="#ECEEF2"
+              BorderBrush="#D0D4DB" BorderThickness="0,0,1,0" Padding="8,10">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+          <TextBlock Text="PÁGINAS" FontSize="10" FontWeight="Bold"
+                     Foreground="#626A76" Margin="4,0,0,2"/>
+          <ScrollViewer Grid.Row="1"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Visible">
+            <StackPanel x:Name="EditorThumbnailsPanel" Spacing="8"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="#D9DCE0" Padding="18">
+        <ScrollViewer x:Name="EditorDocumentScrollViewer"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Visible">
+          <StackPanel x:Name="EditorPagesPanel" Spacing="20"
+                      HorizontalAlignment="Center"/>
+        </ScrollViewer>
+      </Border>
+    </Grid>
 
     <Border Grid.Row="3" Background="#E7E9ED" Padding="14,5">
       <TextBlock x:Name="EditorStatusText"
