@@ -298,7 +298,7 @@ internal static class CidFontOperatorFormatter
     {
         map = new Dictionary<ushort, string>();
         diagnostic = string.Empty;
-        object? fontInfo = font.iPdfFont;
+        object? fontInfo = FindFontInfoOwner(font.iPdfFont);
         object? fontDictionary = ReadField(fontInfo, "_fontDict");
         object? reader = ReadField(fontInfo, "_reader");
         if (fontDictionary == null || reader == null)
@@ -377,7 +377,7 @@ internal static class CidFontOperatorFormatter
 
     private static bool HasIdentityCidToGidMap(Font font)
     {
-        object? fontInfo = font.iPdfFont;
+        object? fontInfo = FindFontInfoOwner(font.iPdfFont);
         object? fontDictionary = ReadField(fontInfo, "_fontDict");
         object? reader = ReadField(fontInfo, "_reader");
         if (fontDictionary == null || reader == null)
@@ -451,6 +451,73 @@ internal static class CidFontOperatorFormatter
         }
 
         return value;
+    }
+
+    private static object? FindFontInfoOwner(object? root)
+    {
+        if (root == null)
+            return null;
+
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        var pending = new Queue<(object Value, int Depth)>();
+        pending.Enqueue((root, 0));
+
+        while (pending.Count > 0 && visited.Count < 500)
+        {
+            var (current, depth) = pending.Dequeue();
+            if (!visited.Add(current))
+                continue;
+
+            if (ReadField(current, "_fontDict") != null &&
+                ReadField(current, "_reader") != null)
+                return current;
+
+            if (depth >= 7)
+                continue;
+
+            Type type = current.GetType();
+            const BindingFlags flags = BindingFlags.Instance |
+                BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.DeclaredOnly;
+
+            for (Type? cursor = type; cursor != null && cursor != typeof(object); cursor = cursor.BaseType)
+            {
+                foreach (FieldInfo field in cursor.GetFields(flags))
+                {
+                    if (field.FieldType.IsPrimitive || field.FieldType.IsEnum ||
+                        field.FieldType == typeof(string) || field.FieldType.IsPointer)
+                        continue;
+
+                    object? value;
+                    try { value = field.GetValue(current); }
+                    catch { continue; }
+
+                    if (value == null || value is Type || value is Delegate ||
+                        value is Stream || value is byte[])
+                        continue;
+
+                    if (value is IEnumerable enumerable)
+                    {
+                        int count = 0;
+                        foreach (object? item in enumerable)
+                        {
+                            if (item != null && count++ < 100)
+                                pending.Enqueue((item, depth + 1));
+                        }
+                    }
+                    else
+                    {
+                        string? ns = value.GetType().Namespace;
+                        if (ns?.StartsWith("Aspose.Pdf", StringComparison.Ordinal) == true ||
+                            value.GetType().Name.Contains("Font", StringComparison.OrdinalIgnoreCase) ||
+                            value.GetType().Name.Contains("Pdf", StringComparison.OrdinalIgnoreCase))
+                            pending.Enqueue((value, depth + 1));
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     private static object? ReadField(object? instance, string name)
