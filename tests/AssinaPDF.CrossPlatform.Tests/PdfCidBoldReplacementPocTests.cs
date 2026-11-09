@@ -244,7 +244,85 @@ public sealed class PdfCidBoldReplacementPocTests
             DumpPublicScalarProperties(font.FontOptions, $"  FontOptions {font.ResourceName}");
             DumpReflectionMembers(font, $"  Font internals {font.ResourceName}", 0);
             DumpPdfObjectTree(font.iPdfFont, $"  PDF font internals {font.ResourceName}", 0, new System.Collections.Generic.HashSet<object>(ReferenceEqualityComparer.Instance));
+            DumpResolvedCidFontObjects(font, $"  RESOLVED {font.ResourceName}");
         }
+    }
+
+
+    private void DumpResolvedCidFontObjects(object fontInfo, string label)
+    {
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+
+        object? ReadField(object? instance, string name)
+        {
+            for (var type = instance?.GetType(); type != null; type = type.BaseType)
+            {
+                var field = type.GetField(name, flags | System.Reflection.BindingFlags.DeclaredOnly);
+                if (field != null)
+                    return field.GetValue(instance);
+            }
+            return null;
+        }
+
+        object? fontDictionary = ReadField(fontInfo, "_fontDict");
+        object? entries = ReadField(fontDictionary, "_entries");
+        object? reader = ReadField(fontInfo, "_reader");
+        if (entries is not System.Collections.IDictionary dictionary || reader == null)
+        {
+            _output.WriteLine($"{label}: não foi possível obter _entries/_reader; entries={entries?.GetType().FullName ?? "null"}; reader={reader?.GetType().FullName ?? "null"}");
+            return;
+        }
+
+        object? GetEntry(string key)
+        {
+            foreach (System.Collections.DictionaryEntry entry in dictionary)
+            {
+                if (string.Equals(entry.Key?.ToString()?.TrimStart('/'), key, StringComparison.Ordinal))
+                    return entry.Value;
+            }
+            return null;
+        }
+
+        object? Resolve(object? value)
+        {
+            if (value == null) return null;
+            var method = reader.GetType().GetMethods(flags)
+                .FirstOrDefault(candidate => candidate.Name == "Resolve" &&
+                    candidate.GetParameters().Length == 1 &&
+                    candidate.GetParameters()[0].ParameterType.IsInstanceOfType(value));
+            if (method == null)
+            {
+                var objectNumber = ReadField(value, "ObjectNumber");
+                var generation = ReadField(value, "Generation");
+                if (objectNumber is int number && generation is int gen)
+                {
+                    method = reader.GetType().GetMethod("ResolveRef", flags, null, new[] { typeof(int), typeof(int) }, null);
+                    if (method != null)
+                        return method.Invoke(reader, new object[] { number, gen });
+                }
+                return value;
+            }
+            return method.Invoke(reader, new[] { value });
+        }
+
+        _output.WriteLine($"{label}: reader={reader.GetType().FullName}; dictionary={fontDictionary?.GetType().FullName ?? "null"}");
+        var descendantsRaw = GetEntry("DescendantFonts");
+        var descendants = Resolve(descendantsRaw);
+        _output.WriteLine($"  DescendantFonts raw={descendantsRaw?.GetType().FullName ?? "null"} resolved={descendants?.GetType().FullName ?? "null"}");
+        if (descendants != null)
+        {
+            var itemProperty = descendants.GetType().GetProperty("Item", flags, null, null, new[] { typeof(int) }, null);
+            var firstRaw = itemProperty?.GetValue(descendants, new object[] { 0 });
+            var descendant = Resolve(firstRaw);
+            _output.WriteLine($"  DescendantFonts[0] raw={firstRaw?.GetType().FullName ?? "null"} resolved={descendant?.GetType().FullName ?? "null"}");
+            DumpPdfObjectTree(descendant, $"{label} DescendantFonts[0]", 0, new System.Collections.Generic.HashSet<object>(ReferenceEqualityComparer.Instance));
+        }
+
+        var toUnicodeRaw = GetEntry("ToUnicode");
+        var toUnicode = Resolve(toUnicodeRaw);
+        _output.WriteLine($"  ToUnicode raw={toUnicodeRaw?.GetType().FullName ?? "null"} resolved={toUnicode?.GetType().FullName ?? "null"}");
+        DumpPdfObjectTree(toUnicode, $"{label} ToUnicode stream", 0, new System.Collections.Generic.HashSet<object>(ReferenceEqualityComparer.Instance));
     }
 
     private void DumpPublicScalarProperties(object? instance, string label)
