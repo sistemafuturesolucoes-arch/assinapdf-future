@@ -13,6 +13,7 @@ using Avalonia.Input.Platform;
 using AvaloniaImage = Avalonia.Controls.Image;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Aspose.Pdf;
 using Aspose.Pdf.Text;
 using AssinaPDF.MacPrototype.Services;
@@ -459,8 +460,11 @@ public partial class EditorWindow : Window
             pageImage.PointerPressed += PageImage_PointerPressed;
             pageImage.PointerMoved += PageImage_PointerMoved;
             pageImage.PointerReleased += PageImage_PointerReleased;
-            // A roda do mouse deve ser tratada pelo ScrollViewer ancestral.
-            // Não interceptar o evento na imagem/cartão, pois isso bloqueia a rolagem nativa.
+            // Em algumas combinações de Avalonia/driver, a roda não chega ao
+            // ScrollViewer quando o ponteiro está sobre a imagem renderizada.
+            // Trate-a diretamente e atualize o deslocamento do documento.
+            pageImage.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
+            page.ContextMenu = CreateSelectionContextMenu();
             pageImage.ContextMenu = CreateSelectionContextMenu();
             _pageSurfaces[i] = (pageImage, overlay);
             _pageCards[i] = page;
@@ -521,10 +525,48 @@ public partial class EditorWindow : Window
         if (!_pageCards.TryGetValue(pageIndex, out Border? pageCard))
             return;
 
-        // BringIntoView usa o layout real do controle e deixa o ScrollViewer
-        // calcular o deslocamento, inclusive quando as páginas ainda estão
-        // terminando de medir/renderizar.
-        pageCard.BringIntoView();
+        // Aguarda o layout do Avalonia concluir a medição/arranjo da página.
+        // Depois calcula o deslocamento no conteúdo real do ScrollViewer.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!ReferenceEquals(pageCard.Parent, EditorPagesPanel))
+                return;
+
+            pageCard.BringIntoView();
+            double targetY = pageCard.Bounds.Y;
+            double maxOffset = Math.Max(
+                0,
+                EditorDocumentScrollViewer.Extent.Height -
+                EditorDocumentScrollViewer.Viewport.Height);
+            double targetOffset = Math.Clamp(targetY, 0, maxOffset);
+
+            EditorDocumentScrollViewer.Offset = new Vector(
+                EditorDocumentScrollViewer.Offset.X,
+                targetOffset);
+        }, DispatcherPriority.Background);
+    }
+
+    private void EditorDocumentScrollViewer_PointerWheelChanged(
+        object? sender,
+        PointerWheelEventArgs e)
+    {
+        double delta = e.Delta.Y;
+        if (Math.Abs(delta) < 0.001)
+            return;
+
+        double maxOffset = Math.Max(
+            0,
+            EditorDocumentScrollViewer.Extent.Height -
+            EditorDocumentScrollViewer.Viewport.Height);
+        double targetOffset = Math.Clamp(
+            EditorDocumentScrollViewer.Offset.Y - (delta * 72),
+            0,
+            maxOffset);
+
+        EditorDocumentScrollViewer.Offset = new Vector(
+            EditorDocumentScrollViewer.Offset.X,
+            targetOffset);
+        e.Handled = true;
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
@@ -1144,6 +1186,9 @@ public partial class EditorWindow : Window
             Canvas.SetTop(inlineEditor, editorTop);
             pageSurface.Overlay.Children.Add(inlineEditor);
             pageSurface.Overlay.IsHitTestVisible = true;
+            // Mantém o painel de edição visível mesmo quando o texto selecionado
+            // está próximo do limite inferior da área atualmente exibida.
+            inlineEditor.BringIntoView();
             EditorStatusText.Text = "Edite o trecho diretamente na página. A barra superior permanece disponível para formatação.";
 
             var completion = new TaskCompletionSource<bool>(
