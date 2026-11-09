@@ -69,10 +69,13 @@
       </Border>
       <Border Grid.Column="1" Background="#D9DCE0" Padding="18">
         <ScrollViewer x:Name="EditorDocumentScrollViewer"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Visible">
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Visible"
+                      PointerWheelChanged="EditorDocumentScrollViewer_PointerWheelChanged"
+                      Focusable="True">
           <StackPanel x:Name="EditorPagesPanel" Spacing="20"
-                      HorizontalAlignment="Center"/>
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top"/>
         </ScrollViewer>
       </Border>
     </Grid>
