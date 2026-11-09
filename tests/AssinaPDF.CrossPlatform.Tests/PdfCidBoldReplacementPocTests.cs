@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Aspose.Pdf;
 using Aspose.Pdf.Text;
+using AssinaPDF.MacPrototype;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -21,7 +23,9 @@ public sealed class PdfCidBoldReplacementPocTests
     [Fact]
     public void SetEachTextSegmentFontToExplicitBold_PersistsAfterSaveAndReopen()
     {
-        // Opt-in: define ASSINAPDF_CID_TEST_PDF to run against the real sample PDF.
+        // Este teste exercita o mesmo formatador CID usado pelo editor.
+        // Não substitui a fonte CID por Arial: altera os operadores PDF para
+        // reutilizar uma variante CID Bold incorporada e compatível.
         var inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
         if (string.IsNullOrWhiteSpace(inputPath))
         {
@@ -41,57 +45,39 @@ public sealed class PdfCidBoldReplacementPocTests
         }
 
         Assert.NotEqual(Path.GetFullPath(inputPath), Path.GetFullPath(outputPath));
+        if (File.Exists(outputPath))
+            File.Delete(outputPath);
 
         using (var sourceDocument = new Document(inputPath))
         {
             var absorber = new TextFragmentAbsorber(targetText);
             sourceDocument.Pages.Accept(absorber);
-
             var sourceFragment = absorber.TextFragments.Cast<TextFragment>().FirstOrDefault();
             Assert.NotNull(sourceFragment);
 
-            var sourceSegments = sourceFragment!.Segments.Cast<TextSegment>().ToArray();
+            int pageNumber = checked((int)sourceFragment!.Page.Number);
+            var sourceSegments = sourceFragment.Segments.Cast<TextSegment>().ToArray();
             Assert.NotEmpty(sourceSegments);
 
             _output.WriteLine(
-                $"ANTES: página={sourceFragment.Page.Number}; texto='{sourceFragment.Text}'; " +
-                $"segmentos={sourceSegments.Length}; fonte do fragmento='{sourceFragment.TextState.Font?.FontName}'");
+                $"ANTES: página={pageNumber}; texto='{sourceFragment.Text}'; " +
+                $"segmentos={sourceSegments.Length}; fonte='{sourceSegments[0].TextState.Font?.FontName}'; " +
+                $"recurso='{sourceSegments[0].TextState.Font?.ResourceName}'");
 
-            for (var index = 0; index < sourceSegments.Length; index++)
-            {
-                var segment = sourceSegments[index];
-                var weight = ReadEmbeddedTrueTypeWeight(segment.TextState.Font);
-                _output.WriteLine(
-                    $"SEGMENTO ANTES[{index + 1}]: texto='{segment.Text}'; " +
-                    $"fonte='{segment.TextState.Font?.FontName}'; recurso='{segment.TextState.Font?.ResourceName}'; " +
-                    $"IsBold={segment.TextState.IsBold}; peso={weight?.ToString() ?? "indisponível"}");
+            var formatterType = typeof(MainWindow).Assembly.GetType(
+                "AssinaPDF.MacPrototype.Services.CidFontOperatorFormatter");
+            Assert.NotNull(formatterType);
 
-                Assert.True(
-                    weight is >= 350 and <= 500,
-                    $"O segmento {index + 1} não parece regular. Peso TTF: {weight?.ToString() ?? "indisponível"}.");
-            }
+            var method = formatterType!.GetMethod(
+                "TryApplyBoldVariant",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(method);
 
-            var boldFont = FontRepository.FindFont("Arial", FontStyles.Bold);
-            Assert.NotNull(boldFont);
-            boldFont.IsEmbedded = true;
-
-            // Change each physical text run independently. TextFragment-level
-            // changes can rebuild/merge the underlying segment collection.
-            foreach (var segment in sourceSegments)
-            {
-                segment.TextState.Font = boldFont;
-                segment.TextState.FontStyle = FontStyles.Bold;
-                segment.TextState.IsBold = true;
-            }
-
-            for (var index = 0; index < sourceSegments.Length; index++)
-            {
-                var segment = sourceSegments[index];
-                _output.WriteLine(
-                    $"APLICADO[{index + 1}]: texto='{segment.Text}'; fonte='{segment.TextState.Font?.FontName}'; " +
-                    $"recurso='{segment.TextState.Font?.ResourceName}'; IsBold={segment.TextState.IsBold}; " +
-                    $"peso={ReadEmbeddedTrueTypeWeight(segment.TextState.Font)?.ToString() ?? "indisponível"}");
-            }
+            object?[] arguments = { sourceDocument, pageNumber, sourceFragment, null };
+            bool applied = (bool)method!.Invoke(null, arguments)!;
+            string reason = arguments[3]?.ToString() ?? "(sem diagnóstico)";
+            _output.WriteLine($"APLICAÇÃO CID: resultado={applied}; detalhe={reason}");
+            Assert.True(applied, reason);
 
             sourceDocument.Save(outputPath);
         }
@@ -102,7 +88,6 @@ public sealed class PdfCidBoldReplacementPocTests
         {
             var savedAbsorber = new TextFragmentAbsorber(targetText);
             savedDocument.Pages.Accept(savedAbsorber);
-
             var savedFragment = savedAbsorber.TextFragments.Cast<TextFragment>().FirstOrDefault();
             Assert.NotNull(savedFragment);
 
@@ -113,28 +98,32 @@ public sealed class PdfCidBoldReplacementPocTests
                 $"DEPOIS: arquivo='{outputPath}'; página={savedFragment.Page.Number}; " +
                 $"texto='{savedFragment.Text}'; segmentos={savedSegments.Length}");
 
-            var savedWeights = savedSegments
-                .Select((segment, index) =>
-                {
-                    var weight = ReadEmbeddedTrueTypeWeight(segment.TextState.Font);
-                    _output.WriteLine(
-                        $"SEGMENTO DEPOIS[{index + 1}]: texto='{segment.Text}'; " +
-                        $"fonte='{segment.TextState.Font?.FontName}'; recurso='{segment.TextState.Font?.ResourceName}'; " +
-                        $"IsBold={segment.TextState.IsBold}; Font.IsBold={segment.TextState.Font?.IsBold}; " +
-                        $"embedded={segment.TextState.Font?.IsEmbedded}; peso={weight?.ToString() ?? "indisponível"}");
-                    return weight;
-                })
-                .ToArray();
+            var savedWeights = savedSegments.Select((segment, index) =>
+            {
+                var font = segment.TextState.Font;
+                var weight = ReadEmbeddedTrueTypeWeight(font);
+                _output.WriteLine(
+                    $"SEGMENTO DEPOIS[{index + 1}]: texto='{segment.Text}'; " +
+                    $"fonte='{font?.FontName}'; recurso='{font?.ResourceName}'; " +
+                    $"IsBold={segment.TextState.IsBold}; embedded={font?.IsEmbedded}; " +
+                    $"peso={weight?.ToString() ?? "indisponível"}");
+                return (Font: font, Weight: weight);
+            }).ToArray();
 
             Assert.Equal(targetText, savedFragment.Text);
-            Assert.All(
-                savedWeights,
-                weight => Assert.True(
-                    weight >= 600,
-                    $"O PDF foi salvo/reaberto, mas ao menos um segmento não usa fonte Bold. Peso TTF OS/2: {weight?.ToString() ?? "indisponível"}."));
+            Assert.All(savedWeights, item =>
+            {
+                Assert.NotNull(item.Font);
+                Assert.NotEqual("F2", item.Font!.ResourceName);
+                Assert.True(item.Font.IsCid, "A variante aplicada deixou de ser uma fonte CID.");
+                Assert.True(item.Font.IsEmbedded, "A variante CID Bold não está incorporada.");
+                Assert.True(
+                    item.Weight >= 600,
+                    $"O PDF foi salvo/reaberto, mas o segmento não usa fonte Bold. Peso TTF OS/2: {item.Weight?.ToString() ?? "indisponível"}.");
+            });
         }
 
-        _output.WriteLine("POC aprovada: a fonte Bold permaneceu nos segmentos após salvar e reabrir o PDF.");
+        _output.WriteLine("POC aprovada: a variante CID Bold permaneceu após salvar e reabrir o PDF.");
     }
 
     [Fact]
