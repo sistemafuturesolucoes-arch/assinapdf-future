@@ -242,6 +242,7 @@ public sealed class PdfCidBoldReplacementPocTests
 
             DumpPublicScalarProperties(font.iPdfFont, $"  iPdfFont {font.ResourceName}");
             DumpPublicScalarProperties(font.FontOptions, $"  FontOptions {font.ResourceName}");
+            DumpReflectionMembers(font, $"  Font internals {font.ResourceName}", 0);
         }
     }
 
@@ -274,6 +275,52 @@ public sealed class PdfCidBoldReplacementPocTests
             catch (Exception ex)
             {
                 _output.WriteLine($"    {property.Name}=<erro:{ex.GetType().Name}>");
+            }
+        }
+    }
+
+    private void DumpReflectionMembers(object? instance, string label, int depth)
+    {
+        if (instance == null || depth > 2)
+            return;
+
+        var type = instance.GetType();
+        _output.WriteLine($"{label}: {type.FullName}");
+
+        var flags = System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.DeclaredOnly;
+
+        for (var current = type; current != null && current != typeof(object); current = current.BaseType)
+        {
+            foreach (var field in current.GetFields(flags).OrderBy(field => field.Name).Take(40))
+            {
+                try
+                {
+                    var value = field.GetValue(instance);
+                    if (value == null)
+                        continue;
+
+                    var valueType = value.GetType();
+                    if (value is string || valueType.IsPrimitive || valueType.IsEnum || value is decimal)
+                    {
+                        _output.WriteLine($"    FIELD {current.Name}.{field.Name}={value}");
+                    }
+                    else
+                    {
+                        _output.WriteLine($"    FIELD {current.Name}.{field.Name}=<{valueType.FullName}>");
+                        if (depth < 2 && !valueType.IsArray &&
+                            !typeof(System.Collections.IEnumerable).IsAssignableFrom(valueType))
+                        {
+                            DumpReflectionMembers(value, $"      {field.Name}", depth + 1);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _output.WriteLine($"    FIELD {current.Name}.{field.Name}=<erro:{ex.GetType().Name}>");
+                }
             }
         }
     }
