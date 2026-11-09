@@ -1321,7 +1321,6 @@ public partial class EditorWindow : Window
                 !originalItalic &&
                 editedRuns[0].IsBold == originalBold &&
                 Math.Abs(editedRuns[0].FontSize - originalFontSize) <= 0.75 &&
-                editedRuns[0].Foreground == originalForeground &&
                 editedRuns[0].Background == originalBackground &&
                 string.Equals(
                     NormalizePdfFontFamily(editedRuns[0].FontFamily),
@@ -1411,8 +1410,15 @@ public partial class EditorWindow : Window
                     }
                     else if (cidSyntheticItalicEdit)
                     {
+                        var italicRun = editedRuns[0];
+                        Aspose.Pdf.Color? italicForeground = italicRun.Foreground is { } requestedColor
+                            ? Aspose.Pdf.Color.FromRgb(
+                                requestedColor.R / 255d,
+                                requestedColor.G / 255d,
+                                requestedColor.B / 255d)
+                            : null;
                         cidFontSwapApplied = CidFontOperatorFormatter.TryApplySyntheticItalicFallback(
-                            document, pageIndex + 1, target, out string cidItalicReason);
+                            document, pageIndex + 1, target, italicForeground, out string cidItalicReason);
                         formattingTrace.Add(
                             cidFontSwapApplied
                                 ? "FORMATAÇÃO CID: " + cidItalicReason
