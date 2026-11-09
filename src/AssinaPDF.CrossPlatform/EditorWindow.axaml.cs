@@ -42,7 +42,9 @@ public partial class EditorWindow : Window
     private readonly EditorHistoryService _history = new();
     private string? _historyEntryId;
     private readonly Dictionary<int, (AvaloniaImage Image, Canvas Overlay)> _pageSurfaces = new();
+    private readonly Dictionary<int, (Grid Surface, double Width, double Height)> _pageLayouts = new();
     private readonly Dictionary<int, Border> _pageCards = new();
+    private double _zoomFactor = 1.0;
     private int? _selectedPageIndex;
     private double _selectedPdfX;
     private double _selectedPdfY;
@@ -402,7 +404,11 @@ public partial class EditorWindow : Window
         EditorPagesPanel.Children.Clear();
         EditorThumbnailsPanel.Children.Clear();
         _pageSurfaces.Clear();
+        _pageLayouts.Clear();
         _pageCards.Clear();
+        _zoomFactor = 1.0;
+        if (this.FindControl<TextBlock>("EditorZoomText") is { } zoomText)
+            zoomText.Text = "100%";
         ClearTextSelection();
 
         _document = new PdfiumDocument(_workingCopyPath);
@@ -456,8 +462,11 @@ public partial class EditorWindow : Window
                 pageContent.Children.OfType<Grid>().SingleOrDefault() is not Grid pageSurface)
                 throw new InvalidOperationException("Não foi possível preparar a visualização da página.");
 
+            pageSurface.Width = rendered.Width;
+            pageSurface.Height = rendered.Height;
             var pageImage = pageSurface.Children.OfType<AvaloniaImage>().Single();
             var overlay = pageSurface.Children.OfType<Canvas>().Single();
+            _pageLayouts[i] = (pageSurface, rendered.Width, rendered.Height);
             pageImage.PointerPressed += PageImage_PointerPressed;
             pageImage.PointerMoved += PageImage_PointerMoved;
             pageImage.PointerReleased += PageImage_PointerReleased;
@@ -555,6 +564,13 @@ public partial class EditorWindow : Window
         if (Math.Abs(delta) < 0.001)
             return;
 
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            SetEditorZoom(_zoomFactor * (delta > 0 ? 1.10 : 1.0 / 1.10));
+            e.Handled = true;
+            return;
+        }
+
         double maxOffset = Math.Max(
             0,
             EditorDocumentScrollViewer.Extent.Height -
@@ -568,6 +584,23 @@ public partial class EditorWindow : Window
             EditorDocumentScrollViewer.Offset.X,
             targetOffset);
         e.Handled = true;
+    }
+
+    private void SetEditorZoom(double requestedZoom)
+    {
+        double nextZoom = Math.Clamp(requestedZoom, 0.50, 3.00);
+        if (Math.Abs(nextZoom - _zoomFactor) < 0.001)
+            return;
+
+        _zoomFactor = nextZoom;
+        foreach (var item in _pageLayouts.Values)
+        {
+            item.Surface.Width = item.Width * _zoomFactor;
+            item.Surface.Height = item.Height * _zoomFactor;
+        }
+
+        if (this.FindControl<TextBlock>("EditorZoomText") is { } zoomText)
+            zoomText.Text = $"{Math.Round(_zoomFactor * 100):0}%";
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
@@ -1534,6 +1567,13 @@ public partial class EditorWindow : Window
                     return true;
                 });
         }
+        catch (InvalidOperationException ex) when (
+            ex.Message.StartsWith("TYPE3_FONT_STYLE_UNSUPPORTED:", StringComparison.Ordinal))
+        {
+            if (_formattingToolbar != null && _defaultToolbarEditor != null)
+                _formattingToolbar.Target = _defaultToolbarEditor;
+            EditorStatusText.Text = ex.Message["TYPE3_FONT_STYLE_UNSUPPORTED:".Length..].Trim();
+        }
         catch (Exception ex)
         {
             if (_formattingToolbar != null && _defaultToolbarEditor != null)
@@ -2080,6 +2120,19 @@ public partial class EditorWindow : Window
             run.IsBold == originalBold &&
             run.IsItalic == originalItalic;
 
+        if (!preserveEmbeddedFace &&
+            IsType3FontResourceName(originalFontName) &&
+            string.Equals(
+                NormalizePdfFontFamily(fontFamily),
+                NormalizePdfFontFamily(originalFontName),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "TYPE3_FONT_STYLE_UNSUPPORTED: Esta página usa uma fonte Type 3 (" +
+                $"{originalFontName}), cujos glifos são desenhos incorporados ao PDF e não possuem uma face Bold/Italic TrueType para substituição automática. " +
+                "Para editar este trecho, escolha explicitamente outra família de fonte na barra de formatação. O arquivo não foi alterado.");
+        }
+
         if (!preserveEmbeddedFace)
         {
             try
@@ -2163,6 +2216,10 @@ public partial class EditorWindow : Window
         if (run.FontSize > 0)
             state.FontSize = (float)run.FontSize;
     }
+
+    private static bool IsType3FontResourceName(string? fontName) =>
+        !string.IsNullOrWhiteSpace(fontName) &&
+        fontName.StartsWith("T3Font_", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsStandard14Family(string family)
     {
