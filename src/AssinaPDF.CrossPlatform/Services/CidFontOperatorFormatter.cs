@@ -196,15 +196,38 @@ internal static class CidFontOperatorFormatter
             operatorText.Length % 2 != 0)
             return Fail("A sequência de glifos não corresponde aos bytes do operador TJ.", out reason);
 
-        int startGlyph = encodedOffset / 2;
-        int targetGlyphCount = encodedTarget.Length / 2;
-        if (startGlyph < 0 || targetGlyphCount <= 0 ||
-            startGlyph + targetGlyphCount > glyphs.Length)
-            return Fail("O intervalo CID está fora dos limites do operador TJ.", out reason);
+        // TJ.Text is a serialized CID byte string, but GlyphPositions is a
+        // glyph array. Do not convert a UTF-16 string offset to a glyph index
+        // by dividing by two: Aspose can expose glyph chunks whose Text length
+        // differs from the assumed two-character width. Resolve both ends of
+        // the selected byte range against actual glyph boundaries instead.
+        int startGlyph = -1;
+        int endGlyph = -1;
+        int textOffset = 0;
+        int selectedTextEnd = encodedOffset + encodedTarget.Length;
+        for (int index = 0; index < glyphs.Length; index++)
+        {
+            int glyphStart = textOffset;
+            textOffset += glyphs[index].Text?.Length ?? 0;
+            int glyphEnd = textOffset;
 
+            if (glyphStart == encodedOffset)
+                startGlyph = index;
+            if (glyphEnd == selectedTextEnd)
+                endGlyph = index + 1;
+        }
+
+        if (startGlyph < 0 || endGlyph <= startGlyph || endGlyph > glyphs.Length)
+            return Fail(
+                $"O intervalo CID não coincide com limites de glifos do operador TJ " +
+                $"(offset={encodedOffset}, comprimento={encodedTarget.Length}, " +
+                $"texto={operatorText.Length}, glifos={glyphs.Length}).",
+                out reason);
+
+        int targetGlyphCount = endGlyph - startGlyph;
         GlyphPosition[] prefix = glyphs.Take(startGlyph).Select(CloneGlyph).ToArray();
         GlyphPosition[] selected = glyphs.Skip(startGlyph).Take(targetGlyphCount).Select(CloneGlyph).ToArray();
-        GlyphPosition[] suffix = glyphs.Skip(startGlyph + targetGlyphCount).Select(CloneGlyph).ToArray();
+        GlyphPosition[] suffix = glyphs.Skip(endGlyph).Select(CloneGlyph).ToArray();
 
         if (!string.Equals(
                 string.Concat(selected.Select(glyph => glyph.Text)),
