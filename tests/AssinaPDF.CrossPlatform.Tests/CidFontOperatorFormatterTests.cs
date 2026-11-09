@@ -194,9 +194,9 @@ public sealed class CidFontOperatorFormatterTests
                 BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(method);
 
-            object?[] arguments = { document, pageNumber, fragment, null };
+            object?[] arguments = { document, pageNumber, fragment, null, null };
             bool applied = (bool)method!.Invoke(null, arguments)!;
-            string reason = arguments[3]?.ToString() ?? "(sem diagnóstico)";
+            string reason = arguments[4]?.ToString() ?? "(sem diagnóstico)";
             _output.WriteLine($"SYNTHETIC CID ITALIC: RESULT={applied}; DETAIL={reason}");
             Assert.True(applied, reason);
 
