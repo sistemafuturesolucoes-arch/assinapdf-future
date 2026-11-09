@@ -177,6 +177,9 @@ internal static class CidFontOperatorFormatter
         return true;
     }
 
+    internal static bool IsBoldFace(Font? font) =>
+        ReadEmbeddedTrueTypeWeight(font) is >= 600;
+
     private static bool TryFindOperator(
         Page page,
         string sourceResource,
@@ -239,27 +242,24 @@ internal static class CidFontOperatorFormatter
         out string encoded,
         out string reason)
     {
-        var unicodeToCid = new Dictionary<string, ushort>(StringComparer.Ordinal);
-        foreach (var item in cidToUnicode)
-        {
-            if (!unicodeToCid.TryAdd(item.Value, item.Key))
-            {
-                encoded = string.Empty;
-                reason = "O mapa ToUnicode contém caracteres duplicados e não permite codificação inequívoca.";
-                return false;
-            }
-        }
-
         var builder = new StringBuilder(text.Length * 2);
         foreach (char character in text)
         {
-            if (!unicodeToCid.TryGetValue(character.ToString(), out ushort cid))
+            var matchingCids = cidToUnicode
+                .Where(item => string.Equals(item.Value, character.ToString(), StringComparison.Ordinal))
+                .Select(item => item.Key)
+                .Take(2)
+                .ToArray();
+            if (matchingCids.Length != 1)
             {
                 encoded = string.Empty;
-                reason = $"O mapa ToUnicode não contém o caractere U+{(int)character:X4}.";
+                reason = matchingCids.Length == 0
+                    ? $"O mapa ToUnicode não contém o caractere U+{(int)character:X4}."
+                    : $"O mapa ToUnicode possui mais de um CID para U+{(int)character:X4}.";
                 return false;
             }
 
+            ushort cid = matchingCids[0];
             builder.Append((char)(cid >> 8));
             builder.Append((char)(cid & 0xFF));
         }
