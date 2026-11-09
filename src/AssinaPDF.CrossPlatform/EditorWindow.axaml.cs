@@ -1248,6 +1248,7 @@ public partial class EditorWindow : Window
             var formattingTrace = new List<string>();
             ApplyPdfEdit(document =>
             {
+                bool cidFontSwapApplied = false;
                 TextFragment target;
                 if (originalBounds != null && originalText != null)
                 {
@@ -1283,7 +1284,6 @@ public partial class EditorWindow : Window
                     if (target == null || closest > 8.0)
                         throw new InvalidOperationException("O texto selecionado não foi localizado novamente no PDF.");
 
-                    bool cidFontSwapApplied = false;
                     if (cidBoldOnlyEdit)
                     {
                         cidFontSwapApplied = CidFontOperatorFormatter.TryApplyBoldVariant(
