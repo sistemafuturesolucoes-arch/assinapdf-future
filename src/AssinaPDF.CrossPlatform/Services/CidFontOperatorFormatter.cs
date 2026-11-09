@@ -35,6 +35,21 @@ internal static class CidFontOperatorFormatter
         Document document,
         int pageNumber,
         TextFragment target,
+        out string reason) =>
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, out reason);
+
+    internal static bool TryApplySyntheticBoldFallback(
+        Document document,
+        int pageNumber,
+        TextFragment target,
+        out string reason) =>
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: true, out reason);
+
+    private static bool TryApplyBoldVariantCore(
+        Document document,
+        int pageNumber,
+        TextFragment target,
+        bool forceSyntheticBold,
         out string reason)
     {
         reason = string.Empty;
@@ -77,47 +92,49 @@ internal static class CidFontOperatorFormatter
 
         var page = document.Pages[pageNumber];
         var boldCandidates = new List<Font>();
-        foreach (Font candidate in page.Resources.Fonts)
+        if (!forceSyntheticBold)
         {
-            if (string.Equals(candidate.ResourceName, sourceFont.ResourceName, StringComparison.Ordinal) ||
-                !candidate.IsCid ||
-                !candidate.IsEmbedded ||
-                !string.Equals(candidate.Encoding?.ToString(), "Identity-H", StringComparison.OrdinalIgnoreCase) ||
-                string.IsNullOrWhiteSpace(candidate.ResourceName))
-                continue;
-
-            ushort? weight = ReadEmbeddedTrueTypeWeight(candidate);
-            if (weight is null || weight.Value < 600)
-                continue;
-
-            if (!HasIdentityCidToGidMap(candidate) ||
-                !TryReadToUnicodeMap(candidate, out var candidateMap, out _))
-                continue;
-
-            bool sameMappings = true;
-            foreach (char character in target.Text)
+            foreach (Font candidate in page.Resources.Fonts)
             {
-                if (!TryFindCid(sourceMap, character.ToString(), out ushort sourceCid) ||
-                    !candidateMap.TryGetValue(sourceCid, out string? candidateUnicode) ||
-                    !string.Equals(candidateUnicode, character.ToString(), StringComparison.Ordinal))
-                {
-                    sameMappings = false;
-                    break;
-                }
-            }
+                if (string.Equals(candidate.ResourceName, sourceFont.ResourceName, StringComparison.Ordinal) ||
+                    !candidate.IsCid ||
+                    !candidate.IsEmbedded ||
+                    !string.Equals(candidate.Encoding?.ToString(), "Identity-H", StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(candidate.ResourceName))
+                    continue;
 
-            if (sameMappings)
-                boldCandidates.Add(candidate);
+                ushort? weight = ReadEmbeddedTrueTypeWeight(candidate);
+                if (weight is null || weight.Value < 600)
+                    continue;
+
+                if (!HasIdentityCidToGidMap(candidate) ||
+                    !TryReadToUnicodeMap(candidate, out var candidateMap, out _))
+                    continue;
+
+                bool sameMappings = true;
+                foreach (char character in target.Text)
+                {
+                    if (!TryFindCid(sourceMap, character.ToString(), out ushort sourceCid) ||
+                        !candidateMap.TryGetValue(sourceCid, out string? candidateUnicode) ||
+                        !string.Equals(candidateUnicode, character.ToString(), StringComparison.Ordinal))
+                    {
+                        sameMappings = false;
+                        break;
+                    }
+                }
+
+                if (sameMappings)
+                    boldCandidates.Add(candidate);
+            }
         }
 
-        if (boldCandidates.Count != 1)
+        if (boldCandidates.Count > 1)
             return Fail(
-                boldCandidates.Count == 0
-                    ? "Não foi encontrada uma fonte CID Bold incorporada com o mesmo mapa de caracteres."
-                    : "Há mais de uma fonte CID Bold compatível; a troca foi cancelada por ambiguidade.",
+                "Há mais de uma fonte CID Bold compatível; a troca foi cancelada por ambiguidade.",
                 out reason);
 
-        Font boldFont = boldCandidates[0];
+        Font? boldFont = boldCandidates.SingleOrDefault();
+        bool syntheticBold = boldFont == null;
         if (!HasIdentityCidToGidMap(sourceFont))
             return Fail("A fonte CID de origem não utiliza CIDToGIDMap Identity.", out reason);
 
@@ -160,15 +177,36 @@ internal static class CidFontOperatorFormatter
                 StringComparison.Ordinal))
             return Fail("Os glifos selecionados não correspondem exatamente ao texto solicitado.", out reason);
 
-        var replacementOperators = new List<Aspose.Pdf.Operator>(5);
+        var replacementOperators = new List<Aspose.Pdf.Operator>(10);
         if (prefix.Length > 0)
             replacementOperators.Add(new SetGlyphsPositionShowText(prefix));
 
-        replacementOperators.Add(new SelectFont(boldFont.ResourceName!, fontSize));
+        if (syntheticBold)
+        {
+            // When the PDF has no matching embedded CID bold face, keep its
+            // original CID font and glyph codes. Fill-and-stroke paints the
+            // same embedded glyph outlines with a small pen, producing a
+            // synthetic bold without substituting Arial or rebuilding text.
+            Aspose.Pdf.Color foreground =
+                segments[0].TextState.ForegroundColor ?? Aspose.Pdf.Color.FromRgb(0, 0, 0);
+            double strokeWidth = Math.Clamp(fontSize * 0.035, 0.20, 0.65);
+            replacementOperators.Add(new GSave());
+            replacementOperators.Add(new SetTextRenderingMode(2));
+            replacementOperators.Add(new SetLineWidth(strokeWidth));
+            replacementOperators.Add(new SetRGBColorStroke(
+                foreground.R / 255d, foreground.G / 255d, foreground.B / 255d));
+        }
+        else
+        {
+            replacementOperators.Add(new SelectFont(boldFont!.ResourceName!, fontSize));
+        }
+
         replacementOperators.Add(new SetGlyphsPositionShowText(selected));
 
-        // Restore the original face after the selected text even when the
-        // selected run is the final content in the original TJ operator.
+        // Restore the graphics/text state and the original face after the
+        // selected run; adjacent glyphs retain their original appearance.
+        if (syntheticBold)
+            replacementOperators.Add(new GRestore());
         replacementOperators.Add(new SelectFont(sourceFont.ResourceName!, fontSize));
         if (suffix.Length > 0)
             replacementOperators.Add(new SetGlyphsPositionShowText(suffix));
@@ -176,8 +214,12 @@ internal static class CidFontOperatorFormatter
         page.Contents.Delete(operatorIndex);
         page.Contents.Insert(operatorIndex, replacementOperators.ToArray());
 
-        reason = $"Fonte CID Regular {sourceFont.ResourceName} substituída por Bold {boldFont.ResourceName}; " +
-                 $"{targetGlyphCount} glifos preservados e {prefix.Length + suffix.Length} glifos adjacentes mantidos.";
+        reason = syntheticBold
+            ? $"Negrito sintético aplicado sobre a fonte CID incorporada {sourceFont.ResourceName}; " +
+              $"traço de {strokeWidth:0.###} pt; {targetGlyphCount} glifos preservados e " +
+              $"{prefix.Length + suffix.Length} glifos adjacentes mantidos."
+            : $"Fonte CID Regular {sourceFont.ResourceName} substituída por Bold {boldFont!.ResourceName}; " +
+              $"{targetGlyphCount} glifos preservados e {prefix.Length + suffix.Length} glifos adjacentes mantidos.";
         return true;
     }
 
