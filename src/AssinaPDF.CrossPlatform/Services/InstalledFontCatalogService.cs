@@ -153,7 +153,6 @@ internal static class InstalledFontCatalogService
         if (normalizedFamily.Length < 2)
             return Array.Empty<string>();
 
-        string prefix = normalizedFamily[..Math.Min(4, normalizedFamily.Length)];
         string windowsFonts = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
