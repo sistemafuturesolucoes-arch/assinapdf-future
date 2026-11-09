@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Aspose.Pdf;
 using Aspose.Pdf.Facades;
 using Aspose.Pdf.Text;
@@ -19,7 +20,7 @@ public sealed class PdfCidBoldReplacementPocTests
     }
 
     [Fact]
-    public void ReplaceTextWithExplicitBoldFont_PersistsAfterSaveAndReopen()
+    public void ReplaceRegularCidTextWithExplicitBoldFont_EmbedsBoldProgramAfterSaveAndReopen()
     {
         // Opt-in: define ASSINAPDF_CID_TEST_PDF to run against the real sample PDF.
         var inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
@@ -31,7 +32,9 @@ public sealed class PdfCidBoldReplacementPocTests
 
         Assert.True(File.Exists(inputPath), $"PDF de teste não encontrado: {inputPath}");
 
-        const string targetText = "SóCheque";
+        // This phrase is regular Arial in the supplied sample PDF. "SóCheque"
+        // is already Arial Bold there, so it is not a valid target for this test.
+        const string targetText = "Informações de Cheques Sem Fundos do Banco Central";
         var outputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_OUTPUT");
         if (string.IsNullOrWhiteSpace(outputPath))
         {
@@ -58,11 +61,16 @@ public sealed class PdfCidBoldReplacementPocTests
             fontSize = sourceFragment.TextState.FontSize;
             foregroundColor = sourceFragment.TextState.ForegroundColor;
 
+            ushort? sourceWeight = ReadEmbeddedTrueTypeWeight(sourceFragment.TextState.Font);
             _output.WriteLine(
                 $"ANTES: página={pageNumber}; texto='{sourceFragment.Text}'; " +
                 $"fonte='{sourceFragment.TextState.Font?.FontName}'; " +
-                $"base='{sourceFragment.TextState.Font?.BaseFont}'; " +
-                $"bold={sourceFragment.TextState.IsBold}; tamanho={fontSize}");
+                $"recurso='{sourceFragment.TextState.Font?.ResourceName}'; " +
+                $"IsBold={sourceFragment.TextState.IsBold}; peso TTF OS/2={sourceWeight?.ToString() ?? "indisponível"}");
+
+            Assert.True(
+                sourceWeight is >= 350 and <= 500,
+                $"O trecho de teste não parece regular. Peso TTF encontrado: {sourceWeight?.ToString() ?? "indisponível"}.");
 
             var boldFont = FontRepository.FindFont("Arial", FontStyles.Bold);
             Assert.NotNull(boldFont);
@@ -101,19 +109,67 @@ public sealed class PdfCidBoldReplacementPocTests
             Assert.NotNull(savedFragment);
 
             var savedFont = savedFragment!.TextState.Font;
+            ushort? savedWeight = ReadEmbeddedTrueTypeWeight(savedFont);
+
             _output.WriteLine(
                 $"DEPOIS: arquivo='{outputPath}'; página={savedFragment.Page.Number}; " +
                 $"texto='{savedFragment.Text}'; fonte='{savedFont?.FontName}'; " +
-                $"base='{savedFont?.BaseFont}'; boldState={savedFragment.TextState.IsBold}; " +
-                $"boldFont={savedFont?.IsBold}; embedded={savedFont?.IsEmbedded}; " +
+                $"recurso='{savedFont?.ResourceName}'; IsBold={savedFragment.TextState.IsBold}; " +
+                $"Font.IsBold={savedFont?.IsBold}; embedded={savedFont?.IsEmbedded}; " +
+                $"peso TTF OS/2={savedWeight?.ToString() ?? "indisponível"}; " +
                 $"tamanho={savedFragment.TextState.FontSize}");
 
             Assert.Equal(targetText, savedFragment.Text);
             Assert.True(
-                savedFragment.TextState.IsBold || savedFont?.IsBold == true,
-                "O PDF foi salvo/reaberto, mas o fragmento não foi reconhecido como negrito.");
+                savedWeight >= 600,
+                $"O PDF foi salvo/reaberto, mas a fonte incorporada não é negrito. Peso TTF OS/2: {savedWeight?.ToString() ?? "indisponível"}.");
         }
 
-        _output.WriteLine("POC aprovada: o negrito persistiu após salvar e reabrir o PDF.");
+        _output.WriteLine("POC aprovada: o programa de fonte Bold permaneceu incorporado após salvar e reabrir o PDF.");
     }
+
+    private static ushort? ReadEmbeddedTrueTypeWeight(Font? font)
+    {
+        if (font == null)
+            return null;
+
+        using var stream = new MemoryStream();
+        font.Save(stream);
+        byte[] data = stream.ToArray();
+
+        // TrueType/OpenType sfnt header: 12 bytes, followed by 16-byte table records.
+        if (data.Length < 12)
+            return null;
+
+        int tableCount = ReadUInt16BigEndian(data, 4);
+        for (int index = 0; index < tableCount; index++)
+        {
+            int recordOffset = 12 + (index * 16);
+            if (recordOffset + 16 > data.Length)
+                return null;
+
+            string tag = Encoding.ASCII.GetString(data, recordOffset, 4);
+            if (!string.Equals(tag, "OS/2", StringComparison.Ordinal))
+                continue;
+
+            uint tableOffset = ReadUInt32BigEndian(data, recordOffset + 8);
+            uint tableLength = ReadUInt32BigEndian(data, recordOffset + 12);
+            if (tableLength < 6 || tableOffset + 6 > data.Length)
+                return null;
+
+            // OS/2: version (2), xAvgCharWidth (2), usWeightClass (2).
+            return ReadUInt16BigEndian(data, checked((int)tableOffset + 4));
+        }
+
+        return null;
+    }
+
+    private static int ReadUInt16BigEndian(byte[] data, int offset) =>
+        (data[offset] << 8) | data[offset + 1];
+
+    private static uint ReadUInt32BigEndian(byte[] data, int offset) =>
+        ((uint)data[offset] << 24) |
+        ((uint)data[offset + 1] << 16) |
+        ((uint)data[offset + 2] << 8) |
+        data[offset + 3];
 }
