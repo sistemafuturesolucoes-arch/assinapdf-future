@@ -527,6 +527,8 @@ public partial class EditorWindow : Window
             pageImage.PointerPressed += PageImage_PointerPressed;
             pageImage.PointerMoved += PageImage_PointerMoved;
             pageImage.PointerReleased += PageImage_PointerReleased;
+            pageImage.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
+            pageCard.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
             pageImage.ContextMenu = CreateSelectionContextMenu();
             _pageSurfaces[i] = (pageImage, overlay);
             _pageCards[i] = page;
@@ -578,11 +580,47 @@ public partial class EditorWindow : Window
         if (sender is not Button button || button.Tag is not int pageIndex)
             return;
 
-        if (_pageCards.TryGetValue(pageIndex, out Border? pageCard))
-        {
-            pageCard.BringIntoView();
-            EditorStatusText.Text = $"Página {pageIndex + 1} de {_pageCards.Count}.";
-        }
+        ScrollToPage(pageIndex);
+        EditorStatusText.Text = $"Página {pageIndex + 1} de {_pageCards.Count}.";
+    }
+
+    private void ScrollToPage(int pageIndex)
+    {
+        if (!_pageCards.TryGetValue(pageIndex, out Border? pageCard))
+            return;
+
+        // The page cards are direct children of EditorPagesPanel, so their Y
+        // coordinate is the exact vertical offset within the ScrollViewer content.
+        double maxOffset = Math.Max(
+            0,
+            EditorDocumentScrollViewer.Extent.Height -
+            EditorDocumentScrollViewer.Viewport.Height);
+        double targetOffset = Math.Clamp(pageCard.Bounds.Y, 0, maxOffset);
+        EditorDocumentScrollViewer.Offset = new Vector(
+            EditorDocumentScrollViewer.Offset.X, targetOffset);
+    }
+
+    private void EditorDocumentScrollViewer_PointerWheelChanged(
+        object? sender,
+        PointerWheelEventArgs e)
+    {
+        double delta = e.Delta.Y;
+        if (Math.Abs(delta) < 0.001)
+            return;
+
+        double maxOffset = Math.Max(
+            0,
+            EditorDocumentScrollViewer.Extent.Height -
+            EditorDocumentScrollViewer.Viewport.Height);
+        double step = Math.Max(48, EditorDocumentScrollViewer.Viewport.Height * 0.12);
+        double targetOffset = Math.Clamp(
+            EditorDocumentScrollViewer.Offset.Y - (delta * step),
+            0,
+            maxOffset);
+
+        EditorDocumentScrollViewer.Offset = new Vector(
+            EditorDocumentScrollViewer.Offset.X, targetOffset);
+        e.Handled = true;
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
@@ -2195,7 +2233,9 @@ public partial class EditorWindow : Window
                     run.IsBold,
                     run.IsItalic,
                     state.Font?.IsEmbedded == true);
-                bool savedBold = state.IsBold || PdfFontFaceHasStyle(state.Font, bold: true);
+                bool savedBold = state.IsBold ||
+                    PdfFontFaceHasStyle(state.Font, bold: true) ||
+                    state.RenderingMode == Aspose.Pdf.Text.TextRenderingMode.FillThenStrokeText;
                 bool savedItalic = state.IsItalic || PdfFontFaceHasStyle(state.Font, bold: false);
                 if (savedBold != run.IsBold && !unchangedEmbeddedFace)
                 {
