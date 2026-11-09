@@ -226,7 +226,7 @@ internal static class CidFontOperatorFormatter
             // Shear only the selected glyph painting through the current
             // transformation matrix. The text matrix and TJ advances remain
             // unchanged; q/Q restores the original page geometry afterwards.
-            replacementOperators.Add(new ConcatenateMatrix(1, 0, -0.2126, 1, 0, 0));
+            replacementOperators.Add(new ConcatenateMatrix(1, 0, 0.2126, 1, 0, 0));
         }
 
         if (syntheticBold)
