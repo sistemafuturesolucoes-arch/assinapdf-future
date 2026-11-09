@@ -323,6 +323,35 @@ public sealed class PdfCidBoldReplacementPocTests
         var toUnicode = Resolve(toUnicodeRaw);
         _output.WriteLine($"  ToUnicode raw={toUnicodeRaw?.GetType().FullName ?? "null"} resolved={toUnicode?.GetType().FullName ?? "null"}");
         DumpPdfObjectTree(toUnicode, $"{label} ToUnicode stream", 0, new System.Collections.Generic.HashSet<object>(ReferenceEqualityComparer.Instance));
+
+        // Export the stream's actual bytes directly. This avoids parsing reflection
+        // output, which is a formatted diagnostic and not a reliable byte transport.
+        if (toUnicode != null)
+        {
+            var rawDataProperty = toUnicode.GetType().GetProperty("RawData", flags);
+            var rawData = rawDataProperty?.GetValue(toUnicode) as byte[];
+            if (rawData == null)
+            {
+                for (var current = toUnicode.GetType(); current != null && rawData == null; current = current.BaseType)
+                {
+                    var rawDataField = current.GetField("<RawData>k__BackingField", flags | System.Reflection.BindingFlags.DeclaredOnly);
+                    rawData = rawDataField?.GetValue(toUnicode) as byte[];
+                }
+            }
+
+            var resourceName = label.Replace("RESOLVED ", "", StringComparison.Ordinal).Trim();
+            if (rawData != null)
+            {
+                var outputPath = Path.Combine(Path.GetTempPath(), $"AssinaPDF-CID-{resourceName}-ToUnicode.bin");
+                File.WriteAllBytes(outputPath, rawData);
+                _output.WriteLine($"TOUNICODE-BINARY {resourceName}: bytes={rawData.Length}; sha256={Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(rawData))}; path={outputPath}");
+                _output.WriteLine($"TOUNICODE-ASCII {resourceName}: {Encoding.ASCII.GetString(rawData, 0, Math.Min(rawData.Length, 100)).Replace("\\r", " ").Replace("\\n", " ")}");
+            }
+            else
+            {
+                _output.WriteLine($"TOUNICODE-BINARY {resourceName}: RawData byte[] não localizado.");
+            }
+        }
     }
 
     private void DumpPublicScalarProperties(object? instance, string label)
