@@ -1256,7 +1256,15 @@ public partial class EditorWindow : Window
                     // que deixarem de ser referenciados após a substituição.
                     target.TextEditOptions = new TextEditOptions(
                         TextEditOptions.FontReplace.RemoveUnusedFonts);
-                    target.Text = replacementText;
+                    // Não regrave o conteúdo quando o usuário alterou apenas a formatação.
+                    // Em PDFs com fontes CID/Type0, atribuir o mesmo texto novamente faz
+                    // o Aspose reconstruir os operadores Tj/TJ antes da troca de fonte.
+                    // Isso pode deixar o fluxo ainda apontando para o recurso CID regular,
+                    // embora TextState.Font passe a indicar Arial Bold em memória.
+                    // Preserve os bytes/operadores originais nesses casos para que
+                    // TextStateModifier.ModifyFont consiga localizar e reencodar o run.
+                    if (!string.Equals(target.Text, replacementText, StringComparison.Ordinal))
+                        target.Text = replacementText;
                 }
                 else
                 {
