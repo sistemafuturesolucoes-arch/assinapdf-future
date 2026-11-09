@@ -45,8 +45,6 @@ public sealed class PdfCidBoldReplacementPocTests
         Assert.NotEqual(Path.GetFullPath(inputPath), Path.GetFullPath(outputPath));
 
         int pageNumber;
-        float fontSize;
-        Aspose.Pdf.Color? foregroundColor;
 
         using (var sourceDocument = new Document(inputPath))
         {
@@ -57,8 +55,6 @@ public sealed class PdfCidBoldReplacementPocTests
             Assert.NotNull(sourceFragment);
 
             pageNumber = sourceFragment!.Page.Number;
-            fontSize = sourceFragment.TextState.FontSize;
-            foregroundColor = sourceFragment.TextState.ForegroundColor;
 
             ushort? sourceWeight = ReadEmbeddedTrueTypeWeight(sourceFragment.TextState.Font);
             _output.WriteLine(
