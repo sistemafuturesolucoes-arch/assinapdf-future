@@ -1645,6 +1645,16 @@ public partial class EditorWindow : Window
         // every not-yet-edited segment keeps its original source position.
         foreach (var item in segmentsToFormat.OrderByDescending(item => item.Start))
         {
+            // As opções no TextFragment não são necessariamente herdadas pelos
+            // TextSegment que o Aspose reescreve individualmente. Configure também
+            // o segmento físico para que a substituição por cobertura de glifos seja
+            // aplicada exatamente ao trecho cujo TextState está sendo alterado.
+            item.Segment.TextEditOptions = new TextEditOptions(
+                TextEditOptions.FontReplace.RemoveUnusedFonts)
+            {
+                NoCharacterBehavior = TextEditOptions.NoCharacterAction.ReplaceFonts
+            };
+
             ApplyRunStyle(
                 item.Segment.TextState,
                 orderedRuns[item.RunIndex],
