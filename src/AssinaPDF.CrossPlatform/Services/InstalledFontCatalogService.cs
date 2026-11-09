@@ -142,6 +142,65 @@ internal static class InstalledFontCatalogService
             .ToArray();
     }
 
+    /// <summary>
+    /// Returns physical TTF/OTF files whose filenames may belong to the requested
+    /// family. The final family/style decision is made from the font program's
+    /// internal names after FontRepository.OpenFont, not from the filename alone.
+    /// </summary>
+    internal static IReadOnlyList<string> GetCandidateFontFiles(string familyName)
+    {
+        string normalizedFamily = NormalizeFontFileToken(familyName);
+        if (normalizedFamily.Length < 2)
+            return Array.Empty<string>();
+
+        string prefix = normalizedFamily[..Math.Min(4, normalizedFamily.Length)];
+        string windowsFonts = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        var directories = BuildCandidateDirectories(
+            OperatingSystem.IsWindows(),
+            OperatingSystem.IsMacOS(),
+            windowsFonts,
+            localAppData,
+            userProfile).ToList();
+
+        if (!string.IsNullOrWhiteSpace(localAppData))
+            directories.Add(Path.Combine(localAppData, "FutureSolucoes", "AssinaPDF", "Fonts"));
+
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string directory in directories.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!Directory.Exists(directory))
+                continue;
+
+            try
+            {
+                foreach (string file in Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly))
+                {
+                    string extension = Path.GetExtension(file);
+                    if (!extension.Equals(".ttf", StringComparison.OrdinalIgnoreCase) &&
+                        !extension.Equals(".otf", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string token = NormalizeFontFileToken(Path.GetFileNameWithoutExtension(file));
+                    if (token.Contains(prefix, StringComparison.Ordinal))
+                        files.Add(file);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"AssinaPDF: não foi possível enumerar fontes em '{directory}': {ex.Message}");
+            }
+        }
+
+        return files.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    internal static string NormalizeFontFileToken(string? value) =>
+        new((value ?? string.Empty).Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant).ToArray());
+
     private static void AddIfNotBlank(ICollection<string> paths, string? path)
     {
         if (!string.IsNullOrWhiteSpace(path))
