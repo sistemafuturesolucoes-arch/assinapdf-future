@@ -36,20 +36,52 @@ internal static class CidFontOperatorFormatter
         int pageNumber,
         TextFragment target,
         out string reason) =>
-        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, out reason);
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: false, out reason);
 
     internal static bool TryApplySyntheticBoldFallback(
         Document document,
         int pageNumber,
         TextFragment target,
         out string reason) =>
-        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: true, out reason);
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: true, forceSyntheticItalic: false, out reason);
+
+    internal static bool TryApplySyntheticItalicFallback(
+        Document document,
+        int pageNumber,
+        TextFragment target,
+        out string reason) =>
+        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: true, out reason);
+
+    internal static bool HasSyntheticItalicOperator(Page page)
+    {
+        bool insideSavedGraphicsState = false;
+        foreach (Aspose.Pdf.Operator operation in page.Contents)
+        {
+            if (operation is GSave)
+            {
+                insideSavedGraphicsState = true;
+                continue;
+            }
+
+            if (insideSavedGraphicsState &&
+                operation is ConcatenateMatrix matrix &&
+                Math.Abs(matrix.Matrix.C) >= 0.05 &&
+                Math.Abs(matrix.Matrix.B) < 0.0001)
+                return true;
+
+            if (operation is GRestore)
+                insideSavedGraphicsState = false;
+        }
+
+        return false;
+    }
 
     private static bool TryApplyBoldVariantCore(
         Document document,
         int pageNumber,
         TextFragment target,
         bool forceSyntheticBold,
+        bool forceSyntheticItalic,
         out string reason)
     {
         reason = string.Empty;
@@ -79,8 +111,8 @@ internal static class CidFontOperatorFormatter
             return Fail("O trecho utiliza mais de um recurso de fonte; a troca segmentada não é segura.", out reason);
 
         ushort? sourceWeight = ReadEmbeddedTrueTypeWeight(sourceFont);
-        if (sourceWeight is null || sourceWeight.Value < 350 || sourceWeight.Value > 500)
-            return Fail("Não foi possível confirmar que a fonte CID de origem é Regular.", out reason);
+        if (sourceWeight is null || sourceWeight.Value < 100 || sourceWeight.Value > 900)
+            return Fail("Não foi possível identificar o peso da fonte CID incorporada.", out reason);
 
         if (!TryReadToUnicodeMap(sourceFont, out var sourceMap, out string cmapDiagnostic))
             return Fail(
@@ -92,7 +124,7 @@ internal static class CidFontOperatorFormatter
 
         var page = document.Pages[pageNumber];
         var boldCandidates = new List<Font>();
-        if (!forceSyntheticBold)
+        if (!forceSyntheticBold && sourceWeight.Value < 600)
         {
             foreach (Font candidate in page.Resources.Fonts)
             {
@@ -134,7 +166,8 @@ internal static class CidFontOperatorFormatter
                 out reason);
 
         Font? boldFont = boldCandidates.SingleOrDefault();
-        bool syntheticBold = boldFont == null;
+        bool syntheticBold = sourceWeight.Value < 600 && (forceSyntheticBold || boldFont == null);
+        bool syntheticItalic = forceSyntheticItalic;
         if (!HasIdentityCidToGidMap(sourceFont))
             return Fail("A fonte CID de origem não utiliza CIDToGIDMap Identity.", out reason);
 
@@ -177,7 +210,7 @@ internal static class CidFontOperatorFormatter
                 StringComparison.Ordinal))
             return Fail("Os glifos selecionados não correspondem exatamente ao texto solicitado.", out reason);
 
-        var replacementOperators = new List<Aspose.Pdf.Operator>(10);
+        var replacementOperators = new List<Aspose.Pdf.Operator>(12);
         double strokeWidth = syntheticBold
             ? Math.Clamp(fontSize * 0.035, 0.20, 0.65)
             : 0;
@@ -185,30 +218,39 @@ internal static class CidFontOperatorFormatter
         if (prefix.Length > 0)
             replacementOperators.Add(new SetGlyphsPositionShowText(prefix));
 
+        if (syntheticBold || syntheticItalic)
+            replacementOperators.Add(new GSave());
+
+        if (syntheticItalic)
+        {
+            // Shear only the selected glyph painting through the current
+            // transformation matrix. The text matrix and TJ advances remain
+            // unchanged; q/Q restores the original page geometry afterwards.
+            replacementOperators.Add(new ConcatenateMatrix(1, 0, -0.2126, 1, 0, 0));
+        }
+
         if (syntheticBold)
         {
-            // When the PDF has no matching embedded CID bold face, keep its
-            // original CID font and glyph codes. Fill-and-stroke paints the
-            // same embedded glyph outlines with a small pen, producing a
+            // Keep the original CID font and glyph codes. Fill-and-stroke paints
+            // the same embedded glyph outlines with a small pen, producing a
             // synthetic bold without substituting Arial or rebuilding text.
             Aspose.Pdf.Color foreground =
                 segments[0].TextState.ForegroundColor ?? Aspose.Pdf.Color.FromRgb(0, 0, 0);
-            replacementOperators.Add(new GSave());
             replacementOperators.Add(new SetTextRenderingMode(2));
             replacementOperators.Add(new SetLineWidth(strokeWidth));
             replacementOperators.Add(new SetRGBColorStroke(
                 foreground.R / 255d, foreground.G / 255d, foreground.B / 255d));
         }
-        else
+        else if (boldFont != null)
         {
-            replacementOperators.Add(new SelectFont(boldFont!.ResourceName!, fontSize));
+            replacementOperators.Add(new SelectFont(boldFont.ResourceName!, fontSize));
         }
 
         replacementOperators.Add(new SetGlyphsPositionShowText(selected));
 
-        // Restore the graphics/text state and the original face after the
-        // selected run; adjacent glyphs retain their original appearance.
-        if (syntheticBold)
+        // Restore the graphics state and original face after the selected run;
+        // adjacent glyphs retain their original appearance and positioning.
+        if (syntheticBold || syntheticItalic)
             replacementOperators.Add(new GRestore());
         replacementOperators.Add(new SelectFont(sourceFont.ResourceName!, fontSize));
         if (suffix.Length > 0)
@@ -217,12 +259,17 @@ internal static class CidFontOperatorFormatter
         page.Contents.Delete(operatorIndex);
         page.Contents.Insert(operatorIndex, replacementOperators.ToArray());
 
-        reason = syntheticBold
-            ? $"Negrito sintético aplicado sobre a fonte CID incorporada {sourceFont.ResourceName}; " +
-              $"traço de {strokeWidth:0.###} pt; {targetGlyphCount} glifos preservados e " +
-              $"{prefix.Length + suffix.Length} glifos adjacentes mantidos."
-            : $"Fonte CID Regular {sourceFont.ResourceName} substituída por Bold {boldFont!.ResourceName}; " +
-              $"{targetGlyphCount} glifos preservados e {prefix.Length + suffix.Length} glifos adjacentes mantidos.";
+        string boldDiagnostic = syntheticBold
+            ? $"negrito sintético (traço {strokeWidth:0.###} pt)"
+            : boldFont != null
+                ? $"variante CID Bold {boldFont.ResourceName}"
+                : "peso Bold original preservado";
+        string italicDiagnostic = syntheticItalic
+            ? "itálico sintético (inclinação 12°)"
+            : "sem alteração de itálico";
+        reason = $"Estilo CID aplicado: {boldDiagnostic}; {italicDiagnostic}; " +
+                 $"{targetGlyphCount} glifos preservados e " +
+                 $"{prefix.Length + suffix.Length} glifos adjacentes mantidos.";
         return true;
     }
 
