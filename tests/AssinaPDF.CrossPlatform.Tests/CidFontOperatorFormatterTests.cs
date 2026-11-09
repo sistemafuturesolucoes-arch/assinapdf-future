@@ -104,7 +104,6 @@ public sealed class CidFontOperatorFormatterTests
             File.Delete(outputPath);
 
         int pageNumber;
-        ushort? originalWeight = null;
         using (var document = new Document(inputPath))
         {
             var absorber = new TextFragmentAbsorber(targetText);
@@ -180,6 +179,7 @@ public sealed class CidFontOperatorFormatterTests
             File.Delete(outputPath);
 
         int pageNumber;
+        ushort? originalWeight = null;
         using (var document = new Document(inputPath))
         {
             var absorber = new TextFragmentAbsorber(targetText);
