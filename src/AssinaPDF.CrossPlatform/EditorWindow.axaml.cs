@@ -1956,41 +1956,12 @@ public partial class EditorWindow : Window
         bool wantsBold,
         bool wantsItalic)
     {
-        string requested = InstalledFontCatalogService.NormalizeFontFileToken(requestedFamily);
-        if (requested.Length == 0)
-            return false;
-
-        string[] names = { font.BaseFont, font.FontName, font.DecodedFontName };
+        string?[] names = { font.BaseFont, font.FontName, font.DecodedFontName };
         foreach (string? name in names)
         {
-            string normalized = InstalledFontCatalogService.NormalizeFontFileToken(name);
-            if (!normalized.StartsWith(requested, StringComparison.Ordinal))
-                continue;
-
-            string suffix = normalized[requested.Length..];
-            // Common PostScript foundry suffixes are not style indicators.
-            suffix = suffix.TrimEnd();
-            if (suffix.EndsWith("mt", StringComparison.Ordinal))
-                suffix = suffix[..^2];
-            if (suffix.EndsWith("ps", StringComparison.Ordinal))
-                suffix = suffix[..^2];
-
-            bool hasBoldMarker =
-                suffix.Contains("bold", StringComparison.Ordinal) ||
-                suffix.Contains("semibold", StringComparison.Ordinal) ||
-                suffix.Contains("demibold", StringComparison.Ordinal) ||
-                suffix.Contains("black", StringComparison.Ordinal) ||
-                suffix.Contains("heavy", StringComparison.Ordinal);
-            bool hasItalicMarker =
-                suffix.Contains("italic", StringComparison.Ordinal) ||
-                suffix.Contains("oblique", StringComparison.Ordinal) ||
-                suffix.Contains("kursiv", StringComparison.Ordinal);
-
-            bool hasExplicitStyle = hasBoldMarker || hasItalicMarker;
-            bool actualBold = hasExplicitStyle ? hasBoldMarker : font.IsBold;
-            bool actualItalic = hasExplicitStyle ? hasItalicMarker : font.IsItalic;
-
-            if (actualBold == wantsBold && actualItalic == wantsItalic)
+            if (InstalledFontCatalogService.FontNameMatchesRequestedStyle(
+                    name, requestedFamily, wantsBold, wantsItalic,
+                    font.IsBold, font.IsItalic))
                 return true;
         }
 
