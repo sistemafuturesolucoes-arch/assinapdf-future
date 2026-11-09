@@ -443,7 +443,7 @@ public partial class EditorWindow : Window
                                 {
                                     HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
                                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch,
-                                    IsHitTestVisible = true
+                                    IsHitTestVisible = false
                                 }
                             }
                         }
@@ -459,8 +459,8 @@ public partial class EditorWindow : Window
             pageImage.PointerPressed += PageImage_PointerPressed;
             pageImage.PointerMoved += PageImage_PointerMoved;
             pageImage.PointerReleased += PageImage_PointerReleased;
-            pageImage.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
-            page.PointerWheelChanged += EditorDocumentScrollViewer_PointerWheelChanged;
+            // A roda do mouse deve ser tratada pelo ScrollViewer ancestral.
+            // Não interceptar o evento na imagem/cartão, pois isso bloqueia a rolagem nativa.
             pageImage.ContextMenu = CreateSelectionContextMenu();
             _pageSurfaces[i] = (pageImage, overlay);
             _pageCards[i] = page;
@@ -521,38 +521,10 @@ public partial class EditorWindow : Window
         if (!_pageCards.TryGetValue(pageIndex, out Border? pageCard))
             return;
 
-        // The page cards are direct children of EditorPagesPanel, so their Y
-        // coordinate is the exact vertical offset within the ScrollViewer content.
-        double maxOffset = Math.Max(
-            0,
-            EditorDocumentScrollViewer.Extent.Height -
-            EditorDocumentScrollViewer.Viewport.Height);
-        double targetOffset = Math.Clamp(pageCard.Bounds.Y, 0, maxOffset);
-        EditorDocumentScrollViewer.Offset = new Vector(
-            EditorDocumentScrollViewer.Offset.X, targetOffset);
-    }
-
-    private void EditorDocumentScrollViewer_PointerWheelChanged(
-        object? sender,
-        PointerWheelEventArgs e)
-    {
-        double delta = e.Delta.Y;
-        if (Math.Abs(delta) < 0.001)
-            return;
-
-        double maxOffset = Math.Max(
-            0,
-            EditorDocumentScrollViewer.Extent.Height -
-            EditorDocumentScrollViewer.Viewport.Height);
-        double step = Math.Max(48, EditorDocumentScrollViewer.Viewport.Height * 0.12);
-        double targetOffset = Math.Clamp(
-            EditorDocumentScrollViewer.Offset.Y - (delta * step),
-            0,
-            maxOffset);
-
-        EditorDocumentScrollViewer.Offset = new Vector(
-            EditorDocumentScrollViewer.Offset.X, targetOffset);
-        e.Handled = true;
+        // BringIntoView usa o layout real do controle e deixa o ScrollViewer
+        // calcular o deslocamento, inclusive quando as páginas ainda estão
+        // terminando de medir/renderizar.
+        pageCard.BringIntoView();
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
@@ -676,9 +648,25 @@ public partial class EditorWindow : Window
             var characters = _document.InspectPageCharacters(pageInfo.PageIndex);
             var lines = PdfiumTextGrouping.GroupIntoLines(characters, pageInfo.PageIndex);
             var word = PdfiumTextHitTest.FindWordAtPoint(lines, pageInfo.PageIndex, pdfX, pdfY, 3.0);
+            var line = PdfiumTextHitTest.FindLineAtPoint(lines, pageInfo.PageIndex, pdfX, pdfY, 3.0);
+
+            // Em PDFs com mapeamento de texto fragmentado, o agrupador pode
+            // reconhecer somente um glifo como palavra. Nesse caso, prioriza
+            // a linha completa para evitar que o clique selecione apenas uma letra.
+            if (line != null && line.Characters.Count > 1 &&
+                (word == null || word.Characters.Count <= 1))
+            {
+                SetTextSelection(image, pageInfo, line.Characters, line.Text);
+                return;
+            }
             if (word != null)
             {
                 SetTextSelection(image, pageInfo, word.Characters, word.Text);
+                return;
+            }
+            if (line != null && line.Characters.Count > 1)
+            {
+                SetTextSelection(image, pageInfo, line.Characters, line.Text);
                 return;
             }
             var character = PdfiumTextHitTest.FindCharacterAtPoint(characters, pageInfo.PageIndex, pdfX, pdfY, 3.0);
