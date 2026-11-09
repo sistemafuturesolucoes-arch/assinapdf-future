@@ -243,7 +243,7 @@ public sealed class PdfCidBoldReplacementPocTests
             DumpPublicScalarProperties(font.iPdfFont, $"  iPdfFont {font.ResourceName}");
             DumpPublicScalarProperties(font.FontOptions, $"  FontOptions {font.ResourceName}");
             DumpReflectionMembers(font, $"  Font internals {font.ResourceName}", 0);
-            DumpPdfObjectTree(font, $"  PDF dictionary {font.ResourceName}", 0, new System.Collections.Generic.HashSet<object>(ReferenceEqualityComparer.Instance));
+            DumpPdfObjectTree(font.iPdfFont, $"  PDF font internals {font.ResourceName}", 0, new System.Collections.Generic.HashSet<object>(ReferenceEqualityComparer.Instance));
         }
     }
 
@@ -368,21 +368,34 @@ public sealed class PdfCidBoldReplacementPocTests
 
         var flags = System.Reflection.BindingFlags.Instance |
                     System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.NonPublic;
-        var entriesField = type.GetFields(flags).FirstOrDefault(field => field.Name == "_entries");
-        if (entriesField?.GetValue(instance) is System.Collections.IDictionary entries)
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.DeclaredOnly;
+        for (var current = type; current != null && current != typeof(object); current = current.BaseType)
         {
-            DumpPdfObjectTree(entries, "_entries", depth + 1, visited);
-            return;
-        }
-
-        if (type.Name.Contains("PdfArray", StringComparison.Ordinal))
-        {
-            foreach (var property in type.GetProperties(flags).Where(property =>
-                         property.GetIndexParameters().Length == 0 && property.Name is "Count" or "Length"))
+            foreach (var field in current.GetFields(flags).OrderBy(field => field.Name).Take(60))
             {
-                try { _output.WriteLine($"{new string(' ', (depth + 1) * 2)}{property.Name}={property.GetValue(instance)}"); }
-                catch { }
+                object? value;
+                try { value = field.GetValue(instance); }
+                catch { continue; }
+                if (value == null) continue;
+
+                var valueType = value.GetType();
+                var indent = new string(' ', (depth + 1) * 2);
+                if (value is string || valueType.IsPrimitive || valueType.IsEnum || value is decimal)
+                {
+                    _output.WriteLine($"{indent}{field.Name}={value}");
+                    continue;
+                }
+
+                _output.WriteLine($"{indent}{field.Name}: {valueType.FullName}");
+                if (field.Name == "_entries" || field.Name.Contains("fontDict", StringComparison.OrdinalIgnoreCase) ||
+                    field.Name.Contains("fontInfo", StringComparison.OrdinalIgnoreCase) ||
+                    valueType.Name.Contains("PdfDictionary", StringComparison.Ordinal) ||
+                    valueType.Name.Contains("FontInfo", StringComparison.Ordinal) ||
+                    value is System.Collections.IDictionary || valueType.Name.Contains("PdfArray", StringComparison.Ordinal))
+                {
+                    DumpPdfObjectTree(value, field.Name, depth + 1, visited);
+                }
             }
         }
     }
