@@ -1306,9 +1306,31 @@ public partial class EditorWindow : Window
                     NormalizePdfFontFamily(originalFontName),
                     StringComparison.OrdinalIgnoreCase);
 
+            // An italic-only change on an embedded CID font must not replace
+            // the CID resource with an unrelated TrueType face. The formatter
+            // applies a local CTM shear to the selected TJ glyphs instead.
+            bool cidSyntheticItalicEdit =
+                originalText != null &&
+                originalFontIsUnidentifiedCid &&
+                originalFontEmbedded &&
+                string.Equals(replacementText, originalText, StringComparison.Ordinal) &&
+                editedRuns.Count == 1 &&
+                editedRuns[0].Start == 0 &&
+                editedRuns[0].Length == replacementText.Length &&
+                editedRuns[0].IsItalic &&
+                !originalItalic &&
+                editedRuns[0].IsBold == originalBold &&
+                Math.Abs(editedRuns[0].FontSize - originalFontSize) <= 0.75 &&
+                editedRuns[0].Foreground == originalForeground &&
+                editedRuns[0].Background == originalBackground &&
+                string.Equals(
+                    NormalizePdfFontFamily(editedRuns[0].FontFamily),
+                    NormalizePdfFontFamily(originalFontName),
+                    StringComparison.OrdinalIgnoreCase);
+
             // Antes de gravar, garanta que as fontes necessárias às novas faces/famílias
             // estejam disponíveis. O download exige autorização e nunca instala fontes no SO.
-            var requiredFonts = cidBoldOnlyEdit
+            var requiredFonts = cidBoldOnlyEdit || cidSyntheticItalicEdit
                 ? Array.Empty<string>()
                 : editedRuns
                     .Where(run => !string.IsNullOrWhiteSpace(run.FontFamily) &&
@@ -1385,6 +1407,16 @@ public partial class EditorWindow : Window
                             cidFontSwapApplied
                                 ? "FORMATAÇÃO CID: " + cidSwapReason
                                 : "FORMATAÇÃO CID não aplicada: " + cidSwapReason +
+                                  " Será tentada a substituição TrueType incorporada.");
+                    }
+                    else if (cidSyntheticItalicEdit)
+                    {
+                        cidFontSwapApplied = CidFontOperatorFormatter.TryApplySyntheticItalicFallback(
+                            document, pageIndex + 1, target, out string cidItalicReason);
+                        formattingTrace.Add(
+                            cidFontSwapApplied
+                                ? "FORMATAÇÃO CID: " + cidItalicReason
+                                : "FORMATAÇÃO CID itálico não aplicado: " + cidItalicReason +
                                   " Será tentada a substituição TrueType incorporada.");
                     }
 
@@ -2212,6 +2244,9 @@ public partial class EditorWindow : Window
         if (pageIndex < 0 || pageIndex >= document.Pages.Count)
             return Fail($"página inválida ({pageIndex + 1}).");
 
+        bool pageHasSyntheticItalic =
+            CidFontOperatorFormatter.HasSyntheticItalicOperator(document.Pages[pageIndex + 1]);
+
         var absorber = new TextFragmentAbsorber();
         document.Pages[pageIndex + 1].Accept(absorber);
 
@@ -2327,7 +2362,7 @@ public partial class EditorWindow : Window
                 bool savedBold = state.IsBold ||
                     PdfFontFaceHasStyle(state.Font, bold: true) ||
                     state.RenderingMode == Aspose.Pdf.Text.TextRenderingMode.FillThenStrokeText;
-                bool savedItalic = state.IsItalic || PdfFontFaceHasStyle(state.Font, bold: false);
+                bool savedItalic = state.IsItalic || PdfFontFaceHasStyle(state.Font, bold: false) || (state.Font?.IsCid == true && pageHasSyntheticItalic);
                 if (savedBold != run.IsBold && !unchangedEmbeddedFace)
                 {
                     var actualFont = state.Font;
