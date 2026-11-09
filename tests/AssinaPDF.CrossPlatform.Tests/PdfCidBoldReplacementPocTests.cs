@@ -164,8 +164,8 @@ public sealed class PdfCidBoldReplacementPocTests
         return null;
     }
 
-    private static int ReadUInt16BigEndian(byte[] data, int offset) =>
-        (data[offset] << 8) | data[offset + 1];
+    private static ushort ReadUInt16BigEndian(byte[] data, int offset) =>
+        checked((ushort)((data[offset] << 8) | data[offset + 1]));
 
     private static uint ReadUInt32BigEndian(byte[] data, int offset) =>
         ((uint)data[offset] << 24) |
