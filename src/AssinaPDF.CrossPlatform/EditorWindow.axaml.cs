@@ -1839,41 +1839,74 @@ public partial class EditorWindow : Window
         bool allowCidFallback,
         out string resolvedFamily)
     {
-        // Arial é a primeira escolha para substituir estilos de fontes CID/Type0.
-        // Em macOS, Arial pode não estar instalado; nesses casos tentamos famílias
-        // TrueType/OpenType comuns, sem recorrer às fontes Standard-14 do PDF.
-        string[] candidates = allowCidFallback
-            ? new[] { requestedFamily, "Helvetica Neue", "Noto Sans", "Liberation Sans", "DejaVu Sans" }
+        bool wantsBold = (requestedStyle & FontStyles.Bold) == FontStyles.Bold;
+        bool wantsItalic = (requestedStyle & FontStyles.Italic) == FontStyles.Italic;
+
+        // FindFont(family, style) pode devolver uma face próxima em algumas
+        // coleções de fontes. Tente primeiro o nome explícito da face e, em
+        // seguida, a resolução por família/estilo. Nenhuma face é aceita sem
+        // conferir os metadados reais do programa de fonte.
+        var families = allowCidFallback
+            ? new[] { requestedFamily, "Arial", "Helvetica Neue", "Noto Sans", "Liberation Sans", "DejaVu Sans" }
             : new[] { requestedFamily };
 
         var failures = new List<string>();
-        foreach (string candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string family in families.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            try
+            string explicitFace = GetPdfFontFaceName(family, wantsBold, wantsItalic);
+            var lookups = new (string Label, Func<Font> Resolve)[]
             {
-                Font font = FontRepository.FindFont(candidate, requestedStyle);
-                font.IsEmbedded = true;
+                (explicitFace, () => FontRepository.FindFont(explicitFace)),
+                ($"{family} [{requestedStyle}]", () => FontRepository.FindFont(family, requestedStyle))
+            };
 
-                if (!font.IsEmbedded)
+            foreach (var lookup in lookups)
+            {
+                if (!attempted.Add(lookup.Label))
+                    continue;
+
+                try
                 {
-                    string reason = font.GetLastFontEmbeddingError() ?? "a biblioteca não confirmou a incorporação";
-                    throw new InvalidOperationException(reason);
+                    Font font = lookup.Resolve();
+                    if (font.IsBold != wantsBold || font.IsItalic != wantsItalic)
+                    {
+                        throw new InvalidOperationException(
+                            $"a face retornada não corresponde ao estilo solicitado " +
+                            $"(esperado Bold={wantsBold}, Italic={wantsItalic}; " +
+                            $"encontrado Bold={font.IsBold}, Italic={font.IsItalic}; " +
+                            $"FontName='{font.FontName}', BaseFont='{font.BaseFont}').");
+                    }
+
+                    font.IsEmbedded = true;
+                    using var embeddedProgram = new MemoryStream();
+                    font.Save(embeddedProgram);
+                    if (embeddedProgram.Length < 12)
+                    {
+                        string embeddingError = font.GetLastFontEmbeddingError()
+                            ?? "o mecanismo não forneceu o programa da fonte";
+                        throw new InvalidOperationException(
+                            "a fonte não pôde ser incorporada: " + embeddingError);
+                    }
+
+                    resolvedFamily = NormalizePdfFontFamily(font.FontName);
+                    if (string.IsNullOrWhiteSpace(resolvedFamily))
+                        resolvedFamily = family;
+
+                    return font;
                 }
-
-                resolvedFamily = NormalizePdfFontFamily(font.FontName);
-                if (string.IsNullOrWhiteSpace(resolvedFamily))
-                    resolvedFamily = candidate;
-
-                return font;
-            }
-            catch (Exception ex)
-            {
-                failures.Add($"{candidate}: {ex.Message}");
+                catch (Exception ex)
+                {
+                    failures.Add($"{lookup.Label}: {ex.Message}");
+                }
             }
         }
 
         throw new InvalidOperationException(
-            "Não foi possível localizar e incorporar uma fonte TrueType/OpenType compatível. " +
+            "Não foi encontrada uma face de fonte incorporável que corresponda exatamente ao estilo solicitado. " +
+            $"Família='{requestedFamily}', negrito={wantsBold}, itálico={wantsItalic}. " +
+            "A edição foi interrompida para não gravar uma fonte visualmente diferente da prévia. " +
             string.Join(" | ", failures));
     }
 
