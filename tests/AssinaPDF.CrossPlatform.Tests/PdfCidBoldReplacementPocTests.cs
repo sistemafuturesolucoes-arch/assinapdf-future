@@ -137,6 +137,34 @@ public sealed class PdfCidBoldReplacementPocTests
         _output.WriteLine("POC aprovada: a fonte Bold permaneceu nos segmentos após salvar e reabrir o PDF.");
     }
 
+    [Fact]
+    public void DumpCidPageContentOperatorsForBoldDiagnosis()
+    {
+        // Read-only diagnostic: dumps the first page content operators without modifying the PDF.
+        var inputPath = Environment.GetEnvironmentVariable("ASSINAPDF_CID_TEST_PDF");
+        if (string.IsNullOrWhiteSpace(inputPath))
+        {
+            _output.WriteLine("Diagnóstico ignorado: defina ASSINAPDF_CID_TEST_PDF com o caminho do PDF.");
+            return;
+        }
+
+        Assert.True(File.Exists(inputPath), $"PDF de teste não encontrado: {inputPath}");
+
+        using var document = new Document(inputPath);
+        var page = document.Pages[1];
+        _output.WriteLine($"PDF={inputPath}");
+        _output.WriteLine($"PÁGINA=1; OPERADORES={page.Contents.Count}");
+
+        var index = 0;
+        foreach (var op in page.Contents)
+        {
+            index++;
+            _output.WriteLine($"OP[{index:D4}] TYPE={op.GetType().FullName} :: {op}");
+        }
+
+        _output.WriteLine("FIM DO DUMP DE OPERADORES (nenhuma alteração foi feita no PDF).");
+    }
+
     private static ushort? ReadEmbeddedTrueTypeWeight(Font? font)
     {
         if (font == null)
