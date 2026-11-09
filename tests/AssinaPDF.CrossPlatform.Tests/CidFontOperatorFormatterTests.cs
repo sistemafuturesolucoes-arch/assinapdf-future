@@ -185,6 +185,8 @@ public sealed class CidFontOperatorFormatterTests
             document.Pages.Accept(absorber);
             var fragment = absorber.TextFragments.Cast<TextFragment>().Single();
             pageNumber = checked((int)fragment.Page.Number);
+            ushort? originalWeight = ReadEmbeddedTrueTypeWeight(
+                fragment.Segments.Cast<TextSegment>().First().TextState.Font);
 
             var formatterType = typeof(MainWindow).Assembly.GetType(
                 "AssinaPDF.MacPrototype.Services.CidFontOperatorFormatter");
@@ -218,6 +220,7 @@ public sealed class CidFontOperatorFormatterTests
             Assert.NotNull(font);
             Assert.True(font!.IsCid, "A fonte CID original foi substituída.");
             Assert.True(font.IsEmbedded, "A fonte CID deixou de estar incorporada.");
+            Assert.Equal(originalWeight, ReadEmbeddedTrueTypeWeight(font));
         });
 
         var operators = reopened.Pages[pageNumber].Contents.Cast<Aspose.Pdf.Operator>().ToArray();
