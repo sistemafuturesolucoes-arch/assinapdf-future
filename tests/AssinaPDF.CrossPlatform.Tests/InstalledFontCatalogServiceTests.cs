@@ -120,4 +120,28 @@ public sealed class InstalledFontCatalogServiceTests
         font.Save(output);
         Assert.True(output.Length > 12, font.GetLastFontEmbeddingError());
     }
+
+    [Fact]
+    public void EnumerateCandidateFontFiles_FindsOnlyLikelyFamilyTtfOtfAndTtcFiles()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "AssinaPDFFontDiscovery", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string[] names = { "arial.ttf", "arialbi.ttf", "Arial-BoldItalic.otf", "arial-collection.ttc", "calibri.ttf", "notes.txt" };
+            foreach (string name in names)
+                File.WriteAllBytes(Path.Combine(directory, name), [0x00]);
+
+            var files = InstalledFontCatalogService.EnumerateCandidateFontFiles(
+                new[] { directory }, "Arial");
+
+            Assert.Equal(4, files.Count);
+            Assert.All(files, file =>
+                Assert.Contains(Path.GetFileName(file), names.Take(4)));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }
