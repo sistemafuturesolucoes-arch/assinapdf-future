@@ -200,8 +200,8 @@ public partial class EditorWindow : Window
 
         EditorStatusText.Text = "Verificando as fontes utilizadas no PDF...";
 
+        // A auditoria de fontes nunca deve bloquear a abertura do documento.
         // Registra as pastas nativas antes de consultar Aspose.FontRepository.
-        // Assim, fontes já instaladas não são tratadas como ausentes.
         InstalledFontCatalogService.RegisterSystemFontDirectories();
 
         try
@@ -217,9 +217,6 @@ public partial class EditorWindow : Window
 
                     foreach (TextFragment fragment in absorber.TextFragments)
                     {
-                        // Um fragmento pode conter vários segmentos com fontes
-                        // diferentes. A pré-verificação precisa inspecionar cada
-                        // segmento, não apenas a fonte herdada pelo fragmento.
                         var segments = fragment.Segments.Cast<TextSegment>().ToArray();
                         if (segments.Length == 0)
                         {
@@ -249,104 +246,39 @@ public partial class EditorWindow : Window
                 .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
 
-            string cidNote = unidentifiedCidFonts.Count == 0
-                ? string.Empty
-                : " Fontes CID sem família identificável: " +
-                  string.Join(", ", unidentifiedCidFonts.Select(item =>
-                      $"{item.Key} ({(item.Value ? "incorporada no PDF" : "não incorporada")})")) +
-                  ". O nome CID é um identificador interno do PDF, não o nome real da família. " +
-                  "Fontes incorporadas acompanham o documento; fontes CID não incorporadas precisam de substituição explícita.";
+            var missingCid = unidentifiedCidFonts
+                .Where(item => !item.Value)
+                .Select(item => item.Key)
+                .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
 
-            var unavailable = new List<string>();
-            var substitutions = new List<string>();
-            var downloadedFamilies = new List<string>();
-
-            foreach (string family in missing)
+            if (missing.Length == 0 && missingCid.Length == 0)
             {
-                bool downloaded = false;
-                try
-                {
-                    downloaded = await FontDownloadService.EnsureAvailableAsync(this, family);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"AssinaPDF: não foi possível obter a fonte '{family}': {ex.Message}");
-                }
-
-                if (downloaded)
-                {
-                    downloadedFamilies.Add(family);
-                    continue;
-                }
-
-                string? substitute = await AskSubstituteFontAsync(family);
-                if (string.IsNullOrWhiteSpace(substitute))
-                {
-                    unavailable.Add(family);
-                    await ShowFontDownloadInstructionAsync(family);
-                    continue;
-                }
-
-                _fontSubstitutions[family] = substitute;
-                substitutions.Add($"{family} → {substitute}");
-            }
-
-            // Uma fonte CID não incorporada não pode ser baixada pelo nome
-            // "CIDFont+F2". Solicite uma família instalada e guarde o vínculo
-            // com o identificador interno para a edição posterior desse texto.
-            foreach (var cidFont in unidentifiedCidFonts.Where(item => !item.Value))
-            {
-                if (_fontSubstitutions.ContainsKey(cidFont.Key))
-                    continue;
-
-                string? substitute = await AskSubstituteFontAsync(cidFont.Key);
-                if (string.IsNullOrWhiteSpace(substitute))
-                {
-                    unavailable.Add(cidFont.Key + " (CID não incorporada)");
-                    await ShowFontDownloadInstructionAsync(cidFont.Key);
-                    continue;
-                }
-
-                _fontSubstitutions[cidFont.Key] = substitute;
-                substitutions.Add($"{cidFont.Key} → {substitute}");
-            }
-
-            if (unavailable.Count == 0)
-            {
-                if (missing.Length == 0 && substitutions.Count == 0)
-                {
-                    EditorStatusText.Text = fonts.Count == 0 && unidentifiedCidFonts.Count == 0
-                        ? "PDF aberto. Não foram encontrados textos com fontes identificáveis."
-                        : $"Verificação concluída: {fonts.Count} família(s) identificada(s); nenhuma fonte conhecida ausente." +
-                          cidNote;
-                    return;
-                }
-
-                string resolutionNote = downloadedFamilies.Count > 0 && substitutions.Count > 0
-                    ? " As fontes ausentes foram baixadas ou substituídas conforme sua escolha."
-                    : downloadedFamilies.Count > 0
-                        ? " As fontes ausentes foram obtidas para uso interno do AssinaPDF."
-                        : " As substituições escolhidas serão usadas ao editar os trechos correspondentes.";
-                string substitutionNote = substitutions.Count == 0
-                    ? string.Empty
-                    : " Substituições: " + string.Join(", ", substitutions) + ".";
-                EditorStatusText.Text = $"Verificação concluída: {fonts.Count} família(s) identificada(s)." +
-                    resolutionNote + substitutionNote + cidNote +
-                    " Nenhuma fonte foi instalada no sistema.";
+                EditorStatusText.Text = fonts.Count == 0 && unidentifiedCidFonts.Count == 0
+                    ? "PDF aberto. Não foram encontrados textos com fontes identificáveis."
+                    : $"Verificação concluída: {fonts.Count} família(s) identificada(s); nenhuma fonte conhecida ausente.";
                 return;
             }
 
-            string names = string.Join(", ", unavailable);
-            string substitutionsDone = substitutions.Count == 0
-                ? string.Empty
-                : " Substituições escolhidas: " + string.Join(", ", substitutions) + ".";
-            EditorStatusText.Text = $"Atenção: {unavailable.Count} fonte(s) não estão disponíveis ({names}). O PDF continua aberto e será exibido com a substituição de fonte do mecanismo de visualização. Não edite os trechos que usam essas fontes até obter a fonte original ou escolher uma substituta; espaçamento e quebras de linha podem mudar." +
-                substitutionsDone + cidNote;
+            var warnings = new List<string>();
+            if (missing.Length > 0)
+                warnings.Add("Fontes não disponíveis: " + string.Join(", ", missing) + ".");
+            if (missingCid.Length > 0)
+                warnings.Add(
+                    "Fontes CID não incorporadas (identificadores internos, não nomes comerciais): " +
+                    string.Join(", ", missingCid) + ".");
+
+            EditorStatusText.Text =
+                "PDF aberto. " + string.Join(" ", warnings) +
+                " A verificação não bloqueará a visualização nem abrirá janelas repetidas. " +
+                "A aparência pode depender da substituição do mecanismo de visualização. " +
+                "Se você editar um trecho que dependa de uma fonte ausente, escolha uma fonte substituta ou instale a fonte original antes de aplicar.";
         }
         catch (Exception ex)
         {
-            EditorStatusText.Text = "Não foi possível concluir a verificação de fontes. O PDF continua aberto; a aparência original da visualização foi mantida. " + ex.Message;
+            EditorStatusText.Text =
+                "Não foi possível concluir a verificação de fontes. O PDF continua aberto; " +
+                "a abertura e a visualização não serão bloqueadas. " + ex.Message;
         }
     }
 
