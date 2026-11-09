@@ -331,7 +331,7 @@ internal static class CidFontOperatorFormatter
             return false;
         }
 
-        byte[]? rawData = ReadRawStreamData(stream);
+        byte[]? rawData = ReadDecodedStreamData(reader, stream);
         if (rawData == null || rawData.Length == 0)
         {
             diagnostic = $"RawData ausente/vazio; stream={stream.GetType().FullName}; " +
@@ -533,6 +533,45 @@ internal static class CidFontOperatorFormatter
         return null;
     }
 
+    private static byte[]? ReadDecodedStreamData(object reader, object stream)
+    {
+        // Aspose.PDF.FOSS keeps PdfReader internal, but exposes DecodeStream
+        // as a public instance method on that reader. This applies the stream's
+        // decryption and declared PDF filters before parsing the ToUnicode CMap.
+        for (Type? type = reader.GetType(); type != null; type = type.BaseType)
+        {
+            MethodInfo? decodeMethod = type.GetMethods(
+                    ReflectionFlags | BindingFlags.DeclaredOnly)
+                .FirstOrDefault(method =>
+                {
+                    if (!string.Equals(method.Name, "DecodeStream", StringComparison.Ordinal))
+                        return false;
+
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return parameters.Length == 3 &&
+                           parameters[0].ParameterType.IsInstanceOfType(stream) &&
+                           parameters[1].ParameterType == typeof(int) &&
+                           parameters[2].ParameterType == typeof(int);
+                });
+
+            if (decodeMethod == null)
+                continue;
+
+            try
+            {
+                if (decodeMethod.Invoke(reader, new object[] { stream, 0, 0 }) is byte[] decoded &&
+                    LooksLikeCMap(decoded))
+                    return decoded;
+            }
+            catch
+            {
+                // Use the raw-data fallback only if it is already a textual CMap.
+            }
+        }
+
+        return ReadRawStreamData(stream);
+    }
+
     private static byte[]? ReadRawStreamData(object? stream)
     {
         if (stream == null)
@@ -550,7 +589,7 @@ internal static class CidFontOperatorFormatter
         {
             object? value = ReadProperty(stream, name);
             if (TryConvertStreamValue(value, out byte[]? decoded) &&
-                LooksLikeCMap(decoded))
+                decoded != null && LooksLikeCMap(decoded))
                 return decoded;
         }
 
@@ -573,7 +612,7 @@ internal static class CidFontOperatorFormatter
                 {
                     object? value = method.Invoke(stream, null);
                     if (TryConvertStreamValue(value, out byte[]? decoded) &&
-                        LooksLikeCMap(decoded))
+                        decoded != null && LooksLikeCMap(decoded))
                         return decoded;
 
                     // Some stream APIs decode in place and return void/bool.
@@ -583,7 +622,7 @@ internal static class CidFontOperatorFormatter
                         {
                             value = ReadProperty(stream, propertyName);
                             if (TryConvertStreamValue(value, out decoded) &&
-                                LooksLikeCMap(decoded))
+                                decoded != null && LooksLikeCMap(decoded))
                                 return decoded;
                         }
                     }
