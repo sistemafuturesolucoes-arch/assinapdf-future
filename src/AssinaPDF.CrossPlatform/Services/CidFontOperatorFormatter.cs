@@ -126,7 +126,7 @@ internal static class CidFontOperatorFormatter
 
         var page = document.Pages[pageNumber];
         var boldCandidates = new List<Font>();
-        if (!forceSyntheticBold && sourceWeight.Value < 600)
+        if (!forceSyntheticBold && !forceSyntheticItalic && sourceWeight.Value < 600)
         {
             foreach (Font candidate in page.Resources.Fonts)
             {
