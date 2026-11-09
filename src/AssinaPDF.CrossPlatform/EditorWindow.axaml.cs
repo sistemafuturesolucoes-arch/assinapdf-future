@@ -544,7 +544,7 @@ public partial class EditorWindow : Window
                 BorderBrush = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.FromRgb(205, 209, 216)),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(5),
+                CornerRadius = new Avalonia.CornerRadius(5),
                 Content = new StackPanel
                 {
                     Spacing = 5,
