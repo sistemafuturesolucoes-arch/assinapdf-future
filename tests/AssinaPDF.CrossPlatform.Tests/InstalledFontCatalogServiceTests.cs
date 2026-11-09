@@ -56,4 +56,41 @@ public sealed class InstalledFontCatalogServiceTests
 
         Assert.Empty(paths);
     }
+
+    [Theory]
+    [InlineData("Arial Bold Italic", "Arial", true, true, true)]
+    [InlineData("Arial-BoldItalicMT", "Arial", true, true, true)]
+    [InlineData("BellMT-BoldItalic", "Bell MT", true, true, true)]
+    [InlineData("Arial-Bold", "Arial", true, false, true)]
+    [InlineData("Arial-Italic", "Arial", false, true, true)]
+    [InlineData("Arial", "Arial", false, false, true)]
+    [InlineData("Arial-BoldItalic", "Arial", true, false, false)]
+    [InlineData("Arial-BoldItalic", "Arial", false, true, false)]
+    [InlineData("LiberationSans-BoldItalic", "Arial", true, true, false)]
+    public void FontNameMatchesRequestedStyle_UsesFaceNameAndFamily(
+        string fontName,
+        string family,
+        bool bold,
+        bool italic,
+        bool expected)
+    {
+        Assert.Equal(expected,
+            InstalledFontCatalogService.FontNameMatchesRequestedStyle(
+                fontName, family, bold, italic));
+    }
+
+    [Fact]
+    public void FontNameMatchesRequestedStyle_UsesAsposeFlagsWhenNameHasNoStyleSuffix()
+    {
+        Assert.True(InstalledFontCatalogService.FontNameMatchesRequestedStyle(
+            "ArialMT", "Arial", fallbackBold: true, fallbackItalic: false,
+            wantsBold: true, wantsItalic: false));
+    }
+
+    [Fact]
+    public void NormalizeFontFileToken_RemovesSeparatorsWithoutChangingFamilyIdentity()
+    {
+        Assert.Equal("bellmt", InstalledFontCatalogService.NormalizeFontFileToken("Bell MT"));
+        Assert.Equal("bellmtbolditalic", InstalledFontCatalogService.NormalizeFontFileToken("BellMT-BoldItalic"));
+    }
 }
