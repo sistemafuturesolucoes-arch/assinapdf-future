@@ -243,6 +243,7 @@ public sealed class PdfCidBoldReplacementPocTests
             DumpPublicScalarProperties(font.iPdfFont, $"  iPdfFont {font.ResourceName}");
             DumpPublicScalarProperties(font.FontOptions, $"  FontOptions {font.ResourceName}");
             DumpReflectionMembers(font, $"  Font internals {font.ResourceName}", 0);
+            DumpPdfObjectTree(font, $"  PDF dictionary {font.ResourceName}", 0, new System.Collections.Generic.HashSet<object>(ReferenceEqualityComparer.Instance));
         }
     }
 
@@ -321,6 +322,67 @@ public sealed class PdfCidBoldReplacementPocTests
                 {
                     _output.WriteLine($"    FIELD {current.Name}.{field.Name}=<erro:{ex.GetType().Name}>");
                 }
+            }
+        }
+    }
+
+    private void DumpPdfObjectTree(object? instance, string label, int depth, System.Collections.Generic.HashSet<object> visited)
+    {
+        if (instance == null || depth > 4 || !visited.Add(instance))
+            return;
+
+        var type = instance.GetType();
+        _output.WriteLine($"{label}: {type.FullName}");
+
+        if (instance is System.Collections.IDictionary dictionary)
+        {
+            foreach (System.Collections.DictionaryEntry entry in dictionary)
+            {
+                var key = entry.Key?.ToString() ?? "(null)";
+                var value = entry.Value;
+                if (value == null)
+                {
+                    _output.WriteLine($"{new string(' ', (depth + 1) * 2)}{key}=null");
+                    continue;
+                }
+
+                var valueType = value.GetType();
+                var scalar = value is string || valueType.IsPrimitive || valueType.IsEnum || value is decimal;
+                _output.WriteLine($"{new string(' ', (depth + 1) * 2)}{key}: {(scalar ? value : valueType.FullName + " :: " + value)}");
+                if (!scalar)
+                    DumpPdfObjectTree(value, key, depth + 1, visited);
+            }
+            return;
+        }
+
+        if (instance is System.Collections.IEnumerable enumerable && instance is not string)
+        {
+            var index = 0;
+            foreach (var item in enumerable)
+            {
+                if (index >= 80) { _output.WriteLine($"{new string(' ', (depth + 1) * 2)}..."); break; }
+                DumpPdfObjectTree(item, $"[{index++}]", depth + 1, visited);
+            }
+            return;
+        }
+
+        var flags = System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic;
+        var entriesField = type.GetFields(flags).FirstOrDefault(field => field.Name == "_entries");
+        if (entriesField?.GetValue(instance) is System.Collections.IDictionary entries)
+        {
+            DumpPdfObjectTree(entries, "_entries", depth + 1, visited);
+            return;
+        }
+
+        if (type.Name.Contains("PdfArray", StringComparison.Ordinal))
+        {
+            foreach (var property in type.GetProperties(flags).Where(property =>
+                         property.GetIndexParameters().Length == 0 && property.Name is "Count" or "Length"))
+            {
+                try { _output.WriteLine($"{new string(' ', (depth + 1) * 2)}{property.Name}={property.GetValue(instance)}"); }
+                catch { }
             }
         }
     }
