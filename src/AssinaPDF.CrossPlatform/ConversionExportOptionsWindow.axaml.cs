@@ -37,6 +37,12 @@ public partial class ConversionExportOptionsWindow : Window
             CustomSizePanel.IsVisible = PageSizeCombo.SelectedIndex == 6;
     }
 
+    private void Format_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (QualityPanel != null && FormatCombo?.SelectedItem is ComboBoxItem selected)
+            QualityPanel.IsVisible = selected.Content?.ToString()?.StartsWith("JPG", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     private void Export_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         string pageSize = (PageSizeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Original";
@@ -60,10 +66,13 @@ public partial class ConversionExportOptionsWindow : Window
         if (!int.TryParse(QualityBox.Text, out int quality)) quality = 92;
         quality = Math.Clamp(quality, 1, 100);
 
+        string imageFormat = formatText.StartsWith("PNG", StringComparison.OrdinalIgnoreCase) ? "PNG" :
+            formatText.StartsWith("TIFF", StringComparison.OrdinalIgnoreCase) ? "TIFF" : "JPG";
+
         Settings = new ConversionExportSettings(
             pageSize, width, height,
             FitModeCombo.SelectedIndex == 1,
-            formatText.StartsWith("PNG", StringComparison.OrdinalIgnoreCase) ? "PNG" : "JPG",
+            imageFormat,
             dpi, quality);
         Close();
     }
