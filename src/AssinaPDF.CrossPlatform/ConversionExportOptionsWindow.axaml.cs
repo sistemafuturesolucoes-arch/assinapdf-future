@@ -18,6 +18,10 @@ public partial class ConversionExportOptionsWindow : Window
     private readonly bool _imagesToPdf;
     public ConversionExportSettings? Settings { get; private set; }
 
+    public ConversionExportOptionsWindow() : this(imagesToPdf: false)
+    {
+    }
+
     public ConversionExportOptionsWindow(bool imagesToPdf)
     {
         _imagesToPdf = imagesToPdf;
@@ -46,9 +50,11 @@ public partial class ConversionExportOptionsWindow : Window
     private void Export_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         string pageSize = (PageSizeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Original";
-        if (!double.TryParse(CustomWidthBox.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out double width) ||
-            !double.TryParse(CustomHeightBox.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out double height) ||
-            width <= 0 || height <= 0 || width > 2000 || height > 2000)
+        bool validWidth = double.TryParse(CustomWidthBox.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out double width) ||
+            double.TryParse(CustomWidthBox.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out width);
+        bool validHeight = double.TryParse(CustomHeightBox.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out double height) ||
+            double.TryParse(CustomHeightBox.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out height);
+        if (!validWidth || !validHeight || width <= 0 || height <= 0 || width > 2000 || height > 2000)
         {
             if (pageSize == "Personalizado")
             {
