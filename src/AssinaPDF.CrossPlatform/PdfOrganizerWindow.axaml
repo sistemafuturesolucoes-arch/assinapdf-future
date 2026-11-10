@@ -6,7 +6,7 @@
         MinWidth="900" MinHeight="620"
         WindowStartupLocation="CenterOwner"
         Background="#F1F3F6">
-  <Grid RowDefinitions="Auto,*">
+  <Grid RowDefinitions="Auto,*,Auto">
     <Border Grid.Row="0" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1" Padding="14,10">
       <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="9">
         <Button x:Name="AddDocumentsButton" Grid.Column="0" Content="＋ Adicionar documento" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="16,9"/>
@@ -42,5 +42,8 @@
         </Grid>
       </Border>
     </Grid>
+    <Border Grid.Row="2" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,1,0,0" Padding="12,7">
+      <TextBlock x:Name="StatusText" Text="Adicione um ou mais documentos PDF para começar." FontSize="11" Foreground="#687180"/>
+    </Border>
   </Grid>
 </Window>
