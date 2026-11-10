@@ -30,7 +30,8 @@ public partial class PdfOrganizerWindow : Window
 
     private readonly List<OrganizerPage> _pages = new();
     private double _zoom = 1.0;
-    private bool _loading;\n    private OrganizerPage? _selectedPage;
+    private bool _loading;
+    private OrganizerPage? _selectedPage;
 
     public PdfOrganizerWindow()
     {
