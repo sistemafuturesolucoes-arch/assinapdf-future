@@ -1,3 +1,4 @@
+using Xunit;
 using AssinaPDF.MacPrototype.Services;
 
 namespace AssinaPDF.CrossPlatform.Tests;
