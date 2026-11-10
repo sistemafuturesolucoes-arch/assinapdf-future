@@ -115,9 +115,8 @@
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="⇄" FontSize="29" Foreground="#7751A8"/>
                 <TextBlock Text="Converter arquivos" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
-                <TextBlock Text="Converta PDFs e imagens entre formatos."
+                <TextBlock Text="Junte PDFs e converta imagens em PDF ou PDF em JPG."
                            FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
-                <TextBlock Text="Em desenvolvimento" FontSize="10" Foreground="#8A76A5"/>
               </StackPanel>
             </Button>
           </Grid>
