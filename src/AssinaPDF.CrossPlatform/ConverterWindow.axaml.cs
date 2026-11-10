@@ -26,54 +26,14 @@ public partial class ConverterWindow : Window
     {
         try
         {
-            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Selecione os PDFs na ordem desejada",
-                AllowMultiple = true,
-                FileTypeFilter = new[]
-                {
-                    new FilePickerFileType("Documentos PDF") { Patterns = new[] { "*.pdf", "*.PDF" } }
-                }
-            });
-
-            if (files.Count < 2)
-            {
-                MergeStatusText.Text = "Selecione pelo menos dois arquivos PDF.";
-                return;
-            }
-
-            var save = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-            {
-                Title = "Salvar PDF unido",
-                SuggestedFileName = "documentos-unidos.pdf",
-                DefaultExtension = "pdf",
-                FileTypeChoices = new[]
-                {
-                    new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } }
-                }
-            });
-            if (save == null) return;
-
-            string destination = Path.GetFullPath(save.Path.LocalPath);
-            var sources = files.Select(x => Path.GetFullPath(x.Path.LocalPath)).ToArray();
-            if (sources.Contains(destination, OperatingSystem.IsWindows()
-                    ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal))
-                throw new InvalidOperationException("O arquivo de destino não pode ser um dos PDFs de origem.");
-
-            using var output = new PdfDocument();
-            foreach (string sourcePath in sources)
-            {
-                using var input = PdfReader.Open(sourcePath, PdfDocumentOpenMode.Import);
-                foreach (PdfPage page in input.Pages)
-                    output.AddPage(page);
-            }
-            output.Save(destination);
-            MergeStatusText.Text = $"{files.Count} arquivos unidos com sucesso.";
-            StatusText.Text = $"PDF criado: {destination}";
+            var organizer = new PdfOrganizerWindow();
+            await organizer.ShowDialog(this);
+            MergeStatusText.Text = "Organizador de PDFs fechado.";
+            StatusText.Text = "Você pode continuar com outras conversões.";
         }
         catch (Exception ex)
         {
-            MergeStatusText.Text = "Não foi possível juntar os PDFs.";
+            MergeStatusText.Text = "Não foi possível abrir o organizador de PDFs.";
             StatusText.Text = ex.Message;
         }
     }
