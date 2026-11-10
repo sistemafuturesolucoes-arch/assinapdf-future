@@ -143,9 +143,17 @@ public partial class ConversionEditorWindow : Window
             var image = new Image
             {
                 Source = item.Preview,
+                Width = 138,
+                Height = 138,
+                Stretch = Stretch.Uniform
+            };
+            var pageSurface = new Border
+            {
                 Width = 150,
                 Height = 150,
-                Stretch = Stretch.Uniform,
+                Background = Brushes.White,
+                Padding = new Thickness(6),
+                Child = image,
                 RenderTransform = new RotateTransform(item.Rotation * 90),
                 RenderTransformOrigin = RelativePoint.Center
             };
@@ -161,7 +169,7 @@ public partial class ConversionEditorWindow : Window
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
             };
             var content = new StackPanel { Spacing = 5 };
-            content.Children.Add(image);
+            content.Children.Add(pageSurface);
             content.Children.Add(label);
             var card = new Border
             {
@@ -199,8 +207,18 @@ public partial class ConversionEditorWindow : Window
         if (_selected != null && _items.Contains(_selected))
         {
             PreviewImage.Source = _selected.Preview;
-            PreviewImage.RenderTransform = new RotateTransform(_selected.Rotation * 90);
-            PreviewImage.RenderTransformOrigin = RelativePoint.Center;
+            bool quarterTurn = _selected.Rotation % 2 != 0;
+            double rotatedWidth = quarterTurn ? _selected.Height : _selected.Width;
+            double rotatedHeight = quarterTurn ? _selected.Width : _selected.Height;
+            double previewScale = Math.Min(1d, Math.Min(760d / Math.Max(1, rotatedWidth), 900d / Math.Max(1, rotatedHeight)));
+            PreviewImage.Width = Math.Max(1, _selected.Width * previewScale);
+            PreviewImage.Height = Math.Max(1, _selected.Height * previewScale);
+            PreviewImage.RenderTransform = null;
+            PreviewPageSurface.Width = PreviewImage.Width + 36;
+            PreviewPageSurface.Height = PreviewImage.Height + 36;
+            PreviewPageSurface.RenderTransform = new RotateTransform(_selected.Rotation * 90);
+            PreviewPageSurface.RenderTransformOrigin = RelativePoint.Center;
+            PreviewPageSurface.IsVisible = true;
             PreviewImage.IsVisible = true;
         }
         else
@@ -299,10 +317,14 @@ public partial class ConversionEditorWindow : Window
 
         try
         {
+            var optionsWindow = new ConversionExportOptionsWindow(_imagesToPdf);
+            await optionsWindow.ShowDialog(this);
+            if (optionsWindow.Settings is not ConversionExportSettings settings) return;
+
             if (_imagesToPdf)
-                await SaveImagesAsPdfAsync();
+                await SaveImagesAsPdfAsync(settings);
             else
-                await ExportPdfPagesAsJpgAsync();
+                await ExportPdfPagesAsImageAsync(settings);
         }
         catch (Exception ex)
         {
@@ -310,11 +332,11 @@ public partial class ConversionEditorWindow : Window
         }
     }
 
-    private async System.Threading.Tasks.Task SaveImagesAsPdfAsync()
+    private async System.Threading.Tasks.Task SaveImagesAsPdfAsync(ConversionExportSettings settings)
     {
         var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Salvar todas as imagens em um único PDF",
+            Title = "Salvar imagens em um único PDF",
             SuggestedFileName = "imagens-combinadas.pdf",
             DefaultExtension = "pdf",
             FileTypeChoices = new[] { new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } } }
@@ -331,65 +353,168 @@ public partial class ConversionEditorWindow : Window
         {
             using XImage image = XImage.FromFile(item.SourcePath);
             bool quarterTurn = item.Rotation % 2 != 0;
-            double width = quarterTurn ? image.PointHeight : image.PointWidth;
-            double height = quarterTurn ? image.PointWidth : image.PointHeight;
+            double contentWidth = quarterTurn ? image.PointHeight : image.PointWidth;
+            double contentHeight = quarterTurn ? image.PointWidth : image.PointHeight;
+            (double pageWidth, double pageHeight) = GetPageSizePoints(settings, contentWidth, contentHeight);
+            double scale = settings.FillPage
+                ? Math.Max(pageWidth / contentWidth, pageHeight / contentHeight)
+                : Math.Min(pageWidth / contentWidth, pageHeight / contentHeight);
+
             var page = output.AddPage();
-            page.Width = XUnit.FromPoint(width);
-            page.Height = XUnit.FromPoint(height);
+            page.Width = XUnit.FromPoint(pageWidth);
+            page.Height = XUnit.FromPoint(pageHeight);
             using XGraphics graphics = XGraphics.FromPdfPage(page);
-            graphics.TranslateTransform(width / 2, height / 2);
+            graphics.DrawRectangle(XBrushes.White, 0, 0, pageWidth, pageHeight);
+            graphics.IntersectClip(new XRect(0, 0, pageWidth, pageHeight));
+            graphics.TranslateTransform(pageWidth / 2, pageHeight / 2);
             graphics.RotateTransform(item.Rotation * 90);
-            graphics.DrawImage(image, -image.PointWidth / 2, -image.PointHeight / 2,
-                image.PointWidth, image.PointHeight);
+            graphics.DrawImage(image,
+                -image.PointWidth * scale / 2,
+                -image.PointHeight * scale / 2,
+                image.PointWidth * scale,
+                image.PointHeight * scale);
         }
 
         output.Save(outputPath);
-        StatusText.Text = $"{_items.Count} imagem(ns) reunida(s) em {Path.GetFileName(outputPath)}. Originais preservados.";
+        StatusText.Text = "Arquivo salvo com sucesso.";
+        await ShowSavedDialogAsync("PDF salvo com sucesso!", $"{Path.GetFileName(outputPath)}\n\nLocal: {Path.GetDirectoryName(outputPath)}");
     }
 
-    private async System.Threading.Tasks.Task ExportPdfPagesAsJpgAsync()
+    private async System.Threading.Tasks.Task ExportPdfPagesAsImageAsync(ConversionExportSettings settings)
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Escolher pasta para salvar todas as páginas em JPG",
+            Title = $"Escolher pasta para salvar as páginas em {settings.ImageFormat}",
             AllowMultiple = false
         });
         if (folders.Count == 0) return;
 
         string folder = folders[0].Path.LocalPath;
         int exported = 0;
+        string extension = settings.ImageFormat == "PNG" ? "png" : "jpg";
+        SKEncodedImageFormat encodedFormat = settings.ImageFormat == "PNG"
+            ? SKEncodedImageFormat.Png : SKEncodedImageFormat.Jpeg;
+
         for (int i = 0; i < _items.Count; i++)
         {
             var item = _items[i];
-            if (item.Pixels == null) continue;
-
-            using var source = new SKBitmap(item.Width, item.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            Marshal.Copy(item.Pixels, 0, source.GetPixels(), Math.Min(item.Pixels.Length, source.ByteCount));
+            using var document = new PdfiumDocument(item.SourcePath);
+            var rendered = document.RenderPage(item.PageNumber - 1, settings.Dpi / 72f);
+            using var source = new SKBitmap(rendered.Width, rendered.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            int copyLength = Math.Min(rendered.Width * 4, rendered.Stride);
+            for (int y = 0; y < rendered.Height; y++)
+                Marshal.Copy(rendered.Pixels, y * rendered.Stride,
+                    IntPtr.Add(source.GetPixels(), y * source.RowBytes), copyLength);
 
             bool quarterTurn = item.Rotation % 2 != 0;
-            int outputWidth = quarterTurn ? item.Height : item.Width;
-            int outputHeight = quarterTurn ? item.Width : item.Height;
-            using var rotated = new SKBitmap(outputWidth, outputHeight, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            using (var canvas = new SKCanvas(rotated))
+            double contentWidth = quarterTurn ? rendered.Height : rendered.Width;
+            double contentHeight = quarterTurn ? rendered.Width : rendered.Height;
+            (int outputWidth, int outputHeight) = GetOutputPixelSize(settings, contentWidth, contentHeight);
+            using var outputBitmap = new SKBitmap(outputWidth, outputHeight, SKColorType.Bgra8888, SKAlphaType.Opaque);
+            using (var canvas = new SKCanvas(outputBitmap))
             {
                 canvas.Clear(SKColors.White);
+                double scale = settings.FillPage
+                    ? Math.Max(outputWidth / contentWidth, outputHeight / contentHeight)
+                    : Math.Min(outputWidth / contentWidth, outputHeight / contentHeight);
                 canvas.Translate(outputWidth / 2f, outputHeight / 2f);
                 canvas.RotateDegrees(item.Rotation * 90);
-                canvas.DrawBitmap(source, -item.Width / 2f, -item.Height / 2f);
+                canvas.Scale((float)scale);
+                canvas.DrawBitmap(source, -rendered.Width / 2f, -rendered.Height / 2f);
                 canvas.Flush();
             }
 
-            using SKImage image = SKImage.FromBitmap(rotated);
-            using SKData encoded = image.Encode(SKEncodedImageFormat.Jpeg, 92);
+            using SKImage image = SKImage.FromBitmap(outputBitmap);
+            using SKData encoded = image.Encode(encodedFormat, settings.JpegQuality);
             string baseName = Path.GetFileNameWithoutExtension(item.SourceName);
-            string outputName = $"{baseName}-arquivo-{i + 1:0000}-pagina-{item.PageNumber:000}.jpg";
+            string outputName = $"{baseName}-arquivo-{i + 1:0000}-pagina-{item.PageNumber:000}.{extension}";
             string outputPath = Path.Combine(folder, outputName);
             using var stream = File.Create(outputPath);
             encoded.SaveTo(stream);
             exported++;
         }
 
-        StatusText.Text = $"{exported} imagem(ns) JPG exportada(s) para a pasta escolhida. PDFs originais preservados.";
+        StatusText.Text = $"{exported} arquivo(s) {settings.ImageFormat} exportado(s).";
+        await ShowSavedDialogAsync("Exportação concluída!", $"{exported} imagem(ns) salva(s) em {settings.ImageFormat}.\n\nPasta: {folder}");
+    }
+
+    private static (double Width, double Height) GetPageSizePoints(
+        ConversionExportSettings settings, double contentWidth, double contentHeight)
+    {
+        if (settings.PageSize == "Original") return (contentWidth, contentHeight);
+        (double widthMm, double heightMm) = GetPageSizeMm(settings);
+        if (contentWidth > contentHeight) (widthMm, heightMm) = (Math.Max(widthMm, heightMm), Math.Min(widthMm, heightMm));
+        else (widthMm, heightMm) = (Math.Min(widthMm, heightMm), Math.Max(widthMm, heightMm));
+        return (widthMm * 72 / 25.4, heightMm * 72 / 25.4);
+    }
+
+    private static (int Width, int Height) GetOutputPixelSize(
+        ConversionExportSettings settings, double contentWidth, double contentHeight)
+    {
+        if (settings.PageSize == "Original")
+            return ((int)Math.Round(contentWidth), (int)Math.Round(contentHeight));
+        (double widthMm, double heightMm) = GetPageSizeMm(settings);
+        if (contentWidth > contentHeight) (widthMm, heightMm) = (Math.Max(widthMm, heightMm), Math.Min(widthMm, heightMm));
+        else (widthMm, heightMm) = (Math.Min(widthMm, heightMm), Math.Max(widthMm, heightMm));
+        return ((int)Math.Round(widthMm / 25.4 * settings.Dpi),
+                (int)Math.Round(heightMm / 25.4 * settings.Dpi));
+    }
+
+    private static (double Width, double Height) GetPageSizeMm(ConversionExportSettings settings) =>
+        settings.PageSize switch
+        {
+            "A3" => (297, 420),
+            "A4" => (210, 297),
+            "A5" => (148, 210),
+            "Carta" => (215.9, 279.4),
+            "Ofício" => (215.9, 355.6),
+            "Personalizado" => (settings.CustomWidthMm, settings.CustomHeightMm),
+            _ => (210, 297)
+        };
+
+    private async System.Threading.Tasks.Task ShowSavedDialogAsync(string heading, string details)
+    {
+        var dialog = new Window
+        {
+            Title = "AssinaPDF",
+            Width = 460,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = new SolidColorBrush(Color.FromRgb(247, 248, 250))
+        };
+        var content = new StackPanel { Spacing = 12, Margin = new Thickness(24) };
+        content.Children.Add(new TextBlock
+        {
+            Text = "✓  " + heading,
+            FontSize = 19,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(22, 128, 74))
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = details,
+            FontSize = 12,
+            Foreground = new SolidColorBrush(Color.FromRgb(65, 72, 84)),
+            TextWrapping = TextWrapping.Wrap
+        });
+        var ok = new Button
+        {
+            Content = "Concluir",
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Padding = new Thickness(22, 9),
+            Background = new SolidColorBrush(Color.FromRgb(103, 65, 184)),
+            Foreground = Brushes.White
+        };
+        ok.Click += (_, _) => dialog.Close();
+        content.Children.Add(ok);
+        dialog.Content = new Border
+        {
+            Background = Brushes.White,
+            CornerRadius = new CornerRadius(12),
+            Child = content
+        };
+        await dialog.ShowDialog(this);
     }
 
     private static WriteableBitmap CreateBitmap(int width, int height, byte[] pixels, int stride)
