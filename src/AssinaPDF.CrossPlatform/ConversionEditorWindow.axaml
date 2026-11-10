@@ -28,7 +28,7 @@
       <Border Grid.Column="1" Background="#DDE1E8">
         <Grid>
           <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-            <Border Background="White" Padding="18" Margin="16" CornerRadius="5" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border x:Name="PreviewPageSurface" IsVisible="False" Background="White" Padding="18" Margin="16" CornerRadius="5" HorizontalAlignment="Center" VerticalAlignment="Center">
               <Image x:Name="PreviewImage" Stretch="Uniform" MaxWidth="760" MaxHeight="900"/>
             </Border>
           </ScrollViewer>
