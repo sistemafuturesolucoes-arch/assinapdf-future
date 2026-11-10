@@ -9,6 +9,14 @@ public partial class ConverterWindow : Window
         InitializeComponent();
     }
 
+    private async void NfeToDanfe_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var window = new NfeImportWindow();
+        await window.ShowDialog(this);
+        NfeStatusText.Text = "Importador de XML de NF-e fechado.";
+        StatusText.Text = "Você pode iniciar outra conversão.";
+    }
+
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
     private async void ImagesToPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
