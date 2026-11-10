@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.PdfOrganizerWindow"
-        Title="AssinaPDF | Organizar PDFs"
+        Title="AssinaPDF | Combinar e organizar PDF"
         Width="1100" Height="760"
         MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner"
@@ -16,7 +16,7 @@
         <Button Content="＋" Click="ZoomIn_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Aumentar zoom"/>
         <Button Content="Ajustar" Click="ZoomReset_Click" Padding="11,8" Margin="0,0,7,5"/>
         <TextBlock x:Name="ZoomLabel" Text="100%" VerticalAlignment="Center" Foreground="#505866" FontSize="12" Margin="0,0,12,5"/>
-        <TextBlock Text="Organizador de documentos PDF" VerticalAlignment="Center" Foreground="#737B87" FontSize="12" Margin="0,0,12,5"/>
+        <TextBlock Text="Combinar e organizar PDF" VerticalAlignment="Center" Foreground="#737B87" FontSize="12" Margin="0,0,12,5"/>
         <TextBlock x:Name="PageCountText" Text="0 página(s)" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#343A46" Margin="0,0,0,5"/>
       </WrapPanel>
     </Border>
