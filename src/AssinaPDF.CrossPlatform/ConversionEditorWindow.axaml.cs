@@ -54,10 +54,10 @@ public partial class ConversionEditorWindow : Window
         EmptyTitle.Text = imagesToPdf ? "Nenhuma imagem adicionada" : "Nenhum PDF adicionado";
         EmptyDescription.Text = imagesToPdf
             ? "Adicione várias imagens, organize a sequência e reúna tudo em um único PDF."
-            : "Adicione vários PDFs. Todas as páginas serão exibidas para organizar e exportar como JPG.";
+            : "Adicione vários PDFs. Todas as páginas serão exibidas para organizar e exportar como JPG, PNG ou TIFF.";
         StatusText.Text = imagesToPdf
             ? "Adicione uma ou mais imagens para montar seu PDF."
-            : "Adicione um ou mais PDFs para exportar as páginas como JPG.";
+            : "Adicione um ou mais PDFs para exportar as páginas como JPG, PNG ou TIFF.";
         Closed += (_, _) => DisposeItems();
     }
 
@@ -127,7 +127,7 @@ public partial class ConversionEditorWindow : Window
             RebuildThumbnails();
             StatusText.Text = _imagesToPdf
                 ? $"{added} imagem(ns) adicionada(s). Organize e clique em Converter em um PDF."
-                : $"{added} página(s) carregada(s) de {files.Count} PDF(s). Organize e exporte em JPG.";
+                : $"{added} página(s) carregada(s) de {files.Count} PDF(s). Organize e configure o formato de exportação.";
         }
         catch (Exception ex)
         {
