@@ -345,11 +345,20 @@ public partial class MainWindow : Window
         DashboardStatusText.Text = "As ferramentas de organização serão disponibilizadas em uma próxima etapa.";
     }
 
-    private void DashboardConvert_Click(
+    private async void DashboardConvert_Click(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
-        DashboardStatusText.Text = "O conversor de documentos será disponibilizado em uma próxima etapa.";
+        try
+        {
+            var converter = new ConverterWindow();
+            await converter.ShowDialog(this);
+            DashboardStatusText.Text = "Central de conversão fechada.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir a central de conversão: {ex.Message}";
+        }
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
