@@ -2,14 +2,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.ConverterWindow"
         Title="AssinaPDF | Converter arquivos"
-        Width="820" Height="650"
-        MinWidth="720" MinHeight="560"
-        WindowStartupLocation="CenterOwner"
-        Background="#F3F4F6">
+        Width="820" Height="650" MinWidth="720" MinHeight="560"
+        WindowStartupLocation="CenterOwner" Background="#F3F4F6">
   <Grid RowDefinitions="Auto,*,Auto" Margin="24">
     <StackPanel Grid.Row="0" Spacing="5" Margin="0,0,0,20">
       <TextBlock Text="Central de conversão" FontSize="26" FontWeight="SemiBold" Foreground="#252A34"/>
-      <TextBlock Text="Conversões locais. Seus arquivos permanecem no computador." FontSize="13" Foreground="#737B87"/>
+      <TextBlock Text="Escolha a conversão para abrir o editor. Seus arquivos permanecem no computador." FontSize="13" Foreground="#737B87"/>
     </StackPanel>
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="14">
@@ -17,20 +15,20 @@
           <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
             <StackPanel Grid.Row="0" Spacing="4">
               <TextBlock Text="Imagem para PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
-              <TextBlock Text="Converta JPG, JPEG, PNG e BMP. Cada imagem será colocada em uma página, ajustada proporcionalmente." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+              <TextBlock Text="Adicione várias imagens, visualize, reorganize e reúna tudo em um único PDF, com uma imagem por página." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
             </StackPanel>
-            <Button Grid.Column="1" Grid.RowSpan="2" Content="Selecionar imagens" Click="ImagesToPdf_Click" VerticalAlignment="Center" Background="#6741B8" Foreground="White" Padding="16,10"/>
-            <TextBlock x:Name="ImagesStatusText" Grid.Row="2" Text="Nenhuma imagem selecionada." FontSize="11" Foreground="#747B86" Margin="0,12,0,0"/>
+            <Button Grid.Column="1" Grid.RowSpan="2" Content="Abrir editor de imagens" Click="ImagesToPdf_Click" VerticalAlignment="Center" Background="#6741B8" Foreground="White" Padding="16,10"/>
+            <TextBlock x:Name="ImagesStatusText" Grid.Row="2" Text="Editor de imagens pronto." FontSize="11" Foreground="#747B86" Margin="0,12,0,0"/>
           </Grid>
         </Border>
         <Border Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="10" Padding="18">
           <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
             <StackPanel Grid.Row="0" Spacing="4">
               <TextBlock Text="PDF para JPG" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
-              <TextBlock Text="Exporte cada página do PDF como uma imagem JPG separada." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+              <TextBlock Text="Adicione vários PDFs, visualize e organize todas as páginas antes de exportar cada uma como JPG para uma única pasta." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
             </StackPanel>
-            <Button Grid.Column="1" Grid.RowSpan="2" Content="Selecionar PDF e exportar" Click="PdfToJpg_Click" VerticalAlignment="Center" Background="#6741B8" Foreground="White" Padding="16,10"/>
-            <TextBlock x:Name="PdfToJpgStatusText" Grid.Row="2" Text="Nenhum PDF selecionado." FontSize="11" Foreground="#747B86" Margin="0,12,0,0"/>
+            <Button Grid.Column="1" Grid.RowSpan="2" Content="Abrir editor de PDF" Click="PdfToJpg_Click" VerticalAlignment="Center" Background="#6741B8" Foreground="White" Padding="16,10"/>
+            <TextBlock x:Name="PdfToJpgStatusText" Grid.Row="2" Text="Editor de PDF pronto." FontSize="11" Foreground="#747B86" Margin="0,12,0,0"/>
           </Grid>
         </Border>
         <Border Background="#ECEEF2" CornerRadius="8" Padding="14">
