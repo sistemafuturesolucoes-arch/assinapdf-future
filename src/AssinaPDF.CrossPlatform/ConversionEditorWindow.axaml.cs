@@ -213,11 +213,17 @@ public partial class ConversionEditorWindow : Window
             double previewScale = Math.Min(1d, Math.Min(760d / Math.Max(1, rotatedWidth), 900d / Math.Max(1, rotatedHeight)));
             PreviewImage.Width = Math.Max(1, _selected.Width * previewScale);
             PreviewImage.Height = Math.Max(1, _selected.Height * previewScale);
-            PreviewImage.RenderTransform = null;
-            PreviewPageSurface.Width = PreviewImage.Width + 36;
-            PreviewPageSurface.Height = PreviewImage.Height + 36;
-            PreviewPageSurface.RenderTransform = new RotateTransform(_selected.Rotation * 90);
-            PreviewPageSurface.RenderTransformOrigin = RelativePoint.Center;
+            PreviewImage.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+            PreviewImage.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+            PreviewImage.RenderTransform = new RotateTransform(_selected.Rotation * 90);
+            PreviewImage.RenderTransformOrigin = RelativePoint.Center;
+
+            // A própria folha branca assume as dimensões da orientação final.
+            // O conteúdo gira dentro dela, evitando que a área de fundo fique em retrato
+            // quando a página passa para paisagem (e vice-versa).
+            PreviewPageSurface.Width = rotatedWidth * previewScale + 36;
+            PreviewPageSurface.Height = rotatedHeight * previewScale + 36;
+            PreviewPageSurface.RenderTransform = null;
             PreviewPageSurface.IsVisible = true;
             PreviewImage.IsVisible = true;
         }
