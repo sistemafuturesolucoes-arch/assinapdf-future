@@ -43,6 +43,9 @@
             <TextBlock Text="Documento selecionado" FontSize="16" FontWeight="SemiBold" Foreground="#292D36"/>
             <TextBlock x:Name="SelectionHint" Text="Selecione um XML na lista para conferir os dados."
                        FontSize="11" Foreground="#737B87" TextWrapping="Wrap"/>
+            <Button Content="Gerar e exportar DANFE PDF" Click="ExportDanfe_Click"
+                    HorizontalAlignment="Left" Padding="12,7"
+                    Background="#6741B8" Foreground="White"/>
           </StackPanel>
           <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
             <TextBlock x:Name="DetailsText" Text="Nenhum documento selecionado."
