@@ -24,6 +24,7 @@
     <PackageReference Include="bblanchon.PDFium.Win32" Version="158.0.8125" />
     <PackageReference Include="SimpleSign.PAdES" Version="0.9.2" />
     <PackageReference Include="PDFsharp" Version="6.2.2" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="Aspose.PDF.FOSS" Version="26.11.0" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
