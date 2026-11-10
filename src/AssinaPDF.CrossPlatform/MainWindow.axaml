@@ -34,7 +34,7 @@
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
           <Button Content="Editar PDF" Click="DashboardEdit_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
-          <Button Content="Organizar" Click="DashboardOrganize_Click"
+          <Button Content="Combinar e organizar PDF" Click="DashboardOrganize_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
           <Button Content="Converter" Click="DashboardConvert_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
@@ -102,10 +102,10 @@
                     CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="☷" FontSize="29" Foreground="#32888A"/>
-                <TextBlock Text="Organizar páginas" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
-                <TextBlock Text="Reordene, gire, divida e junte documentos."
+                <TextBlock Text="Combinar e organizar PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+                <TextBlock Text="Combine vários PDFs e organize, visualize e gire suas páginas."
                            FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
-                <TextBlock Text="Em desenvolvimento" FontSize="10" Foreground="#6D9293"/>
+                <TextBlock Text="Editor de PDFs" FontSize="10" Foreground="#6D9293"/>
               </StackPanel>
             </Button>
 
@@ -115,7 +115,7 @@
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="⇄" FontSize="29" Foreground="#7751A8"/>
                 <TextBlock Text="Converter arquivos" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
-                <TextBlock Text="Junte PDFs e converta imagens em PDF ou PDF em JPG."
+                <TextBlock Text="Converta imagens em PDF ou exporte páginas para JPG."
                            FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
               </StackPanel>
             </Button>
