@@ -50,7 +50,7 @@ public partial class ConversionEditorWindow : Window
 
         Title = imagesToPdf ? "AssinaPDF | Imagens para PDF" : "AssinaPDF | PDF para imagens";
         ThumbnailHeading.Text = imagesToPdf ? "IMAGENS · ARQUIVOS" : "PÁGINAS · PDFs";
-        ConvertButton.Content = imagesToPdf ? "Converter em um PDF" : "Exportar páginas em JPG";
+        ConvertButton.Content = imagesToPdf ? "Converter em um PDF" : "Exportar imagens";
         EmptyTitle.Text = imagesToPdf ? "Nenhuma imagem adicionada" : "Nenhum PDF adicionado";
         EmptyDescription.Text = imagesToPdf
             ? "Adicione várias imagens, organize a sequência e reúna tudo em um único PDF."
@@ -391,7 +391,12 @@ public partial class ConversionEditorWindow : Window
 
         string folder = folders[0].Path.LocalPath;
         int exported = 0;
-        string extension = settings.ImageFormat == "PNG" ? "png" : "jpg";
+        string extension = settings.ImageFormat switch
+        {
+            "PNG" => "png",
+            "TIFF" => "tiff",
+            _ => "jpg"
+        };
         SKEncodedImageFormat encodedFormat = settings.ImageFormat == "PNG"
             ? SKEncodedImageFormat.Png : SKEncodedImageFormat.Jpeg;
 
@@ -424,18 +429,95 @@ public partial class ConversionEditorWindow : Window
                 canvas.Flush();
             }
 
-            using SKImage image = SKImage.FromBitmap(outputBitmap);
-            using SKData encoded = image.Encode(encodedFormat, settings.JpegQuality);
             string baseName = Path.GetFileNameWithoutExtension(item.SourceName);
             string outputName = $"{baseName}-arquivo-{i + 1:0000}-pagina-{item.PageNumber:000}.{extension}";
             string outputPath = Path.Combine(folder, outputName);
-            using var stream = File.Create(outputPath);
-            encoded.SaveTo(stream);
+
+            if (settings.ImageFormat == "TIFF")
+            {
+                SaveBitmapAsTiff(outputBitmap, outputPath, settings.Dpi);
+            }
+            else
+            {
+                using SKImage image = SKImage.FromBitmap(outputBitmap);
+                using SKData encoded = image.Encode(encodedFormat, settings.JpegQuality);
+                using var stream = File.Create(outputPath);
+                encoded.SaveTo(stream);
+            }
             exported++;
         }
 
         StatusText.Text = $"{exported} arquivo(s) {settings.ImageFormat} exportado(s).";
         await ShowSavedDialogAsync("Exportação concluída!", $"{exported} imagem(ns) salva(s) em {settings.ImageFormat}.\n\nPasta: {folder}");
+    }
+
+    private static void SaveBitmapAsTiff(SKBitmap bitmap, string path, int dpi)
+    {
+        // TIFF baseline little-endian, RGB 8 bits/channel, uncompressed.
+        // The export bitmap is opaque (white background), so alpha is intentionally flattened.
+        const ushort entryCount = 13;
+        int ifdStart = 8;
+        int ifdLength = 2 + entryCount * 12 + 4;
+        int bitsOffset = ifdStart + ifdLength;
+        int xResolutionOffset = bitsOffset + 6;
+        int yResolutionOffset = xResolutionOffset + 8;
+        int pixelDataOffset = yResolutionOffset + 8;
+        int byteCount = checked(bitmap.Width * bitmap.Height * 3);
+
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream);
+        writer.Write((byte)'I');
+        writer.Write((byte)'I');
+        writer.Write((ushort)42);
+        writer.Write((uint)ifdStart);
+        writer.Write(entryCount);
+
+        WriteTiffEntry(writer, 256, 4, 1, (uint)bitmap.Width);
+        WriteTiffEntry(writer, 257, 4, 1, (uint)bitmap.Height);
+        WriteTiffEntry(writer, 258, 3, 3, (uint)bitsOffset);
+        WriteTiffEntry(writer, 259, 3, 1, 1);
+        WriteTiffEntry(writer, 262, 3, 1, 2);
+        WriteTiffEntry(writer, 273, 4, 1, (uint)pixelDataOffset);
+        WriteTiffEntry(writer, 277, 3, 1, 3);
+        WriteTiffEntry(writer, 278, 4, 1, (uint)bitmap.Height);
+        WriteTiffEntry(writer, 279, 4, 1, (uint)byteCount);
+        WriteTiffEntry(writer, 282, 5, 1, (uint)xResolutionOffset);
+        WriteTiffEntry(writer, 283, 5, 1, (uint)yResolutionOffset);
+        WriteTiffEntry(writer, 284, 3, 1, 1);
+        WriteTiffEntry(writer, 296, 3, 1, 2);
+        writer.Write((uint)0);
+
+        writer.Write((ushort)8);
+        writer.Write((ushort)8);
+        writer.Write((ushort)8);
+        writer.Write((uint)dpi);
+        writer.Write((uint)1);
+        writer.Write((uint)dpi);
+        writer.Write((uint)1);
+
+        byte[] bgra = new byte[checked(bitmap.Width * 4)];
+        byte[] rgb = new byte[checked(bitmap.Width * 3)];
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            Marshal.Copy(IntPtr.Add(bitmap.GetPixels(), y * bitmap.RowBytes), bgra, 0, bgra.Length);
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                int source = x * 4;
+                int target = x * 3;
+                rgb[target] = bgra[source + 2];
+                rgb[target + 1] = bgra[source + 1];
+                rgb[target + 2] = bgra[source];
+            }
+            writer.Write(rgb);
+        }
+    }
+
+    private static void WriteTiffEntry(BinaryWriter writer, ushort tag, ushort type, uint count, uint value)
+    {
+        writer.Write(tag);
+        writer.Write(type);
+        writer.Write(count);
+        writer.Write(value);
     }
 
     private static (double Width, double Height) GetPageSizePoints(
