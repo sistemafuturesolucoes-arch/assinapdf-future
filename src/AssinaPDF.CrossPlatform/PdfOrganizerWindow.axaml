@@ -2,26 +2,28 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.PdfOrganizerWindow"
         Title="AssinaPDF | Organizar PDFs"
-        Width="1280" Height="850"
-        MinWidth="900" MinHeight="620"
+        Width="1100" Height="760"
+        MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner"
         Background="#F1F3F6">
   <Grid RowDefinitions="Auto,*,Auto">
-    <Border Grid.Row="0" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1" Padding="14,10">
-      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="9">
-        <Button x:Name="AddDocumentsButton" Grid.Column="0" Content="＋ Adicionar documento" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="16,9"/>
-        <Button Grid.Column="1" Content="−" Click="ZoomOut_Click" Padding="13,9" ToolTip.Tip="Diminuir zoom"/>
-        <Button Grid.Column="2" Content="＋" Click="ZoomIn_Click" Padding="13,9" ToolTip.Tip="Aumentar zoom"/>
-        <Button Grid.Column="3" Content="Ajustar" Click="ZoomReset_Click" Padding="13,9"/>
-        <TextBlock x:Name="ZoomLabel" Grid.Column="4" Text="100%" VerticalAlignment="Center" Foreground="#505866" FontSize="12"/>
-        <TextBlock Grid.Column="5" Text="Organizador de documentos PDF" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#737B87" FontSize="13"/>
-        <TextBlock x:Name="PageCountText" Grid.Column="6" Text="0 página(s)" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#343A46"/>
-      </Grid>
+    <Border Grid.Row="0" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1" Padding="10,8">
+      <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Button x:Name="AddDocumentsButton" Content="＋ Adicionar documento" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="13,8" Margin="0,0,7,5"/>
+        <Button Content="↶ Girar esquerda" Click="RotateLeft_Click" Padding="11,8" Margin="0,0,7,5" ToolTip.Tip="Girar a página selecionada 90 graus para a esquerda"/>
+        <Button Content="↷ Girar direita" Click="RotateRight_Click" Padding="11,8" Margin="0,0,7,5" ToolTip.Tip="Girar a página selecionada 90 graus para a direita"/>
+        <Button Content="−" Click="ZoomOut_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Diminuir zoom"/>
+        <Button Content="＋" Click="ZoomIn_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Aumentar zoom"/>
+        <Button Content="Ajustar" Click="ZoomReset_Click" Padding="11,8" Margin="0,0,7,5"/>
+        <TextBlock x:Name="ZoomLabel" Text="100%" VerticalAlignment="Center" Foreground="#505866" FontSize="12" Margin="0,0,12,5"/>
+        <TextBlock Text="Organizador de documentos PDF" VerticalAlignment="Center" Foreground="#737B87" FontSize="12" Margin="0,0,12,5"/>
+        <TextBlock x:Name="PageCountText" Text="0 página(s)" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#343A46" Margin="0,0,0,5"/>
+      </WrapPanel>
     </Border>
-    <Grid Grid.Row="1" ColumnDefinitions="230,*">
+    <Grid Grid.Row="1" ColumnDefinitions="200,*">
       <Border Grid.Column="0" Background="#E9ECF1" BorderBrush="#DDE1E8" BorderThickness="0,0,1,0">
         <Grid RowDefinitions="Auto,*">
-          <TextBlock Grid.Row="0" Text="PÁGINAS DO DOCUMENTO" FontSize="11" FontWeight="SemiBold" Foreground="#687180" Margin="14,14,10,8"/>
+          <TextBlock Grid.Row="0" Text="PÁGINAS DO DOCUMENTO" FontSize="10" FontWeight="SemiBold" Foreground="#687180" Margin="12,12,8,7"/>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="ThumbnailsPanel" Spacing="4"/>
           </ScrollViewer>
@@ -32,9 +34,9 @@
           <ScrollViewer x:Name="DocumentScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
             <StackPanel x:Name="PagesPanel" HorizontalAlignment="Stretch" Spacing="0"/>
           </ScrollViewer>
-          <Border x:Name="EmptyState" IsVisible="True" Background="#F7F8FA" CornerRadius="12" Padding="34" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="430">
+          <Border x:Name="EmptyState" IsVisible="True" Background="#F7F8FA" CornerRadius="12" Padding="28" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="430">
             <StackPanel Spacing="10" HorizontalAlignment="Center">
-              <TextBlock Text="Nenhum documento adicionado" FontSize="20" FontWeight="SemiBold" Foreground="#303744" HorizontalAlignment="Center"/>
+              <TextBlock Text="Nenhum documento adicionado" FontSize="19" FontWeight="SemiBold" Foreground="#303744" HorizontalAlignment="Center"/>
               <TextBlock Text="Clique em Adicionar documento para carregar um ou vários PDFs. As páginas serão exibidas em sequência, uma abaixo da outra." TextWrapping="Wrap" TextAlignment="Center" Foreground="#747C89" FontSize="13"/>
               <Button Content="Adicionar PDF" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="18,10" HorizontalAlignment="Center"/>
             </StackPanel>
