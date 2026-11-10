@@ -31,6 +31,16 @@
             <TextBlock x:Name="PdfToJpgStatusText" Grid.Row="2" Text="Editor de PDF pronto." FontSize="11" Foreground="#747B86" Margin="0,12,0,0"/>
           </Grid>
         </Border>
+        <Border Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="10" Padding="18">
+          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+            <StackPanel Grid.Row="0" Spacing="4">
+              <TextBlock Text="XML de NF-e para DANFE" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+              <TextBlock Text="Importe XMLs de NF-e autorizadas, confira os dados fiscais e prepare a geração do DANFE em PDF." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+            </StackPanel>
+            <Button Grid.Column="1" Grid.RowSpan="2" Content="Importar XML de NF-e" Click="NfeToDanfe_Click" VerticalAlignment="Center" Background="#6741B8" Foreground="White" Padding="16,10"/>
+            <TextBlock x:Name="NfeStatusText" Grid.Row="2" Text="Leitura local de XMLs pronta." FontSize="11" Foreground="#747B86" Margin="0,12,0,0"/>
+          </Grid>
+        </Border>
         <Border Background="#ECEEF2" CornerRadius="8" Padding="14">
           <StackPanel Spacing="4">
             <TextBlock Text="Próximas conversões" FontSize="13" FontWeight="SemiBold" Foreground="#454B55"/>
