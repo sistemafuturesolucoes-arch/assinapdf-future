@@ -1,0 +1,51 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.NfeImportWindow"
+        Title="AssinaPDF | XML de NF-e para DANFE"
+        Width="1040" Height="720" MinWidth="820" MinHeight="600"
+        WindowStartupLocation="CenterOwner" Background="#F3F4F6">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="22">
+    <StackPanel Grid.Row="0" Spacing="5" Margin="0,0,0,16">
+      <TextBlock Text="Importar XML de NF-e" FontSize="25" FontWeight="SemiBold" Foreground="#252A34"/>
+      <TextBlock Text="Adicione XMLs autorizados. A leitura é local e os arquivos originais não são alterados." FontSize="13" Foreground="#737B87" TextWrapping="Wrap"/>
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14">
+      <Border Grid.Column="0" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="9" Padding="12">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Row="0" Spacing="8">
+            <Button Content="Adicionar XMLs" Click="AddXml_Click" Background="#6741B8" Foreground="White" Padding="12,9"/>
+            <TextBlock x:Name="CountText" Text="Nenhum XML adicionado" FontSize="11" Foreground="#737B87"/>
+          </StackPanel>
+          <ListBox x:Name="DocumentsList" Grid.Row="1" Margin="0,10,0,10"
+                   SelectionChanged="DocumentsList_SelectionChanged"/>
+          <StackPanel Grid.Row="2" Spacing="7">
+            <Button Content="Remover selecionado" Click="RemoveSelected_Click" Background="#E7E9ED" Foreground="#34383E"/>
+            <Button Content="Limpar lista" Click="ClearList_Click" Background="#F4E9E9" Foreground="#8A3D3D"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="9" Padding="20">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock Text="Dados da NF-e selecionada" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+            <TextBlock x:Name="SelectionHint" Text="Selecione um XML na lista para conferir os dados." FontSize="12" Foreground="#737B87"/>
+          </StackPanel>
+          <ScrollViewer Grid.Row="1" Margin="0,14,0,0">
+            <TextBlock x:Name="DetailsText" Text="Nenhum documento selecionado."
+                       FontSize="13" Foreground="#454B55" TextWrapping="Wrap"
+                       LineHeight="21"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
+      <TextBlock x:Name="StatusText" Text="Aguardando XML de NF-e." FontSize="11"
+                 Foreground="#666D78" VerticalAlignment="Center" TextWrapping="Wrap"/>
+      <Button Grid.Column="1" Content="Fechar" Click="Close_Click" Padding="18,8"
+              Background="#E2E5EA" Foreground="#34383E"/>
+    </Grid>
+  </Grid>
+</Window>
