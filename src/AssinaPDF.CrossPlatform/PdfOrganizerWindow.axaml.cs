@@ -71,7 +71,7 @@ public partial class PdfOrganizerWindow : Window
                 }
             });
 
-            if (files.Count == 0) return;
+            if (files.Count == 0) { _insertBeforeNextAdd = _insertAfterNextAdd = false; return; }
 
             _loading = true;
             AddDocumentsButton.IsEnabled = false;
@@ -206,7 +206,9 @@ public partial class PdfOrganizerWindow : Window
                     sourceDocument.Dispose();
             }
 
-            StatusText.Text = $"PDF salvo com sucesso: {Path.GetFileName(outputPath)}. Os arquivos originais foram preservados.";
+            _isDirty = false;
+            Title = "AssinaPDF | Combinar e organizar PDF";
+            StatusText.Text = $"PDF salvo com sucesso: {Path.GetFileName(outputPath)}. Os originais foram preservados. Assinaturas digitais anteriores não são mantidas no PDF combinado.";
         }
         catch (Exception ex)
         {
@@ -466,22 +468,34 @@ public partial class PdfOrganizerWindow : Window
             return;
         }
 
-        var page = _selectedPage;
-        var previousBitmap = page.Bitmap;
+        var original = _selectedPage;
+        int index = _pages.IndexOf(original);
+        if (index < 0) return;
         try
         {
-            page.Bitmap = RotateBitmap90(previousBitmap, direction > 0);
+            var rotatedBitmap = RotateBitmap90(original.Bitmap, direction > 0);
             PushUndoState();
-            page.RotationQuarterTurns = (page.RotationQuarterTurns + (direction > 0 ? 1 : 3)) % 4;
+            var rotatedPage = new OrganizerPage
+            {
+                Bitmap = rotatedBitmap,
+                SourcePath = original.SourcePath,
+                SourceName = original.SourceName,
+                SourcePageNumber = original.SourcePageNumber,
+                SequenceNumber = original.SequenceNumber,
+                RotationQuarterTurns = (original.RotationQuarterTurns + (direction > 0 ? 1 : 3)) % 4
+            };
+            _pages[index] = rotatedPage;
+            _selectedPages.Remove(original);
+            _selectedPages.Add(rotatedPage);
+            _selectedPage = rotatedPage;
+            _rangeAnchor = rotatedPage;
             MarkDirty();
             RebuildPageViews();
             UpdateSelectionVisuals();
-            StatusText.Text = $"Página {page.SequenceNumber} girada. A rotação será aplicada ao PDF quando salvarmos o documento final.";
-            previousBitmap.Dispose();
+            StatusText.Text = $"Página {rotatedPage.SequenceNumber} girada. A rotação será aplicada ao PDF final.";
         }
         catch (Exception ex)
         {
-            page.Bitmap = previousBitmap;
             StatusText.Text = $"Não foi possível girar a página: {ex.Message}";
         }
     }
