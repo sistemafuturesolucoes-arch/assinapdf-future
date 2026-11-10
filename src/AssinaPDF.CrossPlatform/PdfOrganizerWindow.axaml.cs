@@ -254,13 +254,13 @@ public partial class PdfOrganizerWindow : Window
         AddItem("Inserir PDF antes desta página…", () => InsertBefore_Click(null, null!), _pages.Contains(page));
         AddItem("Inserir PDF depois desta página…", () => InsertAfter_Click(null, null!), _pages.Contains(page));
         menu.Items.Add(new Separator());
-        AddItem("Mover para cima", () => MoveSelectedPages(-1), _selectedPages.Count > 0);
-        AddItem("Mover para baixo", () => MoveSelectedPages(1), _selectedPages.Count > 0);
-        AddItem("Excluir página(s)", () => DeleteSelected_Click(null, null!), _selectedPages.Count > 0);
-        AddItem("Exportar página(s) selecionada(s)…", () => ExportSelected_Click(null, null!), _selectedPages.Count > 0);
+        AddItem("Mover para cima", () => MoveSelectedPages(-1));
+        AddItem("Mover para baixo", () => MoveSelectedPages(1));
+        AddItem("Excluir página(s)", () => DeleteSelected_Click(null, null!));
+        AddItem("Exportar página(s) selecionada(s)…", () => ExportSelected_Click(null, null!));
         menu.Items.Add(new Separator());
-        AddItem("Desfazer (Ctrl+Z)", () => Undo_Click(null, null!), _undo.Count > 0);
-        AddItem("Refazer (Ctrl+Y)", () => Redo_Click(null, null!), _redo.Count > 0);
+        AddItem("Desfazer (Ctrl+Z)", () => Undo_Click(null, null!));
+        AddItem("Refazer (Ctrl+Y)", () => Redo_Click(null, null!));
 
         return menu;
     }
