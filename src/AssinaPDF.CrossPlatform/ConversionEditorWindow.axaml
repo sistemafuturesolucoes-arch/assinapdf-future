@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.ConversionEditorWindow"
+        Title="AssinaPDF | Editor de conversão"
+        Width="1050" Height="620" MinWidth="760" MinHeight="460"
+        WindowStartupLocation="CenterOwner" Background="#F1F3F6">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1" Padding="10,8">
+      <WrapPanel VerticalAlignment="Center">
+        <Button Content="＋ Adicionar arquivos" Click="AddFiles_Click" Background="#6741B8" Foreground="White" Padding="13,8" Margin="0,0,7,5"/>
+        <Button Content="↑ Mover" Click="MoveUp_Click" Padding="12,8" Margin="0,0,5,5"/>
+        <Button Content="↓ Mover" Click="MoveDown_Click" Padding="12,8" Margin="0,0,5,5"/>
+        <Button Content="↶ Girar" Click="RotateLeft_Click" Padding="12,8" Margin="0,0,5,5"/>
+        <Button Content="↷ Girar" Click="RotateRight_Click" Padding="12,8" Margin="0,0,8,5"/>
+        <Button x:Name="ConvertButton" Content="Converter e salvar" Click="Convert_Click" Background="#16804A" Foreground="White" Padding="15,8" Margin="0,0,8,5"/>
+        <TextBlock x:Name="ItemCountText" Text="0 item(ns)" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="#343A46" Margin="0,0,0,5"/>
+      </WrapPanel>
+    </Border>
+    <Grid Grid.Row="1" ColumnDefinitions="200,*">
+      <Border Grid.Column="0" Background="#E9ECF1" BorderBrush="#DDE1E8" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock x:Name="ThumbnailHeading" Grid.Row="0" Text="ARQUIVOS" FontSize="10" FontWeight="SemiBold" Foreground="#687180" Margin="12,12,8,7"/>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="ThumbnailsPanel" Spacing="4"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="#DDE1E8">
+        <Grid>
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <Border Background="White" Padding="18" Margin="16" CornerRadius="5" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Image x:Name="PreviewImage" Stretch="Uniform" MaxWidth="760" MaxHeight="900"/>
+            </Border>
+          </ScrollViewer>
+          <Border x:Name="EmptyState" IsVisible="True" Background="#F7F8FA" CornerRadius="12" Padding="28" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="430">
+            <StackPanel Spacing="10" HorizontalAlignment="Center">
+              <TextBlock x:Name="EmptyTitle" Text="Nenhum arquivo adicionado" FontSize="19" FontWeight="SemiBold" Foreground="#303744" HorizontalAlignment="Center"/>
+              <TextBlock x:Name="EmptyDescription" Text="Adicione imagens ou PDFs para visualizar, organizar e converter." TextWrapping="Wrap" TextAlignment="Center" Foreground="#747C89" FontSize="13"/>
+              <Button Content="Adicionar arquivos" Click="AddFiles_Click" Background="#6741B8" Foreground="White" Padding="18,10" HorizontalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+    <Border Grid.Row="2" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,1,0,0" Padding="12,7">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock x:Name="StatusText" Text="Adicione arquivos para começar." FontSize="11" Foreground="#687180" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        <Button Grid.Column="1" Content="Fechar editor" Click="Close_Click" Padding="18,7" Margin="12,0,0,0" Background="#E2E5EA" Foreground="#34383E"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>
