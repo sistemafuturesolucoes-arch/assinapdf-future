@@ -11,16 +11,6 @@
       <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
         <Button x:Name="AddDocumentsButton" Content="＋ Adicionar documento" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="13,8" Margin="0,0,7,5"/>
         <Button x:Name="SaveAsButton" Content="Salvar como" Click="SaveAs_Click" Background="#16804A" Foreground="White" Padding="13,8" Margin="0,0,7,5" ToolTip.Tip="Salvar a sequência organizada em um novo arquivo PDF"/>
-        <Button Content="↶ Girar esquerda" Click="RotateLeft_Click" Padding="11,8" Margin="0,0,7,5" ToolTip.Tip="Girar a página selecionada 90 graus para a esquerda"/>
-        <Button Content="↷ Girar direita" Click="RotateRight_Click" Padding="11,8" Margin="0,0,7,5" ToolTip.Tip="Girar a página selecionada 90 graus para a direita"/>
-        <Button Content="Inserir antes" Click="InsertBefore_Click" Padding="10,8" Margin="0,0,5,5" ToolTip.Tip="Adicionar PDFs antes da página selecionada"/>
-        <Button Content="Inserir depois" Click="InsertAfter_Click" Padding="10,8" Margin="0,0,5,5" ToolTip.Tip="Adicionar PDFs depois da página selecionada"/>
-        <Button Content="Excluir" Click="DeleteSelected_Click" Padding="10,8" Margin="0,0,5,5"/>
-        <Button Content="↑" Click="MoveUp_Click" Padding="10,8" Margin="0,0,5,5" ToolTip.Tip="Mover páginas selecionadas para cima"/>
-        <Button Content="↓" Click="MoveDown_Click" Padding="10,8" Margin="0,0,5,5" ToolTip.Tip="Mover páginas selecionadas para baixo"/>
-        <Button Content="Desfazer" Click="Undo_Click" Padding="10,8" Margin="0,0,5,5"/>
-        <Button Content="Refazer" Click="Redo_Click" Padding="10,8" Margin="0,0,5,5"/>
-        <Button Content="Exportar seleção" Click="ExportSelected_Click" Padding="10,8" Margin="0,0,7,5"/>
         <Button Content="−" Click="ZoomOut_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Diminuir zoom"/>
         <Button Content="＋" Click="ZoomIn_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Aumentar zoom"/>
         <Button Content="Ajustar" Click="ZoomReset_Click" Padding="11,8" Margin="0,0,7,5"/>
