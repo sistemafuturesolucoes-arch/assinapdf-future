@@ -22,6 +22,7 @@ public partial class PdfOrganizerWindow : Window
         public required string SourceName { get; init; }
         public required int SourcePageNumber { get; init; }
         public required int SequenceNumber { get; set; }
+        public int RotationQuarterTurns { get; set; }
         public Border? PageCard { get; set; }
         public Image? PageImage { get; set; }
         public Border? ThumbnailCard { get; set; }
