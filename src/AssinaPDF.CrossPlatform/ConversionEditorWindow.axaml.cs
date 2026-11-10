@@ -37,6 +37,12 @@ public partial class ConversionEditorWindow : Window
     private readonly List<ConversionItem> _items = new();
     private ConversionItem? _selected;
 
+    // Construtor público sem parâmetros exigido pelo carregador XAML do Avalonia.
+    // O fluxo normal da aplicação usa o construtor que recebe o modo explicitamente.
+    public ConversionEditorWindow() : this(imagesToPdf: true)
+    {
+    }
+
     public ConversionEditorWindow(bool imagesToPdf)
     {
         _imagesToPdf = imagesToPdf;
