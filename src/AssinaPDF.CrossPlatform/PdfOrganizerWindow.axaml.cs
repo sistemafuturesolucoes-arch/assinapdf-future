@@ -149,6 +149,7 @@ public partial class PdfOrganizerWindow : Window
 
         try
         {
+            if (!await ConfirmSignatureImpactAsync()) return;
             var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Salvar PDF combinado como",
@@ -373,6 +374,7 @@ public partial class PdfOrganizerWindow : Window
         if (selected.Count == 0) { StatusText.Text = "Selecione as páginas que deseja exportar."; return; }
         try
         {
+            if (!await ConfirmSignatureImpactAsync()) return;
             var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Exportar páginas selecionadas",
@@ -410,6 +412,47 @@ public partial class PdfOrganizerWindow : Window
     {
         _isDirty = true;
         Title = "AssinaPDF | Combinar e organizar PDF *";
+    }
+
+    private async Task<bool> ConfirmSignatureImpactAsync()
+    {
+        var prompt = new Window
+        {
+            Title = "Atenção às assinaturas digitais",
+            Width = 430,
+            Height = 205,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(18),
+                Spacing = 14,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "Ao combinar, reorganizar ou exportar páginas, as assinaturas digitais existentes nos PDFs de origem não serão preservadas no novo arquivo. Os documentos originais permanecerão intactos. Deseja continuar?",
+                        TextWrapping = TextWrapping.Wrap
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children =
+                        {
+                            new Button { Content = "Cancelar", MinWidth = 100 },
+                            new Button { Content = "Continuar", MinWidth = 100 }
+                        }
+                    }
+                }
+            }
+        };
+        var root = (StackPanel)prompt.Content!;
+        var buttons = (StackPanel)root.Children[1];
+        ((Button)buttons.Children[0]).Click += (_, _) => prompt.Close(false);
+        ((Button)buttons.Children[1]).Click += (_, _) => prompt.Close(true);
+        return await prompt.ShowDialog<bool>(this);
     }
 
     private async void OrganizerWindow_Closing(object? sender, WindowClosingEventArgs e)
