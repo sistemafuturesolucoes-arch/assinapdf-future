@@ -163,5 +163,41 @@ public partial class NfeImportWindow : Window
         }
     }
 
+    private async void ExportDanfe_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DocumentsList.SelectedItem is not NfeDocumentSummary document)
+        {
+            StatusText.Text = "Selecione uma NF-e autorizada antes de gerar o DANFE.";
+            return;
+        }
+
+        try
+        {
+            var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Salvar DANFE em PDF",
+                SuggestedFileName = $"DANFE-NFe-{document.InvoiceNumber}.pdf",
+                DefaultExtension = "pdf",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } }
+                }
+            });
+            if (destination == null) return;
+
+            string outputPath = Path.GetFullPath(destination.Path.LocalPath);
+            if (string.Equals(outputPath, Path.GetFullPath(document.SourcePath),
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                throw new InvalidOperationException("O PDF não pode substituir o XML original.");
+
+            NfeDanfeGenerator.Generate(document, outputPath);
+            StatusText.Text = $"DANFE gerado: {outputPath}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Falha ao gerar o DANFE: {ex.Message}";
+        }
+    }
+
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 }
