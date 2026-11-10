@@ -22,22 +22,6 @@ public partial class ConverterWindow : Window
 
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
-    private async void MergePdfs_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        try
-        {
-            var organizer = new PdfOrganizerWindow();
-            await organizer.ShowDialog(this);
-            MergeStatusText.Text = "Organizador de PDFs fechado.";
-            StatusText.Text = "Você pode continuar com outras conversões.";
-        }
-        catch (Exception ex)
-        {
-            MergeStatusText.Text = "Não foi possível abrir o organizador de PDFs.";
-            StatusText.Text = ex.Message;
-        }
-    }
-
     private async void ImagesToPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
