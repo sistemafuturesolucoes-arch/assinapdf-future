@@ -17,7 +17,7 @@ public partial class PdfOrganizerWindow : Window
 {
     private sealed class OrganizerPage
     {
-        public required WriteableBitmap Bitmap { get; init; }
+        public required WriteableBitmap Bitmap { get; set; }
         public required string SourcePath { get; init; }
         public required string SourceName { get; init; }
         public required int SourcePageNumber { get; init; }
@@ -29,7 +29,7 @@ public partial class PdfOrganizerWindow : Window
 
     private readonly List<OrganizerPage> _pages = new();
     private double _zoom = 1.0;
-    private bool _loading;
+    private bool _loading;\n    private OrganizerPage? _selectedPage;
 
     public PdfOrganizerWindow()
     {
@@ -105,6 +105,98 @@ public partial class PdfOrganizerWindow : Window
         {
             _loading = false;
             AddDocumentsButton.IsEnabled = true;
+        }
+    }
+
+    private void RotateLeft_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => RotateSelectedPage(-1);
+
+    private void RotateRight_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => RotateSelectedPage(1);
+
+    private void RotateSelectedPage(int direction)
+    {
+        if (_selectedPage == null)
+        {
+            StatusText.Text = "Selecione uma página na coluna à esquerda para girá-la.";
+            return;
+        }
+
+        var page = _selectedPage;
+        var previousBitmap = page.Bitmap;
+        try
+        {
+            page.Bitmap = RotateBitmap90(previousBitmap, direction > 0);
+            page.RotationQuarterTurns = (page.RotationQuarterTurns + (direction > 0 ? 1 : 3)) % 4;
+            RebuildPageViews();
+            UpdateSelectionVisuals();
+            StatusText.Text = $"Página {page.SequenceNumber} girada. A rotação será aplicada ao PDF quando salvarmos o documento final.";
+            previousBitmap.Dispose();
+        }
+        catch (Exception ex)
+        {
+            page.Bitmap = previousBitmap;
+            StatusText.Text = $"Não foi possível girar a página: {ex.Message}";
+        }
+    }
+
+    private static WriteableBitmap RotateBitmap90(WriteableBitmap source, bool clockwise)
+    {
+        int sourceWidth = source.PixelSize.Width;
+        int sourceHeight = source.PixelSize.Height;
+        int sourceStride = checked(sourceWidth * 4);
+        var sourcePixels = new byte[checked(sourceStride * sourceHeight)];
+
+        using (var sourceLock = source.Lock())
+        {
+            for (int y = 0; y < sourceHeight; y++)
+                Marshal.Copy(IntPtr.Add(sourceLock.Address, y * sourceLock.RowBytes), sourcePixels, y * sourceStride, sourceStride);
+        }
+
+        int targetWidth = sourceHeight;
+        int targetHeight = sourceWidth;
+        int targetStride = checked(targetWidth * 4);
+        var targetPixels = new byte[checked(targetStride * targetHeight)];
+
+        for (int y = 0; y < sourceHeight; y++)
+        {
+            for (int x = 0; x < sourceWidth; x++)
+            {
+                int targetX = clockwise ? sourceHeight - 1 - y : y;
+                int targetY = clockwise ? x : sourceWidth - 1 - x;
+                int sourceIndex = y * sourceStride + x * 4;
+                int targetIndex = targetY * targetStride + targetX * 4;
+                Buffer.BlockCopy(sourcePixels, sourceIndex, targetPixels, targetIndex, 4);
+            }
+        }
+
+        var rotated = new WriteableBitmap(
+            new PixelSize(targetWidth, targetHeight),
+            new Vector(96, 96),
+            PixelFormat.Bgra8888,
+            AlphaFormat.Unpremul);
+
+        try
+        {
+            using var targetLock = rotated.Lock();
+            for (int y = 0; y < targetHeight; y++)
+                Marshal.Copy(targetPixels, y * targetStride, IntPtr.Add(targetLock.Address, y * targetLock.RowBytes), targetStride);
+            return rotated;
+        }
+        catch
+        {
+            rotated.Dispose();
+            throw;
+        }
+    }
+
+    private void UpdateSelectionVisuals()
+    {
+        foreach (var item in _pages)
+        {
+            if (item.ThumbnailCard != null)
+                item.ThumbnailCard.BorderBrush = new SolidColorBrush(
+                    ReferenceEquals(item, _selectedPage)
+                        ? Color.FromRgb(103, 65, 184)
+                        : Color.FromRgb(220, 224, 231));
         }
     }
 
@@ -191,12 +283,8 @@ public partial class PdfOrganizerWindow : Window
             page.ThumbnailCard = thumbnailBorder;
             thumbnailBorder.PointerPressed += (_, _) =>
             {
-                foreach (var item in _pages)
-                {
-                    if (item.ThumbnailCard != null)
-                        item.ThumbnailCard.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 224, 231));
-                }
-                thumbnailBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(103, 65, 184));
+                _selectedPage = page;
+                UpdateSelectionVisuals();
                 if (page.PageCard != null)
                 {
                     DocumentScrollViewer.Offset = new Vector(
