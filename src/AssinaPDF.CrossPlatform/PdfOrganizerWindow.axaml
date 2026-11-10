@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.PdfOrganizerWindow"
+        Title="AssinaPDF | Organizar PDFs"
+        Width="1280" Height="850"
+        MinWidth="900" MinHeight="620"
+        WindowStartupLocation="CenterOwner"
+        Background="#F1F3F6">
+  <Grid RowDefinitions="Auto,*">
+    <Border Grid.Row="0" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1" Padding="14,10">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="9">
+        <Button x:Name="AddDocumentsButton" Grid.Column="0" Content="＋ Adicionar documento" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="16,9"/>
+        <Button Grid.Column="1" Content="−" Click="ZoomOut_Click" Padding="13,9" ToolTip.Tip="Diminuir zoom"/>
+        <Button Grid.Column="2" Content="＋" Click="ZoomIn_Click" Padding="13,9" ToolTip.Tip="Aumentar zoom"/>
+        <Button Grid.Column="3" Content="Ajustar" Click="ZoomReset_Click" Padding="13,9"/>
+        <TextBlock x:Name="ZoomLabel" Grid.Column="4" Text="100%" VerticalAlignment="Center" Foreground="#505866" FontSize="12"/>
+        <TextBlock Grid.Column="5" Text="Organizador de documentos PDF" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#737B87" FontSize="13"/>
+        <TextBlock x:Name="PageCountText" Grid.Column="6" Text="0 página(s)" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#343A46"/>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1" ColumnDefinitions="230,*">
+      <Border Grid.Column="0" Background="#E9ECF1" BorderBrush="#DDE1E8" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0" Text="PÁGINAS DO DOCUMENTO" FontSize="11" FontWeight="SemiBold" Foreground="#687180" Margin="14,14,10,8"/>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="ThumbnailsPanel" Spacing="4"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="#DDE1E8">
+        <Grid>
+          <ScrollViewer x:Name="DocumentScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <StackPanel x:Name="PagesPanel" HorizontalAlignment="Stretch" Spacing="0"/>
+          </ScrollViewer>
+          <Border x:Name="EmptyState" IsVisible="True" Background="#F7F8FA" CornerRadius="12" Padding="34" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="430">
+            <StackPanel Spacing="10" HorizontalAlignment="Center">
+              <TextBlock Text="Nenhum documento adicionado" FontSize="20" FontWeight="SemiBold" Foreground="#303744" HorizontalAlignment="Center"/>
+              <TextBlock Text="Clique em Adicionar documento para carregar um ou vários PDFs. As páginas serão exibidas em sequência, uma abaixo da outra." TextWrapping="Wrap" TextAlignment="Center" Foreground="#747C89" FontSize="13"/>
+              <Button Content="Adicionar PDF" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="18,10" HorizontalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>
