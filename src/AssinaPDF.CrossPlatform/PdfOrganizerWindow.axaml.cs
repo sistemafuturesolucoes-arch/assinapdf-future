@@ -189,6 +189,21 @@ public partial class PdfOrganizerWindow : Window
                 Child = thumbnailContent
             };
             page.ThumbnailCard = thumbnailBorder;
+            thumbnailBorder.PointerPressed += (_, _) =>
+            {
+                foreach (var item in _pages)
+                {
+                    if (item.ThumbnailCard != null)
+                        item.ThumbnailCard.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 224, 231));
+                }
+                thumbnailBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(103, 65, 184));
+                if (page.PageCard != null)
+                {
+                    DocumentScrollViewer.Offset = new Vector(
+                        DocumentScrollViewer.Offset.X,
+                        Math.Max(0, page.PageCard.Bounds.Y - 8));
+                }
+            };
             ThumbnailsPanel.Children.Add(thumbnailBorder);
 
             var pageImage = new Image
