@@ -53,9 +53,10 @@
             <TextBlock Text="FORMATO E QUALIDADE DA IMAGEM" FontSize="10" FontWeight="SemiBold" Foreground="#687180"/>
             <StackPanel Spacing="5">
               <TextBlock Text="Formato de saída" FontSize="11" Foreground="#687180"/>
-              <ComboBox x:Name="FormatCombo" SelectedIndex="0">
+              <ComboBox x:Name="FormatCombo" SelectedIndex="0" SelectionChanged="Format_SelectionChanged">
                 <ComboBoxItem Content="JPG — arquivo compacto"/>
                 <ComboBoxItem Content="PNG — sem perda de qualidade"/>
+                <ComboBoxItem Content="TIFF — qualidade profissional"/>
               </ComboBox>
             </StackPanel>
             <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
