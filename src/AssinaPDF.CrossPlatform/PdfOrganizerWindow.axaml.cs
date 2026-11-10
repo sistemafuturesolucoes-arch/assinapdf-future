@@ -9,6 +9,8 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.IO;
 using AssinaPDF.MacPrototype.Services;
 
 namespace AssinaPDF.MacPrototype;
@@ -31,6 +33,7 @@ public partial class PdfOrganizerWindow : Window
     private readonly List<OrganizerPage> _pages = new();
     private double _zoom = 1.0;
     private bool _loading;
+    private bool _saving;
     private OrganizerPage? _selectedPage;
 
     public PdfOrganizerWindow()
@@ -106,6 +109,84 @@ public partial class PdfOrganizerWindow : Window
         finally
         {
             _loading = false;
+            AddDocumentsButton.IsEnabled = true;
+        }
+    }
+
+    private async void SaveAs_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_saving || _loading) return;
+        if (_pages.Count == 0)
+        {
+            StatusText.Text = "Adicione pelo menos um PDF antes de salvar.";
+            return;
+        }
+
+        try
+        {
+            var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Salvar PDF combinado como",
+                SuggestedFileName = "documento-combinado.pdf",
+                DefaultExtension = "pdf",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } }
+                }
+            });
+
+            if (destination == null) return;
+
+            _saving = true;
+            SaveAsButton.IsEnabled = false;
+            AddDocumentsButton.IsEnabled = false;
+            StatusText.Text = "Montando o PDF final...";
+
+            string outputPath = destination.Path.LocalPath;
+            if (string.IsNullOrWhiteSpace(outputPath))
+                throw new InvalidOperationException("Não foi possível identificar o caminho do arquivo de destino.");
+            if (!outputPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                outputPath += ".pdf";
+
+            var sourceDocuments = new Dictionary<string, PdfDocument>(StringComparer.OrdinalIgnoreCase);
+            using var outputDocument = new PdfDocument();
+            try
+            {
+                foreach (var page in _pages)
+                {
+                    if (!sourceDocuments.TryGetValue(page.SourcePath, out var sourceDocument))
+                    {
+                        sourceDocument = PdfReader.Open(page.SourcePath, PdfDocumentOpenMode.Import);
+                        sourceDocuments.Add(page.SourcePath, sourceDocument);
+                    }
+
+                    int sourceIndex = page.SourcePageNumber - 1;
+                    if (sourceIndex < 0 || sourceIndex >= sourceDocument.PageCount)
+                        throw new InvalidDataException($"A página {page.SourcePageNumber} não foi encontrada em {page.SourceName}.");
+
+                    var importedPage = outputDocument.AddPage(sourceDocument.Pages[sourceIndex]);
+                    if (page.RotationQuarterTurns != 0)
+                        importedPage.Rotate = (importedPage.Rotate + page.RotationQuarterTurns * 90) % 360;
+                }
+
+                outputDocument.Save(outputPath);
+            }
+            finally
+            {
+                foreach (var sourceDocument in sourceDocuments.Values)
+                    sourceDocument.Dispose();
+            }
+
+            StatusText.Text = $"PDF salvo com sucesso: {Path.GetFileName(outputPath)}. Os arquivos originais foram preservados.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Não foi possível salvar o PDF: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+            SaveAsButton.IsEnabled = true;
             AddDocumentsButton.IsEnabled = true;
         }
     }
