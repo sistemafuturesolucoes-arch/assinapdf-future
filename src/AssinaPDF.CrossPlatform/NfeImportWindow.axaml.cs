@@ -14,7 +14,6 @@ public partial class NfeImportWindow : Window
     {
         InitializeComponent();
         DocumentsList.ItemsSource = _documents;
-        DocumentsList.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(NfeDocumentSummary.DisplayName));
     }
 
     private async void AddXml_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
