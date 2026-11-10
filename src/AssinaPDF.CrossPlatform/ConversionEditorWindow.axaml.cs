@@ -97,7 +97,7 @@ public partial class ConversionEditorWindow : Window
                         int stride = checked(rendered.Width * 4);
                         var pixels = new byte[checked(stride * rendered.Height)];
                         for (int y = 0; y < rendered.Height; y++)
-                            Marshal.Copy(IntPtr.Add(rendered.Pixels, y * rendered.Stride), pixels, y * stride, stride);
+                            Array.Copy(rendered.Pixels, y * rendered.Stride, pixels, y * stride, stride);
 
                         var preview = CreateBitmap(rendered.Width, rendered.Height, pixels, stride);
                         _items.Add(new ConversionItem
