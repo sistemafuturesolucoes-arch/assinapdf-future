@@ -17,9 +17,9 @@
           <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
             <StackPanel Grid.Row="0" Spacing="4">
               <TextBlock Text="Juntar arquivos PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
-              <TextBlock Text="Selecione dois ou mais PDFs e gere um único documento, mantendo a ordem selecionada." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+              <TextBlock Text="Abra o organizador visual para adicionar PDFs, visualizar páginas em miniatura e preparar a sequência do documento final." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
             </StackPanel>
-            <Button Grid.Column="1" Grid.RowSpan="2" Content="Selecionar PDFs e juntar" Click="MergePdfs_Click" VerticalAlignment="Center" Background="#6741B8" Foreground="White" Padding="16,10"/>
+            <Button Grid.Column="1" Grid.RowSpan="2" Content="Abrir organizador" Click="MergePdfs_Click" VerticalAlignment="Center" Background="#6741B8" Foreground="White" Padding="16,10"/>
             <TextBlock x:Name="MergeStatusText" Grid.Row="2" Text="Nenhum arquivo selecionado." FontSize="11" Foreground="#747B86" Margin="0,12,0,0"/>
           </Grid>
         </Border>
