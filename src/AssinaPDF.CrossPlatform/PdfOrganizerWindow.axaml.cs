@@ -51,6 +51,8 @@ public partial class PdfOrganizerWindow : Window
         InitializeComponent();
         Closed += (_, _) => DisposePages();
         Closing += OrganizerWindow_Closing;
+        KeyDown += OrganizerWindow_KeyDown;
+        Focusable = true;
         UpdatePageCount();
         UpdateZoomLabel();
     }
@@ -224,6 +226,74 @@ public partial class PdfOrganizerWindow : Window
         }
     }
 
+
+    private ContextMenu BuildThumbnailContextMenu(OrganizerPage page)
+    {
+        var menu = new ContextMenu();
+
+        void AddItem(string header, Action action, bool enabled = true)
+        {
+            var item = new MenuItem { Header = header, IsEnabled = enabled };
+            item.Click += (_, _) => action();
+            menu.Items.Add(item);
+        }
+
+        AddItem("Selecionar somente esta página", () =>
+        {
+            _selectedPages.Clear();
+            _selectedPages.Add(page);
+            _selectedPage = page;
+            _rangeAnchor = page;
+            UpdateSelectionVisuals();
+        });
+
+        menu.Items.Add(new Separator());
+        AddItem("Girar 90° para a esquerda", () => RotateSelectedPage(-1));
+        AddItem("Girar 90° para a direita", () => RotateSelectedPage(1));
+        menu.Items.Add(new Separator());
+        AddItem("Inserir PDF antes desta página…", () => InsertBefore_Click(null, null!), _pages.Contains(page));
+        AddItem("Inserir PDF depois desta página…", () => InsertAfter_Click(null, null!), _pages.Contains(page));
+        menu.Items.Add(new Separator());
+        AddItem("Mover para cima", () => MoveSelectedPages(-1), _selectedPages.Count > 0);
+        AddItem("Mover para baixo", () => MoveSelectedPages(1), _selectedPages.Count > 0);
+        AddItem("Excluir página(s)", () => DeleteSelected_Click(null, null!), _selectedPages.Count > 0);
+        AddItem("Exportar página(s) selecionada(s)…", () => ExportSelected_Click(null, null!), _selectedPages.Count > 0);
+        menu.Items.Add(new Separator());
+        AddItem("Desfazer (Ctrl+Z)", () => Undo_Click(null, null!), _undo.Count > 0);
+        AddItem("Refazer (Ctrl+Y)", () => Redo_Click(null, null!), _redo.Count > 0);
+
+        return menu;
+    }
+
+    private void OrganizerWindow_KeyDown(object? sender, KeyEventArgs e)
+    {
+        bool controlOrCommand = e.KeyModifiers.HasFlag(KeyModifiers.Control) ||
+                                e.KeyModifiers.HasFlag(KeyModifiers.Meta);
+
+        if (controlOrCommand && e.Key == Key.S)
+        {
+            SaveAs_Click(this, null!);
+            e.Handled = true;
+        }
+        else if (controlOrCommand && e.Key == Key.Z)
+        {
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                Redo_Click(this, null!);
+            else
+                Undo_Click(this, null!);
+            e.Handled = true;
+        }
+        else if (controlOrCommand && e.Key == Key.Y)
+        {
+            Redo_Click(this, null!);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Delete)
+        {
+            DeleteSelected_Click(this, null!);
+            e.Handled = true;
+        }
+    }
 
     private void SelectPage(OrganizerPage page, KeyModifiers modifiers)
     {
@@ -663,7 +733,7 @@ public partial class PdfOrganizerWindow : Window
             };
             var thumbnailLabel = new TextBlock
             {
-                Text = $"Página {i + 1}",
+                Text = $"Página {i + 1} · origem pág. {page.SourcePageNumber}",
                 FontSize = 12,
                 FontWeight = FontWeight.SemiBold,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
@@ -694,16 +764,31 @@ public partial class PdfOrganizerWindow : Window
                 Child = thumbnailContent
             };
             page.ThumbnailCard = thumbnailBorder;
+            thumbnailBorder.ContextMenu = BuildThumbnailContextMenu(page);
             thumbnailBorder.PointerPressed += (_, args) =>
             {
-                SelectPage(page, args.KeyModifiers);
-                _dragPage = page;
-                UpdateSelectionVisuals();
-                if (page.PageCard != null)
+                var pointer = args.GetCurrentPoint(thumbnailBorder).Properties;
+                if (pointer.IsRightButtonPressed)
                 {
-                    DocumentScrollViewer.Offset = new Vector(
-                        DocumentScrollViewer.Offset.X,
-                        Math.Max(0, page.PageCard.Bounds.Y - 8));
+                    if (!_selectedPages.Contains(page))
+                        SelectPage(page, KeyModifiers.None);
+                    _selectedPage = page;
+                    _dragPage = null;
+                    UpdateSelectionVisuals();
+                    return;
+                }
+
+                if (pointer.IsLeftButtonPressed)
+                {
+                    SelectPage(page, args.KeyModifiers);
+                    _dragPage = page;
+                    UpdateSelectionVisuals();
+                    if (page.PageCard != null)
+                    {
+                        DocumentScrollViewer.Offset = new Vector(
+                            DocumentScrollViewer.Offset.X,
+                            Math.Max(0, page.PageCard.Bounds.Y - 8));
+                    }
                 }
             };
             thumbnailBorder.PointerReleased += (_, args) => CompleteThumbnailDrag(args);
@@ -720,7 +805,7 @@ public partial class PdfOrganizerWindow : Window
 
             var pageLabel = new TextBlock
             {
-                Text = $"Página {i + 1}  •  {page.SourceName}",
+                Text = $"Página {i + 1}  •  origem pág. {page.SourcePageNumber}  •  {page.SourceName}",
                 FontSize = 12,
                 FontWeight = FontWeight.SemiBold,
                 Foreground = new SolidColorBrush(Color.FromRgb(82, 88, 99)),
