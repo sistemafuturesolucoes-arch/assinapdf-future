@@ -169,20 +169,16 @@ public static class NfeDanfeGenerator
                 [EncodeHintType.CHARACTER_SET] = "UTF-8"
             });
         double moduleWidth = width / matrix.Width;
-        double moduleHeight = height / matrix.Height;
-        for (int row = 0; row < matrix.Height; row++)
+        int start = -1;
+        for (int col = 0; col <= matrix.Width; col++)
         {
-            int start = -1;
-            for (int col = 0; col <= matrix.Width; col++)
+            bool black = col < matrix.Width && matrix[col, 0];
+            if (black && start < 0) start = col;
+            if (!black && start >= 0)
             {
-                bool black = col < matrix.Width && matrix[col, row];
-                if (black && start < 0) start = col;
-                if (!black && start >= 0)
-                {
-                    gfx.DrawRectangle(XBrushes.Black, x + start * moduleWidth,
-                        y + row * moduleHeight, (col - start) * moduleWidth, moduleHeight);
-                    start = -1;
-                }
+                gfx.DrawRectangle(XBrushes.Black, x + start * moduleWidth,
+                    y, (col - start) * moduleWidth, height);
+                start = -1;
             }
         }
     }
