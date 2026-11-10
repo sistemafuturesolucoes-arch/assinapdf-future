@@ -129,6 +129,7 @@ public partial class PdfOrganizerWindow : Window
         }
         catch (Exception ex)
         {
+            _insertBeforeNextAdd = _insertAfterNextAdd = false;
             StatusText.Text = $"Não foi possível adicionar os documentos: {ex.Message}";
         }
         finally
@@ -384,7 +385,11 @@ public partial class PdfOrganizerWindow : Window
             });
             if (destination == null) return;
             string path = destination.Path.LocalPath;
+            if (string.IsNullOrWhiteSpace(path)) throw new InvalidOperationException("Não foi possível identificar o destino do arquivo.");
             if (!path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) path += ".pdf";
+            string normalizedPath = Path.GetFullPath(path);
+            if (selected.Any(page => string.Equals(Path.GetFullPath(page.SourcePath), normalizedPath, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Escolha outro destino. O arquivo original não pode ser sobrescrito.");
             var sources = new Dictionary<string, PdfDocument>(StringComparer.OrdinalIgnoreCase);
             using var output = new PdfDocument();
             try
