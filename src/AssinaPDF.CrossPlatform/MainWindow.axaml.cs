@@ -338,11 +338,20 @@ public partial class MainWindow : Window
         }
     }
 
-    private void DashboardOrganize_Click(
+    private async void DashboardOrganize_Click(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
-        DashboardStatusText.Text = "As ferramentas de organização serão disponibilizadas em uma próxima etapa.";
+        try
+        {
+            var organizer = new PdfOrganizerWindow();
+            await organizer.ShowDialog(this);
+            DashboardStatusText.Text = "Editor de combinação e organização de PDFs fechado.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir o editor de PDFs: {ex.Message}";
+        }
     }
 
     private async void DashboardConvert_Click(
