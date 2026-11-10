@@ -148,6 +148,10 @@ public partial class PdfOrganizerWindow : Window
             if (!outputPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
                 outputPath += ".pdf";
 
+            string normalizedOutputPath = Path.GetFullPath(outputPath);
+            if (_pages.Any(page => string.Equals(Path.GetFullPath(page.SourcePath), normalizedOutputPath, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Escolha um nome ou local diferente dos PDFs originais. O AssinaPDF não sobrescreve os documentos de origem.");
+
             var sourceDocuments = new Dictionary<string, PdfDocument>(StringComparer.OrdinalIgnoreCase);
             using var outputDocument = new PdfDocument();
             try
@@ -161,7 +165,7 @@ public partial class PdfOrganizerWindow : Window
                     }
 
                     int sourceIndex = page.SourcePageNumber - 1;
-                    if (sourceIndex < 0 || sourceIndex >= sourceDocument.PageCount)
+                    if (sourceIndex < 0 || sourceIndex >= sourceDocument.Pages.Count)
                         throw new InvalidDataException($"A página {page.SourcePageNumber} não foi encontrada em {page.SourceName}.");
 
                     var importedPage = outputDocument.AddPage(sourceDocument.Pages[sourceIndex]);
