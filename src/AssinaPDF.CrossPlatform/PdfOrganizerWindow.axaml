@@ -10,6 +10,7 @@
     <Border Grid.Row="0" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1" Padding="10,8">
       <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
         <Button x:Name="AddDocumentsButton" Content="＋ Adicionar documento" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="13,8" Margin="0,0,7,5"/>
+        <Button x:Name="SaveAsButton" Content="Salvar como" Click="SaveAs_Click" Background="#16804A" Foreground="White" Padding="13,8" Margin="0,0,7,5" ToolTip.Tip="Salvar a sequência organizada em um novo arquivo PDF"/>
         <Button Content="↶ Girar esquerda" Click="RotateLeft_Click" Padding="11,8" Margin="0,0,7,5" ToolTip.Tip="Girar a página selecionada 90 graus para a esquerda"/>
         <Button Content="↷ Girar direita" Click="RotateRight_Click" Padding="11,8" Margin="0,0,7,5" ToolTip.Tip="Girar a página selecionada 90 graus para a direita"/>
         <Button Content="−" Click="ZoomOut_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Diminuir zoom"/>
