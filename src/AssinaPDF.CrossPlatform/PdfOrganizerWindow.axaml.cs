@@ -1,0 +1,275 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Avalonia.Platform.Storage;
+using AssinaPDF.MacPrototype.Services;
+
+namespace AssinaPDF.MacPrototype;
+
+public partial class PdfOrganizerWindow : Window
+{
+    private sealed class OrganizerPage
+    {
+        public required WriteableBitmap Bitmap { get; init; }
+        public required string SourcePath { get; init; }
+        public required string SourceName { get; init; }
+        public required int SourcePageNumber { get; init; }
+        public required int SequenceNumber { get; set; }
+        public Border? PageCard { get; set; }
+        public Image? PageImage { get; set; }
+        public Border? ThumbnailCard { get; set; }
+    }
+
+    private readonly List<OrganizerPage> _pages = new();
+    private double _zoom = 1.0;
+    private bool _loading;
+
+    public PdfOrganizerWindow()
+    {
+        InitializeComponent();
+        Closed += (_, _) => DisposePages();
+        UpdatePageCount();
+        UpdateZoomLabel();
+    }
+
+    private async void AddDocuments_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_loading) return;
+
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Adicionar documentos PDF",
+                AllowMultiple = true,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Documentos PDF") { Patterns = new[] { "*.pdf", "*.PDF" } }
+                }
+            });
+
+            if (files.Count == 0) return;
+
+            _loading = true;
+            AddDocumentsButton.IsEnabled = false;
+            StatusText.Text = "Carregando e preparando as páginas...";
+
+            int addedPages = 0;
+            foreach (var file in files)
+            {
+                string path = file.Path.LocalPath;
+                using var document = new PdfiumDocument(path);
+                var documentPages = new List<OrganizerPage>();
+
+                try
+                {
+                    for (int pageIndex = 0; pageIndex < document.PageCount; pageIndex++)
+                    {
+                        var rendered = document.RenderPage(pageIndex, 1.25f);
+                        documentPages.Add(new OrganizerPage
+                        {
+                            Bitmap = CreateBitmap(rendered),
+                            SourcePath = path,
+                            SourceName = Path.GetFileName(path),
+                            SourcePageNumber = pageIndex + 1,
+                            SequenceNumber = _pages.Count + documentPages.Count + 1
+                        });
+                    }
+                }
+                catch
+                {
+                    foreach (var page in documentPages) page.Bitmap.Dispose();
+                    throw;
+                }
+
+                _pages.AddRange(documentPages);
+                addedPages += documentPages.Count;
+            }
+
+            RebuildPageViews();
+            UpdatePageCount();
+            StatusText.Text = $"{files.Count} documento(s) adicionado(s). {addedPages} página(s) incluída(s) ao final da sequência.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Não foi possível adicionar os documentos: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            AddDocumentsButton.IsEnabled = true;
+        }
+    }
+
+    private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _zoom = Math.Min(2.5, _zoom + 0.1);
+        ApplyZoom();
+    }
+
+    private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _zoom = Math.Max(0.4, _zoom - 0.1);
+        ApplyZoom();
+    }
+
+    private void ZoomReset_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _zoom = 1.0;
+        ApplyZoom();
+    }
+
+    private void ApplyZoom()
+    {
+        foreach (var page in _pages)
+        {
+            if (page.PageImage == null) continue;
+            double width = 720 * _zoom;
+            double ratio = (double)page.Bitmap.PixelSize.Height / page.Bitmap.PixelSize.Width;
+            page.PageImage.Width = width;
+            page.PageImage.Height = width * ratio;
+        }
+        UpdateZoomLabel();
+    }
+
+    private void RebuildPageViews()
+    {
+        ThumbnailsPanel.Children.Clear();
+        PagesPanel.Children.Clear();
+
+        for (int i = 0; i < _pages.Count; i++)
+        {
+            var page = _pages[i];
+            page.SequenceNumber = i + 1;
+
+            var thumbnail = new Image
+            {
+                Source = page.Bitmap,
+                Width = 150,
+                Height = 190,
+                Stretch = Stretch.Uniform
+            };
+            var thumbnailLabel = new TextBlock
+            {
+                Text = $"Página {i + 1}",
+                FontSize = 12,
+                FontWeight = FontWeight.SemiBold,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 6, 0, 2)
+            };
+            var sourceLabel = new TextBlock
+            {
+                Text = page.SourceName,
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Color.FromRgb(112, 119, 130)),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 170,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+            };
+            var thumbnailContent = new StackPanel { Spacing = 2 };
+            thumbnailContent.Children.Add(thumbnail);
+            thumbnailContent.Children.Add(thumbnailLabel);
+            thumbnailContent.Children.Add(sourceLabel);
+
+            var thumbnailBorder = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(220, 224, 231)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(7),
+                Padding = new Thickness(8),
+                Margin = new Thickness(5),
+                Child = thumbnailContent
+            };
+            page.ThumbnailCard = thumbnailBorder;
+            ThumbnailsPanel.Children.Add(thumbnailBorder);
+
+            var pageImage = new Image
+            {
+                Source = page.Bitmap,
+                Stretch = Stretch.Uniform,
+                Width = 720 * _zoom,
+                Height = 720 * _zoom * page.Bitmap.PixelSize.Height / page.Bitmap.PixelSize.Width
+            };
+            page.PageImage = pageImage;
+
+            var pageLabel = new TextBlock
+            {
+                Text = $"Página {i + 1}  •  {page.SourceName}",
+                FontSize = 12,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(82, 88, 99)),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var pageContent = new StackPanel { Spacing = 8 };
+            pageContent.Children.Add(pageLabel);
+            pageContent.Children.Add(pageImage);
+
+            var pageCard = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(221, 225, 232)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(16),
+                Margin = new Thickness(12, 10),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Child = pageContent
+            };
+            page.PageCard = pageCard;
+            PagesPanel.Children.Add(pageCard);
+        }
+
+        EmptyState.IsVisible = _pages.Count == 0;
+        ApplyZoom();
+    }
+
+    private void UpdatePageCount()
+    {
+        PageCountText.Text = $"{_pages.Count} página(s)";
+        EmptyState.IsVisible = _pages.Count == 0;
+    }
+
+    private void UpdateZoomLabel() => ZoomLabel.Text = $"{Math.Round(_zoom * 100)}%";
+
+    private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
+    {
+        var bitmap = new WriteableBitmap(
+            new PixelSize(page.Width, page.Height),
+            new Vector(96, 96),
+            PixelFormat.Bgra8888,
+            AlphaFormat.Unpremul);
+
+        try
+        {
+            using var framebuffer = bitmap.Lock();
+            int bytesPerRow = checked(page.Width * 4);
+            for (int y = 0; y < page.Height; y++)
+            {
+                IntPtr destination = IntPtr.Add(framebuffer.Address, checked(y * framebuffer.RowBytes));
+                Marshal.Copy(page.Pixels, checked(y * page.Stride), destination, bytesPerRow);
+            }
+            return bitmap;
+        }
+        catch
+        {
+            bitmap.Dispose();
+            throw;
+        }
+    }
+
+    private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
+
+    private void DisposePages()
+    {
+        foreach (var page in _pages) page.Bitmap.Dispose();
+        _pages.Clear();
+    }
+}
