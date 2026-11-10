@@ -742,6 +742,7 @@ public partial class PdfOrganizerWindow : Window
 
         EmptyState.IsVisible = _pages.Count == 0;
         ApplyZoom();
+        UpdateSelectionVisuals();
     }
 
     private void UpdatePageCount()
