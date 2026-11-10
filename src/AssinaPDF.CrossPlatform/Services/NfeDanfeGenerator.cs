@@ -25,7 +25,7 @@ public static class NfeDanfeGenerator
             throw new InvalidDataException("A chave de acesso não é válida para gerar o DANFE.");
 
         using var pdf = new PdfDocument();
-        int rowsPerPage = 22;
+        int rowsPerPage = 17;
         int pageCount = Math.Max(1, (int)Math.Ceiling(invoice.Items.Count / (double)rowsPerPage));
 
         for (int pageIndex = 0; pageIndex < pageCount; pageIndex++)
