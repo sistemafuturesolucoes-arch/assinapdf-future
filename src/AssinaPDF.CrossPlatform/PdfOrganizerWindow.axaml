@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.PdfOrganizerWindow"
         Title="AssinaPDF | Combinar e organizar PDF"
-        Width="1100" Height="760"
-        MinWidth="760" MinHeight="520"
+        Width="1050" Height="620"
+        MinWidth="760" MinHeight="460"
         WindowStartupLocation="CenterOwner"
         Background="#F1F3F6">
   <Grid RowDefinitions="Auto,*,Auto">
