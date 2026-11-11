@@ -256,7 +256,7 @@ public partial class MainWindow : Window
             var files = await StorageProvider.OpenFilePickerAsync(
                 new FilePickerOpenOptions
                 {
-                    Title = "Selecionar PDF para edição",
+                    Title = "Abrir PDF para visualização",
                     AllowMultiple = false,
                     FileTypeFilter = new[]
                     {
@@ -270,24 +270,35 @@ public partial class MainWindow : Window
             if (files.Count == 0)
                 return;
 
-            var entry = _editorHistory.CreateWorkingCopy(files[0].Path.LocalPath);
-            string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
-                ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
+            string originalPath = files[0].Path.LocalPath;
+            var viewer = new PdfViewerWindow(originalPath, async () =>
+            {
+                var entry = _editorHistory.CreateWorkingCopy(originalPath);
+                string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
+                    ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
 
-            DashboardStatusText.Text = $"Abrindo {entry.OriginalFileName} diretamente no editor...";
-            var editor = new EditorWindow(
-                entry.WorkingCopyPath,
-                entry.OriginalPath,
-                documentDirectory);
+                try
+                {
+                    var editor = new EditorWindow(
+                        entry.WorkingCopyPath,
+                        entry.OriginalPath,
+                        documentDirectory);
+                    await editor.ShowDialog(viewer);
+                    _editorHistory.Touch(entry.Id);
+                    return entry.WorkingCopyPath;
+                }
+                catch
+                {
+                    throw;
+                }
+            });
 
-            await editor.ShowDialog(this);
-            _editorHistory.Touch(entry.Id);
-            DashboardStatusText.Text =
-                $"Edição encerrada. “{entry.OriginalFileName}” permanece no histórico.";
+            await viewer.ShowDialog(this);
+            DashboardStatusText.Text = $"Visualização encerrada: {System.IO.Path.GetFileName(originalPath)}";
         }
         catch (Exception ex)
         {
-            DashboardStatusText.Text = $"Não foi possível abrir o editor: {ex.Message}";
+            DashboardStatusText.Text = $"Não foi possível abrir o visualizador: {ex.Message}";
         }
     }
 
