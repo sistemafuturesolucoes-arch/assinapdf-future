@@ -8,6 +8,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using AssinaPDF.MacPrototype.Services;
 
 namespace AssinaPDF.MacPrototype;
