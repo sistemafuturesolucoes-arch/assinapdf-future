@@ -16,8 +16,6 @@ public partial class BatchSignatureWindow : Window
     private readonly CertificateStoreService _certificateStore = new();
     private readonly List<CertificateInfo> _certificates = new();
     private readonly ObservableCollection<BatchPdfItem> _documents = new();
-    private IReadOnlyList<SignaturePlacement> _placementTemplate =
-        Array.Empty<SignaturePlacement>();
     private bool _loadingCertificateSelection;
     private bool _operationInProgress;
 
@@ -122,6 +120,7 @@ public partial class BatchSignatureWindow : Window
         CertificatePicker.SelectedItem = item.Certificate;
         _loadingCertificateSelection = false;
         UpdateCertificateDetails(item.Certificate);
+        UpdatePlacementDetails(item);
     }
 
     private void CertificatePicker_SelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -188,8 +187,6 @@ public partial class BatchSignatureWindow : Window
     {
         _documents.Clear();
         DocumentsList.SelectedIndex = -1;
-        _placementTemplate = Array.Empty<SignaturePlacement>();
-        PlacementText.Text = "Nenhuma posição configurada.";
         UpdateCount();
         StatusText.Text = "Fila limpa. Nenhum PDF original foi excluído.";
     }
@@ -214,9 +211,9 @@ public partial class BatchSignatureWindow : Window
                 return;
             }
 
-            _placementTemplate = positioningWindow.SelectedPlacements.ToArray();
-            PlacementText.Text = $"{_placementTemplate.Count} posição(ões) configurada(s) com base em {Path.GetFileName(item.SourcePath)}. As coordenadas proporcionais serão reaproveitadas nos demais PDFs.";
-            StatusText.Text = "Posicionamento visual configurado para a fila.";
+            item.Placements = positioningWindow.SelectedPlacements.ToArray();
+            UpdatePlacementDetails(item);
+            StatusText.Text = $"{item.Placements.Count} posição(ões) salvas somente para {Path.GetFileName(item.SourcePath)}.";
         }
         catch (Exception ex)
         {
@@ -243,9 +240,10 @@ public partial class BatchSignatureWindow : Window
             return;
         }
 
-        if (_placementTemplate.Count == 0)
+        var missingPlacement = _documents.FirstOrDefault(x => x.Placements.Count == 0);
+        if (missingPlacement != null)
         {
-            StatusText.Text = "Configure ao menos uma posição visual antes de assinar.";
+            StatusText.Text = $"Configure as posições de assinatura de “{Path.GetFileName(missingPlacement.SourcePath)}”. Cada PDF possui seu próprio posicionamento.";
             return;
         }
 
@@ -311,7 +309,7 @@ public partial class BatchSignatureWindow : Window
                         ? null
                         : SigningReasonTextBox.Text.Trim();
 
-                    foreach (var placement in _placementTemplate)
+                    foreach (var placement in item.Placements)
                     {
                         if (placement.PageIndex < 0 || placement.PageIndex >= pdf.PageCount)
                             throw new InvalidOperationException($"O PDF possui {pdf.PageCount} página(s), mas o posicionamento exige a página {placement.PageIndex + 1}.");
@@ -403,10 +401,18 @@ public partial class BatchSignatureWindow : Window
         RootLayout.IsEnabled = enabled;
     }
 
+    private void UpdatePlacementDetails(BatchPdfItem item)
+    {
+        PlacementText.Text = item.Placements.Count == 0
+            ? "Nenhuma posição configurada para este documento."
+            : $"{item.Placements.Count} posição(ões) configurada(s) neste PDF. A seleção é exclusiva deste documento.";
+    }
+
     private void UpdateCount()
     {
         int assigned = _documents.Count(x => x.Certificate?.CanAttemptSigning == true);
-        CountText.Text = $"{_documents.Count} PDF(s) · {assigned} com certificado atribuído";
+        int positioned = _documents.Count(x => x.Placements.Count > 0);
+        CountText.Text = $"{_documents.Count} PDF(s) · {assigned} com certificado · {positioned} com posição";
     }
 
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
@@ -417,6 +423,8 @@ public partial class BatchSignatureWindow : Window
 
         public string SourcePath { get; }
         public int PageCount { get; }
+        public IReadOnlyList<SignaturePlacement> Placements { get; set; } =
+            Array.Empty<SignaturePlacement>();
         public CertificateInfo? Certificate
         {
             get => _certificate;
