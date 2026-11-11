@@ -30,7 +30,7 @@
       </Directory>
     </StandardDirectory>
 
-    <StandardDirectory Id="CommonProgramsFolder">
+    <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="AssinaPDF" />
     </StandardDirectory>
 
@@ -52,7 +52,7 @@
           WorkingDirectory="INSTALLFOLDER"
           Icon="AssinaPDFIcon" />
         <RegistryValue
-          Root="HKLM"
+          Root="HKCU"
           Key="Software\Future Soluções\AssinaPDF\Shortcuts"
           Name="StartMenu"
           Type="integer"
@@ -65,7 +65,7 @@
       </Component>
     </DirectoryRef>
 
-    <StandardDirectory Id="CommonDesktopFolder">
+    <StandardDirectory Id="DesktopFolder">
       <Component Id="AssinaPDFDesktopShortcut" Guid="*">
         <Shortcut
           Id="DesktopShortcut"
