@@ -65,6 +65,7 @@ public partial class PdfViewerWindow : Window
                 _thumbnails.Clear();
                 _thumbnails.AddRange(newThumbnails);
                 _document = newDocument;
+                _renderScale = 1.5f;
                 _pageIndex = 0;
                 BuildThumbnails();
                 BuildContinuousPages();
