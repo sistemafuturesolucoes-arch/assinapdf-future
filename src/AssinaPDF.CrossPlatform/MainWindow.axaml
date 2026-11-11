@@ -30,7 +30,7 @@
                   Foreground="White" BorderThickness="0" Padding="17,8"/>
           <Button Content="Assinatura digital" Click="DashboardSign_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
-          <Button Content="Validação" Click="DashboardValidate_Click"
+          <Button Content="Validação" Click="OpenValidationCenter_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
           <Button Content="Editar PDF" Click="DashboardEdit_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
@@ -63,7 +63,7 @@
               </StackPanel>
             </Button>
 
-            <Button Grid.Row="0" Grid.Column="1" Click="DashboardValidate_Click"
+            <Button Grid.Row="0" Grid.Column="1" Click="OpenValidationCenter_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
                     CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
