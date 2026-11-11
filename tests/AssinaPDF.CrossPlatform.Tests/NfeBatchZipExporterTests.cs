@@ -40,7 +40,6 @@ public sealed class NfeBatchZipExporterTests
             Assert.Contains(archive.Entries, e => e.FullName == "LEIA-ME.txt");
 
             using var original = archive.GetEntry(root + "XML_ORIGINAIS/entrada.xml")!.Open();
-            using var expected = File.OpenRead(xmlPath);
             using var actualBytes = new MemoryStream();
             original.CopyTo(actualBytes);
             Assert.Equal(File.ReadAllBytes(xmlPath), actualBytes.ToArray());
