@@ -61,7 +61,7 @@
                      VerticalAlignment="Center"
                      ToolTip.Tip="Zoom: use Ctrl + rolagem do mouse"/>
         </Grid>
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
           <TextBlock x:Name="SelectedTextLabel" Grid.Column="0"
                      IsVisible="False" FontSize="10" Foreground="#4C3482"
                      VerticalAlignment="Center" MaxWidth="360"
@@ -76,11 +76,11 @@
                   IsVisible="False" Padding="9,3"
                   Background="#FCE8E8" Foreground="#A12626"
                   BorderThickness="0" VerticalAlignment="Center"/>
-          <TextBlock Grid.Column="2"
+          <TextBlock Grid.Column="3"
                      Text="Selecione um trecho para editar ou escolha T para inserir texto."
                      FontSize="10" Foreground="#737B87"
                      VerticalAlignment="Center"/>
-          <TextBlock Grid.Column="3" Text="Ferramentas essenciais"
+          <TextBlock Grid.Column="4" Text="Ferramentas essenciais"
                      FontSize="10" Foreground="#737B87"
                      VerticalAlignment="Center"/>
         </Grid>
