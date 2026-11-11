@@ -271,10 +271,12 @@ public partial class MainWindow : Window
                 return;
 
             string originalPath = files[0].Path.LocalPath;
+            EditedPdfEntry? editEntry = null;
             PdfViewerWindow? viewer = null;
             viewer = new PdfViewerWindow(originalPath, async () =>
             {
-                var entry = _editorHistory.CreateWorkingCopy(originalPath);
+                editEntry ??= _editorHistory.CreateWorkingCopy(originalPath);
+                var entry = editEntry;
                 string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
                     ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
 
