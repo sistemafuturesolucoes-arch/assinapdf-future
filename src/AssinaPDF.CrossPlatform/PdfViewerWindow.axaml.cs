@@ -211,7 +211,7 @@ public partial class PdfViewerWindow : Window
             // de impressão nativo sem incorporar outro controle de navegador no processo.
             var startInfo = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = _currentPath,
+                FileName = _originalPath,
                 UseShellExecute = true
             };
             System.Diagnostics.Process.Start(startInfo);
