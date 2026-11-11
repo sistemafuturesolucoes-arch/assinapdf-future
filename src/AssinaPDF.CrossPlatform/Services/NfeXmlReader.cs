@@ -289,7 +289,9 @@ public static class NfeXmlReader
 
     private static decimal ParseDecimal(string value, string field)
     {
-        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result))
+        const NumberStyles xmlDecimalStyles =
+            NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint;
+        if (!decimal.TryParse(value, xmlDecimalStyles, CultureInfo.InvariantCulture, out var result))
             throw new InvalidDataException($"O campo numérico {field} possui valor inválido: {value}.");
         return result;
     }
