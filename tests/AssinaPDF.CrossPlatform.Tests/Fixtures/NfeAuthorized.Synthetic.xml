@@ -10,8 +10,8 @@
         <mod>55</mod>
         <serie>1</serie>
         <nNF>4</nNF>
-        <dhEmi>2026-01-15T10:00:00-03:00</dhEmi>
-        <dhSaiEnt>2026-01-15T10:00:00-03:00</dhSaiEnt>
+        <dhEmi>2026-10-15T10:00:00-03:00</dhEmi>
+        <dhSaiEnt>2026-10-15T10:00:00-03:00</dhSaiEnt>
         <tpNF>1</tpNF>
         <idDest>2</idDest>
         <cMunFG>4204202</cMunFG>
@@ -167,7 +167,7 @@
       <tpAmb>1</tpAmb>
       <verAplic>TESTE</verAplic>
       <chNFe>42261011222333000181550010000000041123456787</chNFe>
-      <dhRecbto>2026-01-15T10:01:00-03:00</dhRecbto>
+      <dhRecbto>2026-10-15T10:01:00-03:00</dhRecbto>
       <nProt>142610000000001</nProt>
       <cStat>100</cStat>
       <xMotivo>Autorizacao ficticia para teste automatizado</xMotivo>
