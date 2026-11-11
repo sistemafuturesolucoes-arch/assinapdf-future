@@ -51,6 +51,7 @@ public partial class EditorWindow : Window
     private enum EditorToolMode { Select, AddText }
     private EditorToolMode _toolMode = EditorToolMode.Select;
     private bool _isDraggingSelection;
+    private bool _isInlineEditorOpen;
     private Avalonia.Point _selectionStart;
     private Avalonia.Point _selectionEnd;
     private AvaloniaImage? _activeSelectionImage;
@@ -466,6 +467,7 @@ public partial class EditorWindow : Window
             var pageImage = pageSurface.Children.OfType<AvaloniaImage>().Single();
             var overlay = pageSurface.Children.OfType<Canvas>().Single();
             _pageLayouts[i] = (pageSurface, rendered.Width, rendered.Height);
+            pageImage.Cursor = new Cursor(StandardCursorType.Arrow);
             pageImage.PointerPressed += PageImage_PointerPressed;
             pageImage.PointerMoved += PageImage_PointerMoved;
             pageImage.PointerReleased += PageImage_PointerReleased;
@@ -682,6 +684,38 @@ public partial class EditorWindow : Window
 
     private void PageImage_PointerMoved(object? sender, PointerEventArgs e)
     {
+        if (sender is AvaloniaImage image && image.Tag is PagePreviewInfo info &&
+            _pageSurfaces.TryGetValue(info.PageIndex, out var surface))
+        {
+            if (_toolMode == EditorToolMode.AddText)
+            {
+                image.Cursor = new Cursor(StandardCursorType.Ibeam);
+                var marker = surface.Overlay.Children.OfType<TextBlock>()
+                    .FirstOrDefault(item => Equals(item.Tag, "FutureTextCursor"));
+                if (marker == null)
+                {
+                    marker = new TextBlock
+                    {
+                        Text = "T", Tag = "FutureTextCursor", FontSize = 16,
+                        FontWeight = Avalonia.Media.FontWeight.Bold,
+                        Foreground = Avalonia.Media.Brushes.White,
+                        Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(76, 52, 130)),
+                        Padding = new Thickness(4, 1), IsHitTestVisible = false
+                    };
+                    surface.Overlay.Children.Add(marker);
+                }
+                var pointer = e.GetPosition(image);
+                Canvas.SetLeft(marker, pointer.X + 9);
+                Canvas.SetTop(marker, pointer.Y + 9);
+            }
+            else
+            {
+                image.Cursor = new Cursor(StandardCursorType.Arrow);
+                foreach (var marker in surface.Overlay.Children.OfType<TextBlock>()
+                             .Where(item => Equals(item.Tag, "FutureTextCursor")).ToArray())
+                    surface.Overlay.Children.Remove(marker);
+            }
+        }
         if (_isDraggingSelection && ReferenceEquals(sender, _activeSelectionImage))
             _selectionEnd = e.GetPosition(_activeSelectionImage);
     }
@@ -702,11 +736,9 @@ public partial class EditorWindow : Window
 
         SelectTextInRectangle(image, pageInfo, _selectionStart, _selectionEnd);
 
-        // Um clique simples abre a edição diretamente sobre a página.
-        // Arrastar continua permitindo selecionar um trecho maior antes de editar.
-        if (isClick && _selectedPageIndex is int pageIndex)
-            _ = EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY,
-                _selectedText, _selectedTextBounds);
+        // Selecionar texto não abre o editor automaticamente. A edição de
+        // conteúdo existente é explícita; a ferramenta T insere texto novo.
+
 
         _activeSelectionImage = null;
         _activeSelectionPage = null;
@@ -805,20 +837,123 @@ public partial class EditorWindow : Window
             BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(35, 116, 220)),
             BorderThickness = new Thickness(1.5),
             Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromArgb(62, 35, 116, 220)),
-            Width = Math.Max(3, rect.Width), Height = Math.Max(3, rect.Height), IsHitTestVisible = false
+            Width = Math.Max(6, rect.Width), Height = Math.Max(6, rect.Height),
+            IsHitTestVisible = true, Cursor = new Cursor(StandardCursorType.SizeAll)
+        };
+        double selectionLeft = rect.X, selectionTop = rect.Y;
+        bool draggingText = false;
+        Avalonia.Point dragStart = default;
+        highlight.PointerPressed += (_, args) =>
+        {
+            if (!args.GetCurrentPoint(highlight).Properties.IsLeftButtonPressed) return;
+            draggingText = true;
+            dragStart = args.GetPosition(surface.Overlay);
+            args.Pointer.Capture(highlight);
+            args.Handled = true;
+        };
+        highlight.PointerMoved += (_, args) =>
+        {
+            if (!draggingText) return;
+            var current = args.GetPosition(surface.Overlay);
+            Canvas.SetLeft(highlight, selectionLeft + current.X - dragStart.X);
+            Canvas.SetTop(highlight, selectionTop + current.Y - dragStart.Y);
+            args.Handled = true;
+        };
+        highlight.PointerReleased += (_, args) =>
+        {
+            if (!draggingText) return;
+            draggingText = false;
+            var current = args.GetPosition(surface.Overlay);
+            args.Pointer.Capture(null);
+            double dx = current.X - dragStart.X, dy = current.Y - dragStart.Y;
+            surface.Overlay.IsHitTestVisible = false;
+            if (Math.Abs(dx) >= 2 || Math.Abs(dy) >= 2)
+                _ = MoveSelectedTextAsync(pageInfo, image, dx, dy);
+            args.Handled = true;
         };
         Canvas.SetLeft(highlight, rect.X);
         Canvas.SetTop(highlight, rect.Y);
         surface.Overlay.Children.Add(highlight);
+        surface.Overlay.IsHitTestVisible = true;
         SelectedTextLabel.Text = text.Length > 70 ? text[..67] + "..." : text;
         SelectedTextLabel.IsVisible = true;
         EditSelectedTextButton.IsVisible = true;
         EditorStatusText.Text = "Trecho selecionado no PDF. Clique com o botão direito para editar ou copiar.";
     }
 
+    private async Task MoveSelectedTextAsync(PagePreviewInfo pageInfo, AvaloniaImage image, double deltaViewX, double deltaViewY)
+    {
+        if (_selectedTextBounds is not { } selectedBounds || string.IsNullOrWhiteSpace(_selectedText))
+            return;
+        string selectedText = _selectedText;
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(0, 0, image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints, out double originX, out double originY) ||
+            !PdfiumPageCoordinateMapper.TryViewToPdf(deltaViewX, deltaViewY, image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints, out double movedX, out double movedY))
+        {
+            EditorStatusText.Text = "Não foi possível calcular a nova posição do texto.";
+            LoadDocumentPreview();
+            return;
+        }
+        double dx = movedX - originX, dy = movedY - originY;
+        if (Math.Abs(dx) < 0.1 && Math.Abs(dy) < 0.1) { LoadDocumentPreview(); return; }
+        double expectedCx = (selectedBounds.Left + selectedBounds.Right) / 2 + dx;
+        double expectedCy = (selectedBounds.Bottom + selectedBounds.Top) / 2 + dy;
+        try
+        {
+            ApplyPdfEdit(document =>
+            {
+                var absorber = new TextFragmentAbsorber();
+                document.Pages[pageInfo.PageIndex + 1].Accept(absorber);
+                var candidates = absorber.TextFragments
+                    .Where(fragment => string.Equals(fragment.Text, selectedText, StringComparison.Ordinal))
+                    .Select(fragment => new { Fragment = fragment, Bounds = fragment.Rectangle })
+                    .Where(item => item.Bounds != null)
+                    .Select(item => new
+                    {
+                        item.Fragment, Bounds = item.Bounds!,
+                        Distance = Math.Pow((item.Bounds!.LLX + item.Bounds.URX) / 2 -
+                            (selectedBounds.Left + selectedBounds.Right) / 2, 2) +
+                            Math.Pow((item.Bounds.LLY + item.Bounds.URY) / 2 -
+                            (selectedBounds.Bottom + selectedBounds.Top) / 2, 2)
+                    }).OrderBy(item => item.Distance).ToArray();
+                if (candidates.Length == 0 || candidates[0].Distance > 100)
+                    throw new InvalidOperationException("Selecione o bloco completo de texto. Este trecho não corresponde a um único bloco editável.");
+                if (candidates.Length > 1 && Math.Abs(candidates[1].Distance - candidates[0].Distance) < 1)
+                    throw new InvalidOperationException("Há blocos idênticos próximos. Não movi nenhum para evitar alterar o texto errado.");
+                var position = candidates[0].Fragment.Position;
+                candidates[0].Fragment.Position = new Position(position.X + dx, position.Y + dy);
+            }, "Texto reposicionado no PDF.", savedDocument =>
+            {
+                var verify = new TextFragmentAbsorber();
+                savedDocument.Pages[pageInfo.PageIndex + 1].Accept(verify);
+                return verify.TextFragments.Where(fragment =>
+                    string.Equals(fragment.Text, selectedText, StringComparison.Ordinal)).Any(fragment =>
+                {
+                    var bounds = fragment.Rectangle;
+                    if (bounds == null) return false;
+                    double cx = (bounds.LLX + bounds.URX) / 2, cy = (bounds.LLY + bounds.URY) / 2;
+                    return Math.Pow(cx - expectedCx, 2) + Math.Pow(cy - expectedCy, 2) < 225;
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            LoadDocumentPreview();
+            EditorStatusText.Text = $"Não foi possível mover o texto no PDF; a versão anterior foi preservada. {ex.Message}";
+        }
+    }
+
     private void SelectMode_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _toolMode = EditorToolMode.Select;
+        foreach (var surface in _pageSurfaces.Values)
+        {
+            surface.Image.Cursor = new Cursor(StandardCursorType.Arrow);
+            foreach (var marker in surface.Overlay.Children.OfType<TextBlock>()
+                         .Where(item => Equals(item.Tag, "FutureTextCursor")).ToArray())
+                surface.Overlay.Children.Remove(marker);
+        }
         SelectModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(233, 227, 245));
         SelectModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(76, 52, 130));
         AddTextModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
@@ -830,6 +965,8 @@ public partial class EditorWindow : Window
     {
         _toolMode = EditorToolMode.AddText;
         ClearTextSelection();
+        foreach (var surface in _pageSurfaces.Values)
+            surface.Image.Cursor = new Cursor(StandardCursorType.Ibeam);
         AddTextModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(233, 227, 245));
         AddTextModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(76, 52, 130));
         SelectModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
@@ -913,6 +1050,23 @@ public partial class EditorWindow : Window
         double y,
         string? requestedSelection = null,
         (double Left, double Bottom, double Right, double Top)? requestedBounds = null)
+    {
+        if (_isInlineEditorOpen)
+        {
+            EditorStatusText.Text = "Já existe uma edição de texto aberta. Conclua ou cancele antes de iniciar outra.";
+            return;
+        }
+        _isInlineEditorOpen = true;
+        try
+        {
+            await EditTextAtPointCoreAsync(pageIndex, x, y, requestedSelection, requestedBounds);
+        }
+        finally { _isInlineEditorOpen = false; }
+    }
+
+    private async Task EditTextAtPointCoreAsync(
+        int pageIndex, double x, double y, string? requestedSelection,
+        (double Left, double Bottom, double Right, double Top)? requestedBounds)
     {
         try
         {
