@@ -67,6 +67,14 @@ public class NfeXmlReaderTests
     }
 
     [Fact]
+    public void Parse_AuthorizedOutOfDeadlineStatus_IsAccepted()
+    {
+        string xml = AuthorizedXml.Replace("<cStat>100</cStat>", "<cStat>150</cStat>");
+        var result = NfeXmlReader.Parse(xml);
+        Assert.Equal("4", result.InvoiceNumber);
+    }
+
+    [Fact]
     public void Parse_ProtocolWithDifferentAccessKey_RejectsDocument()
     {
         string xml = AuthorizedXml.Replace(
