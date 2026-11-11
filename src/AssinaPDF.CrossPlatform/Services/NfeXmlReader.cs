@@ -123,7 +123,8 @@ public static class NfeXmlReader
             throw new InvalidDataException("A chave de acesso do protocolo não corresponde à chave da NF-e.");
 
         string status = RequiredValue(protocol, "cStat");
-        if (status != "100")
+        // 100 = autorização de uso; 150 = autorização concedida fora de prazo.
+        if (status is not ("100" or "150"))
             throw new InvalidDataException($"NF-e não autorizada. Status {status}: {Value(protocol, "xMotivo")}");
 
         var issuer = Required(info, "emit");
