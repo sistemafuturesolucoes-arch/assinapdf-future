@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.PdfViewerWindow"
+        Title="AssinaPDF | Visualizador de PDF"
+        Width="1200" Height="820"
+        MinWidth="850" MinHeight="580"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+  <Grid RowDefinitions="58,* ,34">
+    <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#D9DDE3" BorderThickness="0,0,0,1" Padding="14,8">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+          <Button Content="‹" Width="34" Click="PreviousPage_Click" ToolTip.Tip="Página anterior"/>
+          <TextBlock x:Name="PageCounterText" Text="Página 1 de 1" VerticalAlignment="Center" MinWidth="100" TextAlignment="Center"/>
+          <Button Content="›" Width="34" Click="NextPage_Click" ToolTip.Tip="Próxima página"/>
+          <Border Width="1" Height="28" Background="#D9DDE3" Margin="7,0"/>
+          <Button Content="−" Width="34" Click="ZoomOut_Click" ToolTip.Tip="Diminuir zoom"/>
+          <TextBlock x:Name="ZoomText" Text="100%" VerticalAlignment="Center" MinWidth="52" TextAlignment="Center"/>
+          <Button Content="+" Width="34" Click="ZoomIn_Click" ToolTip.Tip="Aumentar zoom"/>
+          <Button Content="Ajustar largura" Click="FitWidth_Click" Padding="10,6"/>
+        </StackPanel>
+        <TextBlock x:Name="DocumentNameText" Grid.Column="1" VerticalAlignment="Center"
+                   HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="#343A44"
+                   TextTrimming="CharacterEllipsis" Margin="14,0"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Content="Editar PDF" Click="EditPdf_Click" Background="#6741B8" Foreground="White" Padding="16,8"/>
+          <Button Content="Fechar" Click="CloseViewer_Click" Padding="14,8"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="190,*">
+      <Border Grid.Column="0" Background="#E9EBEF" BorderBrush="#D2D6DD" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0" Text="PÁGINAS" FontSize="11" FontWeight="Bold"
+                     Foreground="#5A606A" Margin="14,13,10,10"/>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="ThumbnailsPanel" Spacing="8" Margin="10,0,10,12"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="#AEB4BD" Padding="16">
+        <ScrollViewer x:Name="PageScrollViewer"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      Background="#AEB4BD">
+          <Border Background="White" BorderBrush="#C5C9D0" BorderThickness="1"
+                  Padding="12" HorizontalAlignment="Center" VerticalAlignment="Top">
+            <Image x:Name="PageImage" Stretch="Uniform" HorizontalAlignment="Center"/>
+          </Border>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" Background="#E7E9ED" Padding="12,5">
+      <TextBlock x:Name="ViewerStatusText" Text="Preparando visualização..."
+                 FontSize="11" Foreground="#626974" VerticalAlignment="Center"/>
+    </Border>
+  </Grid>
+</Window>
