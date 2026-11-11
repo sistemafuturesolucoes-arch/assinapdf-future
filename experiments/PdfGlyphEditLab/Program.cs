@@ -10,7 +10,7 @@ Run("selection spanning split text runs", () =>
         new GlyphBox(2, "C", 26, 10, 34, 22),
         new GlyphBox(3, "D", 34, 10, 42, 22)
     };
-    var result = GlyphSelectionPlanner.Select(glyphs, new SelectionRect(17, 9, 35, 23));
+    var result = GlyphSelectionPlanner.Select(glyphs, new SelectionRect(17, 9, 42, 23));
     Assert(result.Select(x => x.CharacterIndex).SequenceEqual(new[] { 1, 2, 3 }),
         "Expected B, C and D even when the source text is represented by separate runs.");
 });
