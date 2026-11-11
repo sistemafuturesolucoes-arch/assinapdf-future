@@ -2038,6 +2038,12 @@ public partial class EditorWindow : Window
             orderedRuns[0].Length == fragment.Text.Length)
         {
             EditedTextRun wholeRun = orderedRuns[0];
+
+            // Reafirme o vínculo entre cada TextState e seu segmento antes de
+            // alterar a fonte. Sem esse vínculo, o Aspose pode manter o estado
+            // atualizado em memória, mas serializar a face anterior no PDF.
+            RestoreSegmentStateOwnership(fragment);
+
             foreach (TextSegment segment in fragment.Segments)
             {
                 ApplyRunStyle(
@@ -2678,22 +2684,36 @@ public partial class EditorWindow : Window
             return Fail("o texto aparece em mais de uma posição e não foi possível identificar com segurança o trecho editado.");
         }
 
-        var savedSegments = new List<(int Start, int End, TextSegment Segment)>();
+        // Mantenha os offsets brutos para diagnóstico, mas faça a associação
+        // dos estilos por caracteres significativos. O Aspose pode reabrir o PDF
+        // com espaços/quebras diferentes dos enviados pelo editor; NormalizePdfText
+        // já considera esses textos equivalentes para localizar o grupo.
+        var savedSegments = new List<(
+            int Start, int End, int NormalizedStart, int NormalizedEnd, TextSegment Segment)>();
         int offset = 0;
+        int normalizedOffset = 0;
         foreach (TextFragment selectedFragment in selectedGroup)
         {
             foreach (TextSegment segment in selectedFragment.Segments)
             {
-                int end = offset + (segment.Text?.Length ?? 0);
-                savedSegments.Add((offset, end, segment));
+                string segmentText = segment.Text ?? string.Empty;
+                int end = checked(offset + segmentText.Length);
+                int normalizedEnd = checked(
+                    normalizedOffset + NormalizePdfText(segmentText).Length);
+                savedSegments.Add((
+                    offset, end, normalizedOffset, normalizedEnd, segment));
                 offset = end;
+                normalizedOffset = normalizedEnd;
             }
         }
 
         if (NormalizePdfText(string.Concat(selectedGroup.Select(item => item.Text))) != normalizedExpected)
             return Fail("os blocos recuperados não correspondem ao texto editado.");
-        if (offset != expectedText.Length)
-            return Fail($"os blocos relidos totalizam {offset} caracteres, mas a prévia enviou {expectedText.Length}; não foi possível mapear os estilos por posição.");
+        if (normalizedOffset != normalizedExpected.Length)
+            return Fail(
+                $"os blocos relidos totalizam {normalizedOffset} caracteres significativos, " +
+                $"mas o texto normalizado da prévia possui {normalizedExpected.Length}; " +
+                "não foi possível mapear os estilos por posição.");
 
         foreach (var run in expectedRuns.Where(item => item.Length > 0))
         {
@@ -2702,8 +2722,17 @@ public partial class EditorWindow : Window
                 return Fail($"intervalo de formatação inválido na posição {run.Start}.");
 
             string runText = expectedText.Substring(run.Start, run.Length);
+            int normalizedRunStart = NormalizePdfText(expectedText.Substring(0, run.Start)).Length;
+            int normalizedRunEnd = NormalizePdfText(expectedText.Substring(0, runEnd)).Length;
+
+            // Um intervalo composto somente por espaços/quebras não possui glifos
+            // cuja fonte possa ser verificada no PDF reaberto.
+            if (normalizedRunStart == normalizedRunEnd)
+                continue;
+
             var covered = savedSegments.Where(item =>
-                item.Start < runEnd && item.End > run.Start).ToArray();
+                item.NormalizedStart < normalizedRunEnd &&
+                item.NormalizedEnd > normalizedRunStart).ToArray();
 
             if (covered.Length == 0)
                 return Fail($"nenhum segmento salvo corresponde ao trecho na posição {run.Start}.");
