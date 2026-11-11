@@ -937,16 +937,19 @@ public partial class EditorWindow : Window
         double dx = deltaViewX * pageInfo.WidthPoints / image.Bounds.Width;
         double dy = -deltaViewY * pageInfo.HeightPoints / image.Bounds.Height;
         if (Math.Abs(dx) < 0.1 && Math.Abs(dy) < 0.1) { LoadDocumentPreview(); return; }
-        double expectedCx = (selectedBounds.Left + selectedBounds.Right) / 2 + dx;
-        double expectedCy = (selectedBounds.Bottom + selectedBounds.Top) / 2 + dy;
+        double expectedCx = 0;
+        double expectedCy = 0;
         try
         {
             ApplyPdfEdit(document =>
             {
                 var absorber = new TextFragmentAbsorber();
                 document.Pages[pageInfo.PageIndex + 1].Accept(absorber);
+                string normalizedSelection = NormalizePdfText(selectedText);
                 var candidates = absorber.TextFragments
-                    .Where(fragment => string.Equals(fragment.Text, selectedText, StringComparison.Ordinal))
+                    .Where(fragment => string.Equals(
+                        NormalizePdfText(fragment.Text ?? string.Empty),
+                        normalizedSelection, StringComparison.Ordinal))
                     .Select(fragment => new { Fragment = fragment, Bounds = fragment.Rectangle })
                     .Where(item => item.Bounds != null)
                     .Select(item => new
@@ -957,23 +960,35 @@ public partial class EditorWindow : Window
                             Math.Pow((item.Bounds.LLY + item.Bounds.URY) / 2 -
                             (selectedBounds.Bottom + selectedBounds.Top) / 2, 2)
                     }).OrderBy(item => item.Distance).ToArray();
-                if (candidates.Length == 0 || candidates[0].Distance > 100)
-                    throw new InvalidOperationException("Selecione o bloco completo de texto. Este trecho não corresponde a um único bloco editável.");
+
+                // O retângulo desenhado pelo PDFium pode ser ligeiramente diferente
+                // do retângulo tipográfico do Aspose. A correspondência do texto é
+                // normalizada e a distância serve apenas para desambiguar repetições.
+                if (candidates.Length == 0 || candidates[0].Distance > 2500)
+                    throw new InvalidOperationException("Não encontrei um único bloco editável correspondente à seleção. O PDF original foi preservado.");
                 if (candidates.Length > 1 && Math.Abs(candidates[1].Distance - candidates[0].Distance) < 1)
-                    throw new InvalidOperationException("Há blocos idênticos próximos. Não movi nenhum para evitar alterar o texto errado.");
-                var position = candidates[0].Fragment.Position;
-                candidates[0].Fragment.Position = new Position(position.XIndent + dx, position.YIndent + dy);
+                    throw new InvalidOperationException("Há blocos idênticos na mesma posição. Não movi nenhum para evitar alterar o texto errado.");
+
+                var target = candidates[0];
+                expectedCx = (target.Bounds.LLX + target.Bounds.URX) / 2 + dx;
+                expectedCy = (target.Bounds.LLY + target.Bounds.URY) / 2 + dy;
+                var position = target.Fragment.Position ??
+                    new Position(target.Bounds.LLX, target.Bounds.LLY);
+                target.Fragment.Position = new Position(
+                    position.XIndent + dx, position.YIndent + dy);
             }, "Texto reposicionado no PDF.", savedDocument =>
             {
                 var verify = new TextFragmentAbsorber();
                 savedDocument.Pages[pageInfo.PageIndex + 1].Accept(verify);
                 return verify.TextFragments.Where(fragment =>
-                    string.Equals(fragment.Text, selectedText, StringComparison.Ordinal)).Any(fragment =>
+                    string.Equals(
+                        NormalizePdfText(fragment.Text ?? string.Empty),
+                        NormalizePdfText(selectedText), StringComparison.Ordinal)).Any(fragment =>
                 {
                     var bounds = fragment.Rectangle;
                     if (bounds == null) return false;
                     double cx = (bounds.LLX + bounds.URX) / 2, cy = (bounds.LLY + bounds.URY) / 2;
-                    return Math.Pow(cx - expectedCx, 2) + Math.Pow(cy - expectedCy, 2) < 225;
+                    return Math.Pow(cx - expectedCx, 2) + Math.Pow(cy - expectedCy, 2) < 900;
                 });
             });
         }
