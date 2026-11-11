@@ -38,6 +38,9 @@ public static class NfeBatchZipExporter
         ArgumentException.ThrowIfNullOrWhiteSpace(outputZipPath);
         ArgumentNullException.ThrowIfNull(documents);
 
+        if (!Enum.IsDefined(groupingMode))
+            throw new ArgumentOutOfRangeException(nameof(groupingMode));
+
         var items = documents.ToList();
 
         if (items.Count == 0)
@@ -67,6 +70,16 @@ public static class NfeBatchZipExporter
             {
                 throw new InvalidOperationException(
                     "O ZIP não pode substituir um XML original.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.PdfPath) &&
+                string.Equals(
+                    output,
+                    Path.GetFullPath(item.PdfPath),
+                    comparison))
+            {
+                throw new InvalidOperationException(
+                    "O ZIP não pode substituir um DANFE original.");
             }
         }
 
