@@ -918,7 +918,8 @@ public partial class EditorWindow : Window
         SelectedTextLabel.Text = text.Length > 70 ? text[..67] + "..." : text;
         SelectedTextLabel.IsVisible = true;
         EditSelectedTextButton.IsVisible = true;
-        EditorStatusText.Text = "Trecho selecionado no PDF. Clique com o botão direito para editar ou copiar.";
+        DeleteSelectedTextButton.IsVisible = true;
+        EditorStatusText.Text = "Trecho selecionado. Você pode editar, excluir ou arrastar o texto.";
     }
 
     private async Task MoveSelectedTextAsync(PagePreviewInfo pageInfo, AvaloniaImage image, double deltaViewX, double deltaViewY)
@@ -974,8 +975,27 @@ public partial class EditorWindow : Window
                 expectedCy = (target.Bounds.LLY + target.Bounds.URY) / 2 + dy;
                 var position = target.Fragment.Position ??
                     new Position(target.Bounds.LLX, target.Bounds.LLY);
+                // O fragmento absorvido pode ser apenas uma representação agregada.
+                // Atualize também a posição de cada segmento físico para regravar os
+                // operadores de texto (Tj/TJ), não apenas a moldura lógica.
                 target.Fragment.Position = new Position(
                     position.XIndent + dx, position.YIndent + dy);
+                foreach (TextSegment segment in target.Fragment.Segments)
+                {
+                    if (segment.Position is { } segmentPosition)
+                    {
+                        segment.Position = new Position(
+                            segmentPosition.XIndent + dx,
+                            segmentPosition.YIndent + dy);
+                    }
+
+                    if (segment.BaselinePosition is { } baseline)
+                    {
+                        segment.BaselinePosition = new Position(
+                            baseline.XIndent + dx,
+                            baseline.YIndent + dy);
+                    }
+                }
             }, "Texto reposicionado no PDF.", savedDocument =>
             {
                 var verify = new TextFragmentAbsorber();
@@ -1083,8 +1103,49 @@ public partial class EditorWindow : Window
         SelectedTextLabel.Text = string.Empty;
         SelectedTextLabel.IsVisible = false;
         EditSelectedTextButton.IsVisible = false;
+        DeleteSelectedTextButton.IsVisible = false;
         _selectedText = string.Empty;
         _selectedTextBounds = null;
+    }
+
+    private void DeleteSelectedText_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_selectedPageIndex is not int pageIndex ||
+            _selectedTextBounds is not { } bounds ||
+            string.IsNullOrWhiteSpace(_selectedText))
+            return;
+
+        string selectedText = _selectedText;
+        try
+        {
+            var selectedRectangle = new Aspose.Pdf.Rectangle(
+                bounds.Left, bounds.Bottom, bounds.Right, bounds.Top);
+            ApplyPdfEdit(document =>
+            {
+                var absorber = new TextFragmentAbsorber();
+                absorber.RemoveAllText(document.Pages[pageIndex + 1], selectedRectangle);
+            }, "Texto selecionado excluído do PDF.", savedDocument =>
+            {
+                var verify = new TextFragmentAbsorber();
+                savedDocument.Pages[pageIndex + 1].Accept(verify);
+                return !verify.TextFragments.Any(fragment =>
+                    fragment.Rectangle is { } rectangle &&
+                    rectangle.URX >= bounds.Left && rectangle.LLX <= bounds.Right &&
+                    rectangle.URY >= bounds.Bottom && rectangle.LLY <= bounds.Top &&
+                    string.Equals(
+                        NormalizePdfText(fragment.Text),
+                        NormalizePdfText(selectedText),
+                        StringComparison.Ordinal));
+            });
+            ClearTextSelection();
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                $"Não foi possível excluir a seleção. A versão anterior foi preservada. {ex.Message}";
+        }
     }
 
     private async void EditSelectedText_Click(
