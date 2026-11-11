@@ -23,6 +23,14 @@ public partial class BatchSignatureWindow : Window
     {
         InitializeComponent();
         DocumentsList.ItemsSource = _documents;
+        PreviewControl.PlacementsChanged += placements =>
+        {
+            if (DocumentsList.SelectedItem is BatchPdfItem current)
+            {
+                current.Placements = placements.ToArray();
+                UpdateCount();
+            }
+        };
 
         try
         {
@@ -112,6 +120,7 @@ public partial class BatchSignatureWindow : Window
             CertificatePicker.SelectedItem = null;
             _loadingCertificateSelection = false;
             CertificateDetailsText.Text = "O certificado selecionado será usado somente neste documento.";
+            PreviewControl.SetDocument(null, null);
             return;
         }
 
@@ -120,7 +129,7 @@ public partial class BatchSignatureWindow : Window
         CertificatePicker.SelectedItem = item.Certificate;
         _loadingCertificateSelection = false;
         UpdateCertificateDetails(item.Certificate);
-        UpdatePlacementDetails(item);
+        PreviewControl.SetDocument(item.SourcePath, item.Placements);
     }
 
     private void CertificatePicker_SelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -191,36 +200,6 @@ public partial class BatchSignatureWindow : Window
         StatusText.Text = "Fila limpa. Nenhum PDF original foi excluído.";
     }
 
-    private async void ConfigurePlacement_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (DocumentsList.SelectedItem is not BatchPdfItem item)
-        {
-            StatusText.Text = "Selecione um PDF para configurar o posicionamento.";
-            return;
-        }
-
-        try
-        {
-            using var document = new PdfiumDocument(item.SourcePath);
-            var positioningWindow = new SignaturePositioningWindow(document);
-            await positioningWindow.ShowDialog(this);
-
-            if (positioningWindow.SelectedPlacements.Count == 0)
-            {
-                StatusText.Text = "Posicionamento cancelado ou nenhuma posição selecionada.";
-                return;
-            }
-
-            item.Placements = positioningWindow.SelectedPlacements.ToArray();
-            UpdatePlacementDetails(item);
-            StatusText.Text = $"{item.Placements.Count} posição(ões) salvas somente para {Path.GetFileName(item.SourcePath)}.";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "Não foi possível configurar as posições: " + ex.Message;
-        }
-    }
-
     private async void SignAll_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_operationInProgress)
@@ -243,7 +222,7 @@ public partial class BatchSignatureWindow : Window
         var missingPlacement = _documents.FirstOrDefault(x => x.Placements.Count == 0);
         if (missingPlacement != null)
         {
-            StatusText.Text = $"Configure as posições de assinatura de “{Path.GetFileName(missingPlacement.SourcePath)}”. Cada PDF possui seu próprio posicionamento.";
+            StatusText.Text = $"Marque pelo menos uma área de assinatura na prévia do PDF “{Path.GetFileName(missingPlacement.SourcePath)}”.";
             return;
         }
 
@@ -399,13 +378,6 @@ public partial class BatchSignatureWindow : Window
     private void SetControlsEnabled(bool enabled)
     {
         RootLayout.IsEnabled = enabled;
-    }
-
-    private void UpdatePlacementDetails(BatchPdfItem item)
-    {
-        PlacementText.Text = item.Placements.Count == 0
-            ? "Nenhuma posição configurada para este documento."
-            : $"{item.Placements.Count} posição(ões) configurada(s) neste PDF. A seleção é exclusiva deste documento.";
     }
 
     private void UpdateCount()
