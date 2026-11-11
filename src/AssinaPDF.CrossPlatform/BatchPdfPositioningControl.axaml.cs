@@ -67,6 +67,7 @@ public partial class BatchPdfPositioningControl : UserControl
         try
         {
             _document = new PdfiumDocument(path);
+            _zoom = CalculateFitWidthZoom();
             ShowPage(0);
             PreviewStatusText.Text = "Clique e arraste sobre o PDF para criar uma área de assinatura. As posições ficam salvas neste documento.";
         }
@@ -214,6 +215,25 @@ public partial class BatchPdfPositioningControl : UserControl
         RefreshMarkers();
         PlacementsChanged?.Invoke(Array.Empty<SignaturePlacement>());
         PreviewStatusText.Text = "Todas as posições deste PDF foram removidas.";
+    }
+
+    private double CalculateFitWidthZoom()
+    {
+        if (_document == null) return 0.7;
+        double availableWidth = PdfScrollViewer.Bounds.Width;
+        if (availableWidth <= 0) return 0.7;
+
+        var sample = _document.RenderPage(_pageIndex, 0.1f);
+        double pageWidthAt100Percent = sample.PageWidthPoints * 96.0 / 72.0;
+        if (pageWidthAt100Percent <= 0) return 0.7;
+
+        return Math.Clamp((availableWidth - 32) / pageWidthAt100Percent, 0.35, 1.5);
+    }
+
+    private void FitWidth_Click(object? s, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _zoom = CalculateFitWidthZoom();
+        ShowPage(_pageIndex);
     }
 
     private void PreviousPage_Click(object? s, Avalonia.Interactivity.RoutedEventArgs e)
