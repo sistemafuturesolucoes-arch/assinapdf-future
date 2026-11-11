@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.EditorCenterWindow"
+        Title="AssinaPDF | Central de edição"
+        Width="900" Height="650"
+        MinWidth="680" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <Border Grid.Row="0" Background="#FFFFFF" Padding="26,20">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Central de edição" FontSize="25"
+                     FontWeight="SemiBold" Foreground="#292D36"/>
+          <TextBlock Text="Continue um documento recente ou comece uma nova edição."
+                     FontSize="13" Foreground="#737B87"/>
+        </StackPanel>
+        <Button Grid.Column="1" Content="← Voltar"
+                Click="CloseCenter_Click" VerticalAlignment="Center"
+                Padding="16,9" Background="#ECEEF2"
+                Foreground="#34383E" BorderThickness="0"/>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="1" Background="#292D36" Padding="24,14">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="3" VerticalAlignment="Center">
+          <TextBlock Text="SEUS DOCUMENTOS" FontSize="11"
+                     FontWeight="Bold" Foreground="#D5D8DE"/>
+          <TextBlock Text="Os arquivos de trabalho ficam salvos neste computador."
+                     FontSize="12" Foreground="#FFFFFF"/>
+        </StackPanel>
+        <Button Grid.Column="1" Content="+ Editar documento"
+                Click="NewPdf_Click" Padding="18,10"
+                Background="#FFFFFF" Foreground="#292D36"
+                BorderThickness="0" FontWeight="SemiBold"/>
+      </Grid>
+    </Border>
+
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="28,24" Spacing="12">
+        <TextBlock Text="Edições recentes" FontSize="18"
+                   FontWeight="SemiBold" Foreground="#292D36"/>
+        <StackPanel x:Name="RecentDocumentsPanel" Spacing="10"/>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="3" Background="#E7E9ED" Padding="18,9">
+      <TextBlock x:Name="CenterStatusText"
+                 Text="Selecione um documento ou inicie uma nova edição."
+                 FontSize="11" Foreground="#666D78"/>
+    </Border>
+  </Grid>
+</Window>

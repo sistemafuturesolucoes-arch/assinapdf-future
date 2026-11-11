@@ -1,0 +1,115 @@
+name: AssinaPDF Windows x64 Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - integracao-assinapdf-crossplatform
+    paths:
+      - 'src/AssinaPDF.CrossPlatform/**'
+      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
+      - 'installer-crossplatform/**'
+      - 'scripts/generate_windows_icon.py'
+      - '.github/workflows/assinapdf-crossplatform-build.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/AssinaPDF.CrossPlatform/**'
+      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
+      - 'installer-crossplatform/**'
+      - 'scripts/generate_windows_icon.py'
+      - '.github/workflows/assinapdf-crossplatform-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Testes automatizados
+    runs-on: windows-2025
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Executar testes
+        run: dotnet test ./tests/AssinaPDF.CrossPlatform.Tests/AssinaPDF.CrossPlatform.Tests.csproj -c Release
+
+  publish-windows:
+    name: Publicar e empacotar Windows x64
+    needs: tests
+    runs-on: windows-2025
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Configurar Python para gerar o ícone Windows
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Gerar ícone Windows a partir da logo PNG oficial
+        run: |
+          python -m pip install --disable-pip-version-check Pillow
+          python scripts/generate_windows_icon.py
+
+      - name: Publicar aplicação autocontida
+        shell: pwsh
+        run: |
+          dotnet publish ./src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:DebugSymbols=false `
+            -p:DebugType=None `
+            -o "publish/win-x64"
+
+      - name: Verificar publicação Windows x64
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'publish/win-x64'
+          $exe = Join-Path $publishDir 'AssinaPDF.MacPrototype.exe'
+          $logo = Join-Path $publishDir 'logo-future.png'
+          if (-not (Test-Path $exe)) { throw "Executável principal não foi publicado: $exe" }
+          if (-not (Test-Path $logo)) { throw "Logo oficial não foi incluída na publicação." }
+          $pdfium = Get-ChildItem $publishDir -Filter 'pdfium.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $pdfium) { throw "pdfium.dll não foi encontrada na publicação Windows x64." }
+          Write-Host "Executável: $exe"
+          Write-Host "PDFium: $($pdfium.FullName)"
+          Write-Host "Arquivos publicados: $((Get-ChildItem $publishDir -Recurse -File | Measure-Object).Count)"
+
+      - name: Construir instalador MSI Windows x64
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'publish/win-x64'
+          dotnet build ./installer-crossplatform/AssinaPDF.CrossPlatform.wixproj `
+            -c Release `
+            -p:InstallerPlatform=x64 `
+            -p:PublishDir="$publishDir/"
+
+          $msi = Get-ChildItem ./installer-crossplatform/bin -Filter 'AssinaPDF-CrossPlatform-Setup-x64.msi' -Recurse |
+            Select-Object -First 1
+          if (-not $msi) { throw "O MSI Windows x64 não foi gerado." }
+          Write-Host "Instalador gerado: $($msi.FullName)"
+          Write-Host "Tamanho: $([math]::Round($msi.Length / 1MB, 2)) MB"
+
+      - name: Disponibilizar instalador MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssinaPDF-Windows-x64-Installer
+          path: installer-crossplatform/bin/**/AssinaPDF-CrossPlatform-Setup-x64.msi
+          if-no-files-found: error
+          retention-days: 14

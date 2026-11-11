@@ -1,0 +1,44 @@
+name: AssinaPDF CrossPlatform - Build e Testes
+
+on:
+  push:
+    branches:
+      - integracao-assinapdf-crossplatform
+    paths:
+      - 'src/AssinaPDF.CrossPlatform/**'
+      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
+      - '.github/workflows/assinapdf-crossplatform-tests.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/AssinaPDF.CrossPlatform/**'
+      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
+      - '.github/workflows/assinapdf-crossplatform-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-2025
+    timeout-minutes: 30
+
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restaurar dependências
+        run: dotnet restore src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj
+
+      - name: Compilar aplicativo CrossPlatform
+        run: dotnet build src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj --configuration Release --no-restore
+
+      - name: Executar testes automatizados
+        run: dotnet test tests/AssinaPDF.CrossPlatform.Tests/AssinaPDF.CrossPlatform.Tests.csproj --configuration Release
