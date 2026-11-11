@@ -10,6 +10,7 @@ using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using AssinaPDF.MacPrototype.Services;
 using SimpleSign.PAdES.Validation;
+using SimpleSign.Core.Validation;
 
 namespace AssinaPDF.MacPrototype;
 
