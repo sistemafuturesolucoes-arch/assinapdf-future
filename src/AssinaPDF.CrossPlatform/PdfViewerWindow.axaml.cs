@@ -23,6 +23,7 @@ public partial class PdfViewerWindow : Window
     private readonly List<Border> _pageSurfaces = new();
     private int _pageIndex;
     private double _zoom = 1.0;
+    private float _renderScale = 1.5f;
     private bool _loading;
 
     public PdfViewerWindow(string pdfPath, Func<Task<string?>> editAction)
@@ -125,7 +126,7 @@ public partial class PdfViewerWindow : Window
         for (int i = 0; i < _document.PageCount; i++)
         {
             // Renderização moderada para manter o consumo de memória mais previsível.
-            var bitmap = CreateBitmap(_document.RenderPage(i, 0.85f));
+            var bitmap = CreateBitmap(_document.RenderPage(i, _renderScale));
             _pageBitmaps.Add(bitmap);
             var image = new Image
             {
@@ -205,21 +206,29 @@ public partial class PdfViewerWindow : Window
 
     private void PrintPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (_document == null)
+            return;
+
         try
         {
-            // Abre o PDF no visualizador padrão do sistema, que oferece o diálogo
-            // de impressão nativo sem incorporar outro controle de navegador no processo.
-            var startInfo = new System.Diagnostics.ProcessStartInfo
+            if (!OperatingSystem.IsWindows())
             {
-                FileName = _originalPath,
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(startInfo);
-            ViewerStatusText.Text = "PDF aberto no visualizador do sistema. Use a opção Imprimir nessa janela.";
+                ViewerStatusText.Text = "A impressão nativa com propriedades da impressora está sendo preparada para macOS. Nesta versão, teste a impressão no Windows.";
+                return;
+            }
+
+            bool printed = PdfPrinterService.ShowPrinterDialogAndPrint(
+                _document,
+                Path.GetFileName(_originalPath),
+                this.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+
+            ViewerStatusText.Text = printed
+                ? "Documento enviado para a impressora selecionada."
+                : "Impressão cancelada.";
         }
         catch (Exception ex)
         {
-            ViewerStatusText.Text = $"Não foi possível abrir o PDF para impressão: {ex.Message}";
+            ViewerStatusText.Text = $"Não foi possível imprimir o PDF: {ex.Message}";
         }
     }
 
@@ -253,8 +262,53 @@ public partial class PdfViewerWindow : Window
 
     private void SetZoom(double value)
     {
-        _zoom = Math.Clamp(value, 0.25, 2.5);
+        double nextZoom = Math.Clamp(value, 0.25, 5.0);
+        if (Math.Abs(nextZoom - _zoom) < 0.0001)
+            return;
+
+        _zoom = nextZoom;
+        RerenderPagesForZoom();
         ApplyZoomToPages();
+    }
+
+    private void RerenderPagesForZoom()
+    {
+        if (_document == null || _pageBitmaps.Count == 0)
+            return;
+
+        // Repete a estratégia do visualizador principal: quando o zoom aumenta,
+        // rasteriza novamente a partir do PDF original em vez de ampliar o bitmap antigo.
+        float requestedScale = 1.5f * (float)Math.Max(1.0, _zoom);
+        if (requestedScale <= _renderScale * 1.20f)
+            return;
+
+        var replacements = new List<WriteableBitmap>(_pageBitmaps.Count);
+        try
+        {
+            for (int i = 0; i < _pageBitmaps.Count; i++)
+            {
+                var rendered = _document.RenderPage(i, requestedScale);
+                replacements.Add(CreateBitmap(rendered));
+            }
+
+            for (int i = 0; i < replacements.Count; i++)
+            {
+                var previous = _pageBitmaps[i];
+                _pageBitmaps[i] = replacements[i];
+                if (_pageSurfaces[i].Child is Image image)
+                    image.Source = replacements[i];
+                previous.Dispose();
+            }
+
+            _renderScale = requestedScale;
+        }
+        catch (Exception ex)
+        {
+            foreach (var bitmap in replacements)
+                bitmap.Dispose();
+
+            ViewerStatusText.Text = $"Não foi possível melhorar a resolução do zoom: {ex.Message}";
+        }
     }
 
     private void PageScrollViewer_ScrollChanged(object? sender, ScrollChangedEventArgs e)
