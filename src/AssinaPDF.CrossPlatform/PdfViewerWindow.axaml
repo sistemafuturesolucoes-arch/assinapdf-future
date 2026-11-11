@@ -43,10 +43,7 @@
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto"
                       Background="#AEB4BD">
-          <Border Background="White" BorderBrush="#C5C9D0" BorderThickness="1"
-                  Padding="12" HorizontalAlignment="Center" VerticalAlignment="Top">
-            <Image x:Name="PageImage" Stretch="Uniform" HorizontalAlignment="Center"/>
-          </Border>
+          <StackPanel x:Name="PagesPanel" Spacing="18" HorizontalAlignment="Center" Margin="0,0,0,18"/>
         </ScrollViewer>
       </Border>
     </Grid>
