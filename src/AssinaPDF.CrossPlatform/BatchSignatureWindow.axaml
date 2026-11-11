@@ -1,0 +1,106 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.BatchSignatureWindow"
+        Title="AssinaPDF | Assinatura em Lote"
+        Width="1120" Height="760"
+        MinWidth="900" MinHeight="620"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="16" RowSpacing="10">
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="Assinatura em Lote" FontSize="23" FontWeight="SemiBold" Foreground="#252A34"/>
+      <TextBlock Text="Adicione vários PDFs, atribua um certificado a cada documento e assine a fila em uma única operação."
+                 FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+    </StackPanel>
+
+    <WrapPanel Grid.Row="1" Orientation="Horizontal">
+      <Button Content="＋ Adicionar PDFs" Click="AddPdfs_Click" Margin="0,0,8,0"
+              Padding="13,8" Background="#6741B8" Foreground="White"/>
+      <Button Content="Remover selecionado" Click="RemoveSelected_Click" Margin="0,0,8,0"
+              Padding="13,8" Background="#E7E9ED" Foreground="#34383E"/>
+      <Button Content="Limpar lista" Click="ClearList_Click"
+              Padding="13,8" Background="#F4E9E9" Foreground="#8A3D3D"/>
+    </WrapPanel>
+
+    <Grid Grid.Row="2" ColumnDefinitions="350,*" ColumnSpacing="12">
+      <Border Grid.Column="0" Background="White" BorderBrush="#E0E3E8"
+              BorderThickness="1" CornerRadius="8" Padding="10">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock Text="DOCUMENTOS DA FILA" FontSize="11" FontWeight="SemiBold" Foreground="#555D69"/>
+            <TextBlock x:Name="CountText" Text="Nenhum PDF adicionado" FontSize="11" Foreground="#737B87"/>
+          </StackPanel>
+          <ListBox x:Name="DocumentsList" Grid.Row="1" Margin="0,8"
+                   SelectionChanged="DocumentsList_SelectionChanged">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:CompileBindings="False">
+                <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"
+                           FontSize="12" Foreground="#34383E" Margin="4,7"/>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Grid.Row="2" Spacing="3">
+            <TextBlock Text="CERTIFICADO PARA TODOS" FontSize="10" FontWeight="SemiBold" Foreground="#555D69"/>
+            <ComboBox x:Name="ApplyAllCertificatePicker" PlaceholderText="Escolha um certificado"
+                      MinHeight="36"/>
+            <Button Content="Aplicar certificado a todos" Click="ApplyCertificateToAll_Click"
+                    Padding="9,7" Background="#E7E9ED" Foreground="#34383E"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" Background="White" BorderBrush="#E0E3E8"
+              BorderThickness="1" CornerRadius="8" Padding="16">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" RowSpacing="10">
+          <TextBlock Grid.Row="0" Text="CONFIGURAÇÃO DO DOCUMENTO" FontSize="11"
+                     FontWeight="SemiBold" Foreground="#555D69"/>
+          <StackPanel Grid.Row="1" Spacing="4">
+            <TextBlock Text="Documento selecionado" FontSize="10" Foreground="#737B87"/>
+            <TextBlock x:Name="SelectedDocumentText" Text="Selecione um PDF na lista."
+                       FontSize="14" FontWeight="SemiBold" Foreground="#292D36"
+                       TextWrapping="Wrap"/>
+          </StackPanel>
+          <StackPanel Grid.Row="2" Spacing="5">
+            <TextBlock Text="Certificado deste documento" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#454B55"/>
+            <ComboBox x:Name="CertificatePicker" PlaceholderText="Selecione o certificado"
+                      MinHeight="38" SelectionChanged="CertificatePicker_SelectionChanged"/>
+            <TextBlock x:Name="CertificateDetailsText" Text="O certificado selecionado será usado somente neste documento."
+                       FontSize="10" Foreground="#737B87" TextWrapping="Wrap"/>
+          </StackPanel>
+          <StackPanel Grid.Row="3" Spacing="5">
+            <TextBlock Text="Motivo da assinatura (opcional)" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#454B55"/>
+            <TextBox x:Name="SigningReasonTextBox" Watermark="Ex.: Aprovação do documento"
+                     MinHeight="36"/>
+          </StackPanel>
+          <Border Grid.Row="4" Background="#F4F1F9" CornerRadius="6" Padding="12">
+            <StackPanel Spacing="7">
+              <TextBlock Text="POSICIONAMENTO VISUAL" FontSize="10" FontWeight="SemiBold"
+                         Foreground="#6741B8"/>
+              <TextBlock x:Name="PlacementText" Text="Nenhuma posição configurada."
+                         FontSize="11" Foreground="#454B55" TextWrapping="Wrap"/>
+              <Button Content="Configurar posições no PDF selecionado"
+                      Click="ConfigurePlacement_Click" Padding="10,8"
+                      Background="#6741B8" Foreground="White"/>
+            </StackPanel>
+          </Border>
+          <TextBlock Grid.Row="5" Text="Nesta primeira etapa, cada PDF será exportado separadamente. As opções de PDF consolidado e separação por páginas serão adicionadas após validar a assinatura em lote."
+                     FontSize="11" Foreground="#737B87" TextWrapping="Wrap"
+                     VerticalAlignment="Top"/>
+          <Button Grid.Row="6" Content="Assinar todos os documentos" Click="SignAll_Click"
+                  Padding="16,11" Background="#27865A" Foreground="White"
+                  HorizontalAlignment="Right" MinWidth="230"/>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+      <TextBlock x:Name="StatusText" Text="Aguardando PDFs." FontSize="11"
+                 Foreground="#666D78" VerticalAlignment="Center" TextWrapping="Wrap"/>
+      <Button Grid.Column="1" Content="Fechar" Click="Close_Click"
+              Padding="14,8" Background="#E2E5EA" Foreground="#34383E"/>
+    </Grid>
+  </Grid>
+</Window>
