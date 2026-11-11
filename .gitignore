@@ -1,0 +1,39 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+src/AssinaPDF.CrossPlatform/**/*.bak
+# Publicações e arquivos de distribuição
+publish/
+**/publish/
+
+# Pacotes e instaladores gerados
+*.msi
+*.dmg
+*.app/
+*.zip
+
+# Arquivos temporários e backups
+*.tmp
+*.log
+*.bak
+# Backups de desenvolvimento
+**/*-backup.txt
+
+# Backups locais do desenvolvimento
+src/_AssinaPDF_Backups/
+
+# Artefatos gerados pelo WiX
+installer-crossplatform/bin/
+installer-crossplatform/obj/
+*.wixpdb
+*.cab
+
+# Arquivos temporários de sistema
+.DS_Store
+Thumbs.db
+
+# Backups antigos dos arquivos-fonte
+src/AssinaPDF.CrossPlatform/**/*.bak*
+src/AssinaPDF.CrossPlatform/**/*.recuperacao
+src/AssinaPDF.CrossPlatform/**/*backup*

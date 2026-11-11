@@ -1,0 +1,53 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.PdfOrganizerWindow"
+        Title="AssinaPDF | Combinar e organizar PDF"
+        Width="1050" Height="620"
+        MinWidth="760" MinHeight="460"
+        WindowStartupLocation="CenterOwner"
+        Background="#F1F3F6">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1" Padding="10,8">
+      <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Button x:Name="AddDocumentsButton" Content="＋ Adicionar documento" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="13,8" Margin="0,0,7,5"/>
+        <Button x:Name="SaveAsButton" Content="Salvar como" Click="SaveAs_Click" Background="#16804A" Foreground="White" Padding="13,8" Margin="0,0,7,5" ToolTip.Tip="Salvar a sequência organizada em um novo arquivo PDF"/>
+        <Button Content="−" Click="ZoomOut_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Diminuir zoom"/>
+        <Button Content="＋" Click="ZoomIn_Click" Padding="11,8" Margin="0,0,5,5" ToolTip.Tip="Aumentar zoom"/>
+        <Button Content="Ajustar" Click="ZoomReset_Click" Padding="11,8" Margin="0,0,7,5"/>
+        <TextBlock x:Name="ZoomLabel" Text="100%" VerticalAlignment="Center" Foreground="#505866" FontSize="12" Margin="0,0,12,5"/>
+        <TextBlock Text="Combinar e organizar PDF" VerticalAlignment="Center" Foreground="#737B87" FontSize="12" Margin="0,0,12,5"/>
+        <TextBlock x:Name="PageCountText" Text="0 página(s)" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#343A46" Margin="0,0,0,5"/>
+      </WrapPanel>
+    </Border>
+    <Grid Grid.Row="1" ColumnDefinitions="200,*">
+      <Border Grid.Column="0" Background="#E9ECF1" BorderBrush="#DDE1E8" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0" Text="PÁGINAS DO DOCUMENTO · Ctrl/Shift para selecionar" FontSize="10" FontWeight="SemiBold" Foreground="#687180" Margin="12,12,8,7"/>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="ThumbnailsPanel" Spacing="4"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="#DDE1E8">
+        <Grid>
+          <ScrollViewer x:Name="DocumentScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <StackPanel x:Name="PagesPanel" HorizontalAlignment="Stretch" Spacing="0"/>
+          </ScrollViewer>
+          <Border x:Name="EmptyState" IsVisible="True" Background="#F7F8FA" CornerRadius="12" Padding="28" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="430">
+            <StackPanel Spacing="10" HorizontalAlignment="Center">
+              <TextBlock Text="Nenhum documento adicionado" FontSize="19" FontWeight="SemiBold" Foreground="#303744" HorizontalAlignment="Center"/>
+              <TextBlock Text="Clique em Adicionar documento para carregar um ou vários PDFs. As páginas serão exibidas em sequência, uma abaixo da outra." TextWrapping="Wrap" TextAlignment="Center" Foreground="#747C89" FontSize="13"/>
+              <Button Content="Adicionar PDF" Click="AddDocuments_Click" Background="#6741B8" Foreground="White" Padding="18,10" HorizontalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+    <Border Grid.Row="2" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,1,0,0" Padding="12,7">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock x:Name="StatusText" Text="Adicione um ou mais documentos PDF para começar." FontSize="11" Foreground="#687180" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        <Button Grid.Column="1" Content="Fechar editor" Click="Close_Click" Padding="18,7" Margin="12,0,0,0" Background="#E2E5EA" Foreground="#34383E"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

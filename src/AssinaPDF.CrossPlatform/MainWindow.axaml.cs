@@ -1,0 +1,1496 @@
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Avalonia.Platform.Storage;
+using AssinaPDF.MacPrototype.Services;
+using SimpleSign.PAdES.Validation;
+using SimpleSign.Core.Validation;
+using System.Text;
+using Avalonia.Controls.Shapes;
+using Avalonia.Input;
+using Avalonia.Media;
+using SimpleSign.PAdES;
+using SimpleSign.PAdES.Signing;
+using SimpleSign.Core.Extensions;
+using SimpleSign.Core.Signing;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.IO;
+
+namespace AssinaPDF.MacPrototype;
+
+public partial class MainWindow : Window
+{
+    private readonly CertificateStoreService _certificateStore = new();
+    private readonly EditorHistoryService _editorHistory = new();
+    private readonly List<CertificateInfo> _certificates = new();
+
+    private Bitmap? _futureLogo;
+    private PdfiumDocument? _pdfDocument;
+    private readonly List<WriteableBitmap> _pageBitmaps = new();
+    private readonly List<Image> _pageImages = new();
+    private readonly List<Image> _thumbnailImages = new();
+    private readonly List<Border> _pageCards = new();
+    private readonly List<Canvas> _signatureOverlays = new();
+    private readonly List<Canvas> _textSelectionOverlays = new();
+    private readonly List<Border> _textSelectionMarkers = new();
+    private readonly List<PdfiumTextWordInfo?> _selectedTextWords = new();
+    private readonly List<IReadOnlyList<PdfiumTextLineInfo>> _pageTextLines = new();
+    private readonly List<(double Width, double Height)> _pageDimensions = new();
+    private IReadOnlyList<SignatureWidgetInfo> _signatureWidgets = Array.Empty<SignatureWidgetInfo>();
+    private string? _currentPdfPath;
+
+    private bool _loadingCertificates;
+    private bool _operationInProgress;
+    private bool _isPanning;
+    private Point _panStart;
+    private Vector _panStartOffset;
+    private double _zoom = 1.0;
+    private float _renderScale = 1.5f;
+
+    private readonly List<SignaturePlacement> _signaturePlacements = new();
+
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        LoadFutureLogo();
+        PdfScrollViewer.SizeChanged += (_, _) => ApplyZoom();
+        PdfScrollViewer.AddHandler(
+            InputElement.PointerWheelChangedEvent,
+            PdfScrollViewer_PointerWheelChanged,
+            Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        KeyDown += MainWindow_KeyDown;
+
+        Closed += (_, _) =>
+        {
+            DisposeCertificates();
+            _pdfDocument?.Dispose();
+            _pdfDocument = null;
+
+            foreach (var bitmap in _pageBitmaps)
+                bitmap.Dispose();
+            _pageBitmaps.Clear();
+
+            _futureLogo?.Dispose();
+            _futureLogo = null;
+        };
+
+        DashboardView.IsVisible = true;
+        WorkspaceView.IsVisible = false;
+        RefreshCertificates();
+    }
+
+    private void LoadFutureLogo()
+    {
+        try
+        {
+            var logoPath = System.IO.Path.Combine(
+                AppContext.BaseDirectory, "logo-future.png");
+
+            if (!File.Exists(logoPath))
+            {
+                StatusText.Text = "Logo Future não encontrada.";
+                return;
+            }
+
+            _futureLogo = new Bitmap(logoPath);
+            FutureLogo.Source = _futureLogo;
+            Icon = new WindowIcon(_futureLogo);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Erro ao carregar logo: {ex.Message}";
+        }
+    }
+
+    private void OpenPromoLink_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://futuresolucoes.com.br/",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Não foi possível abrir o site: {ex.Message}";
+        }
+    }
+
+    private async void OpenPdf_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(
+                new FilePickerOpenOptions
+                {
+                    Title = "Selecionar documento PDF",
+                    AllowMultiple = false,
+                    FileTypeFilter = new List<FilePickerFileType>
+                    {
+                        new("Documentos PDF")
+                        {
+                            Patterns = new[] { "*.pdf", "*.PDF" }
+                        }
+                    }
+                });
+
+            if (files.Count == 0)
+                return;
+
+            string path = files[0].Path.LocalPath;
+            StatusText.Text = "Abrindo e renderizando todas as páginas do PDF...";
+
+            var newDocument = new PdfiumDocument(path);
+            var newBitmaps = new List<WriteableBitmap>();
+            var newPageDimensions = new List<(double Width, double Height)>();
+            var newPageTextLines = new List<IReadOnlyList<PdfiumTextLineInfo>>();
+
+            try
+            {
+                for (int i = 0; i < newDocument.PageCount; i++)
+                {
+                    var renderedPage = newDocument.RenderPage(i, 1.5f);
+                    newBitmaps.Add(CreateBitmap(renderedPage));
+                    newPageDimensions.Add((renderedPage.PageWidthPoints, renderedPage.PageHeightPoints));
+
+                    try
+                    {
+                        var characters = newDocument.InspectPageCharacters(i);
+                        newPageTextLines.Add(PdfiumTextGrouping.GroupIntoLines(characters, i));
+                    }
+                    catch (Exception textReadError)
+                    {
+                        Debug.WriteLine($"Não foi possível preparar a seleção de texto da página {i + 1}: {textReadError}");
+                        newPageTextLines.Add(Array.Empty<PdfiumTextLineInfo>());
+                    }
+                }
+
+                var oldDocument = _pdfDocument;
+                var oldBitmaps = _pageBitmaps.ToArray();
+                try
+                {
+                    _signatureWidgets = PdfSignatureWidgetReader.Read(path);
+                }
+                catch (Exception signatureReadError)
+                {
+                    _signatureWidgets = Array.Empty<SignatureWidgetInfo>();
+                    Debug.WriteLine($"Não foi possível ler os campos visuais de assinatura: {signatureReadError}");
+                }
+
+                _pdfDocument = newDocument;
+                _renderScale = 1.5f;
+                _currentPdfPath = path;
+                _pageDimensions.Clear();
+                _pageDimensions.AddRange(newPageDimensions);
+                _pageTextLines.Clear();
+                _pageTextLines.AddRange(newPageTextLines);
+                _signaturePlacements.Clear();
+
+                _pageBitmaps.Clear();
+                _pageBitmaps.AddRange(newBitmaps);
+                BuildHomePageViewer();
+
+                DashboardView.IsVisible = false;
+                WorkspaceView.IsVisible = true;
+                PdfScrollViewer.IsVisible = true;
+                ViewerPlaceholder.IsVisible = false;
+                SelectedFileText.Text = files[0].Name;
+
+                oldDocument?.Dispose();
+                foreach (var bitmap in oldBitmaps)
+                    bitmap.Dispose();
+
+                _zoom = 1.0;
+                ApplyZoom();
+                UpdateActionButtons();
+
+                StatusText.Text =
+                    $"PDF aberto com sucesso. {newDocument.PageCount} página(s). " +
+                    $"{_signatureWidgets.Count} campo(s) de assinatura visível(is) localizado(s).";
+            }
+            catch
+            {
+                foreach (var bitmap in newBitmaps)
+                    bitmap.Dispose();
+                newDocument.Dispose();
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Não foi possível abrir o PDF: {ex.Message}";
+        }
+    }
+
+    private void GoHome_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        DashboardView.IsVisible = true;
+        WorkspaceView.IsVisible = false;
+        DashboardStatusText.Text = string.IsNullOrWhiteSpace(_currentPdfPath)
+            ? "Pronto para começar."
+            : $"Último documento aberto: {System.IO.Path.GetFileName(_currentPdfPath)}";
+    }
+
+    private async void DashboardOpen_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(
+                new FilePickerOpenOptions
+                {
+                    Title = "Abrir PDF para visualização",
+                    AllowMultiple = false,
+                    FileTypeFilter = new[]
+                    {
+                        new FilePickerFileType("Documentos PDF")
+                        {
+                            Patterns = new[] { "*.pdf", "*.PDF" }
+                        }
+                    }
+                });
+
+            if (files.Count == 0)
+                return;
+
+            string originalPath = files[0].Path.LocalPath;
+            EditedPdfEntry? editEntry = null;
+            PdfViewerWindow? viewer = null;
+            viewer = new PdfViewerWindow(originalPath, async () =>
+            {
+                editEntry ??= _editorHistory.CreateWorkingCopy(originalPath);
+                var entry = editEntry;
+                string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
+                    ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
+
+                try
+                {
+                    var editor = new EditorWindow(
+                        entry.WorkingCopyPath,
+                        entry.OriginalPath,
+                        documentDirectory);
+                    await editor.ShowDialog(viewer!);
+                    _editorHistory.Touch(entry.Id);
+                    return entry.WorkingCopyPath;
+                }
+                catch
+                {
+                    throw;
+                }
+            });
+
+            await viewer.ShowDialog(this);
+            DashboardStatusText.Text = $"Visualização encerrada: {System.IO.Path.GetFileName(originalPath)}";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir o visualizador: {ex.Message}";
+        }
+    }
+
+    private void DashboardSign_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        // A navegação para assinatura apenas abre a área de trabalho.
+        // O usuário escolhe o documento ao clicar em "Abrir PDF".
+        DashboardView.IsVisible = false;
+        WorkspaceView.IsVisible = true;
+        DashboardStatusText.Text = "Área de assinatura aberta.";
+        StatusText.Text = _pdfDocument == null
+            ? "Clique em Abrir PDF para selecionar o documento que deseja assinar."
+            : $"Documento carregado: {System.IO.Path.GetFileName(_currentPdfPath)}";
+        UpdateActionButtons();
+    }
+
+    private void DashboardValidate_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        // A validação tem sua própria entrada na área de trabalho.
+        // O usuário escolhe o PDF pelo botão Abrir PDF e inicia a análise
+        // somente quando clicar em Validar assinatura.
+        DashboardView.IsVisible = false;
+        WorkspaceView.IsVisible = true;
+        DashboardStatusText.Text = "Área de validação aberta.";
+        StatusText.Text = _pdfDocument == null
+            ? "Clique em Abrir PDF para selecionar o documento que deseja validar."
+            : $"Documento carregado: {System.IO.Path.GetFileName(_currentPdfPath)}. Clique em Validar assinatura para analisar.";
+        UpdateActionButtons();
+    }
+
+    private async void DashboardEdit_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var editorCenter = new EditorCenterWindow();
+            await editorCenter.ShowDialog(this);
+            DashboardStatusText.Text = "Central de edição fechada.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir a central de edição: {ex.Message}";
+        }
+    }
+
+    private async void DashboardOrganize_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var organizer = new PdfOrganizerWindow();
+            await organizer.ShowDialog(this);
+            DashboardStatusText.Text = "Editor de combinação e organização de PDFs fechado.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir o editor de PDFs: {ex.Message}";
+        }
+    }
+
+    private async void DashboardConvert_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var converter = new ConverterWindow();
+            await converter.ShowDialog(this);
+            DashboardStatusText.Text = "Central de conversão fechada.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir a central de conversão: {ex.Message}";
+        }
+    }
+
+    private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
+    {
+        var bitmap = new WriteableBitmap(
+            new PixelSize(page.Width, page.Height),
+            new Vector(96, 96),
+            PixelFormat.Bgra8888,
+            AlphaFormat.Unpremul);
+
+        try
+        {
+            using var framebuffer = bitmap.Lock();
+
+            int bytesPerPixel = 4;
+            int bytesPerRow = checked(page.Width * bytesPerPixel);
+
+            for (int y = 0; y < page.Height; y++)
+            {
+                IntPtr destination = IntPtr.Add(
+                    framebuffer.Address,
+                    checked(y * framebuffer.RowBytes));
+
+                Marshal.Copy(
+                    page.Pixels,
+                    checked(y * page.Stride),
+                    destination,
+                    bytesPerRow);
+            }
+
+            return bitmap;
+        }
+        catch
+        {
+            bitmap.Dispose();
+            throw;
+        }
+    }
+
+    private void BuildHomePageViewer()
+    {
+        PdfPagesPanel.Children.Clear();
+        HomeThumbnailsPanel.Children.Clear();
+        _pageImages.Clear();
+        _thumbnailImages.Clear();
+        _pageCards.Clear();
+        _signatureOverlays.Clear();
+        _textSelectionOverlays.Clear();
+        _textSelectionMarkers.Clear();
+        _selectedTextWords.Clear();
+
+        for (int i = 0; i < _pageBitmaps.Count; i++)
+        {
+            int pageIndex = i;
+            var bitmap = _pageBitmaps[i];
+
+            var image = new Image
+            {
+                Source = bitmap,
+                Stretch = Stretch.Uniform,
+                IsHitTestVisible = false
+            };
+
+            var pageLabel = new TextBlock
+            {
+                Text = $"Página {pageIndex + 1}",
+                FontSize = 12,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(70, 70, 80)),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var signatureOverlay = new Canvas
+            {
+                IsHitTestVisible = true,
+                ClipToBounds = true
+            };
+            foreach (var widget in _signatureWidgets.Where(x => x.PageIndex == pageIndex))
+            {
+                var marker = new Button
+                {
+                    Content = "",
+                    Tag = widget,
+                    Padding = new Thickness(3),
+                    FontSize = 10,
+                    FontWeight = FontWeight.SemiBold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(30, 77, 125)),
+                    Background = Brushes.Transparent,
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(43, 120, 197)),
+                    BorderThickness = new Thickness(2),
+                    CornerRadius = new CornerRadius(3)
+                };
+                marker.Click += async (_, _) => await ShowSignatureWidgetAsync(widget);
+                signatureOverlay.Children.Add(marker);
+            }
+
+            var selectionOverlay = new Canvas
+            {
+                IsHitTestVisible = true,
+                Background = Brushes.Transparent,
+                ClipToBounds = true
+            };
+            var selectionMarker = new Border
+            {
+                IsVisible = false,
+                IsHitTestVisible = false,
+                Background = new SolidColorBrush(Color.FromArgb(48, 35, 115, 205)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(35, 115, 205)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(2)
+            };
+            selectionOverlay.Children.Add(selectionMarker);
+            selectionOverlay.PointerPressed += (_, args) =>
+                SelectTextAtPoint(pageIndex, selectionOverlay, args);
+
+            var pageVisual = new Grid();
+            pageVisual.Children.Add(image);
+            pageVisual.Children.Add(selectionOverlay);
+            pageVisual.Children.Add(signatureOverlay);
+
+            var pageContent = new StackPanel { Spacing = 4 };
+            pageContent.Children.Add(pageLabel);
+            pageContent.Children.Add(pageVisual);
+            _signatureOverlays.Add(signatureOverlay);
+            _textSelectionOverlays.Add(selectionOverlay);
+            _textSelectionMarkers.Add(selectionMarker);
+            _selectedTextWords.Add(null);
+
+            var pageCard = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(195, 198, 205)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(14),
+                CornerRadius = new CornerRadius(3),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Child = pageContent
+            };
+
+            PdfPagesPanel.Children.Add(pageCard);
+            _pageImages.Add(image);
+            _pageCards.Add(pageCard);
+
+            var thumbnailImage = new Image
+            {
+                Source = bitmap,
+                Width = 112,
+                Height = 138,
+                Stretch = Stretch.Uniform,
+                IsHitTestVisible = false
+            };
+
+            _thumbnailImages.Add(thumbnailImage);
+
+            var thumbnailContent = new StackPanel { Spacing = 4 };
+            thumbnailContent.Children.Add(thumbnailImage);
+            thumbnailContent.Children.Add(new TextBlock
+            {
+                Text = $"Página {pageIndex + 1}",
+                FontSize = 11,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(65, 65, 75))
+            });
+
+            var thumbnailButton = new Button
+            {
+                Content = thumbnailContent,
+                Padding = new Thickness(5),
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(205, 205, 215)),
+                BorderThickness = new Thickness(1),
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                Tag = pageIndex
+            };
+
+            thumbnailButton.Click += (_, _) => pageCard.BringIntoView();
+
+            var contextMenu = new ContextMenu();
+            var exportItem = new MenuItem { Header = "Exportar esta página..." };
+            exportItem.Click += async (_, _) => await ExportPageAsync(pageIndex);
+            contextMenu.Items.Add(exportItem);
+            thumbnailButton.ContextMenu = contextMenu;
+
+            HomeThumbnailsPanel.Children.Add(thumbnailButton);
+        }
+    }
+
+
+    private void SelectTextAtPoint(
+        int pageIndex,
+        Canvas selectionOverlay,
+        PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(selectionOverlay).Properties.IsLeftButtonPressed ||
+            pageIndex < 0 ||
+            pageIndex >= _pageTextLines.Count ||
+            pageIndex >= _pageDimensions.Count ||
+            pageIndex >= _selectedTextWords.Count)
+            return;
+
+        var dimensions = _pageDimensions[pageIndex];
+        var point = e.GetPosition(selectionOverlay);
+
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+            point.X,
+            point.Y,
+            selectionOverlay.Bounds.Width,
+            selectionOverlay.Bounds.Height,
+            dimensions.Width,
+            dimensions.Height,
+            out double pdfX,
+            out double pdfY))
+            return;
+
+        var selected = PdfiumTextHitTest.FindWordAtPoint(
+            _pageTextLines[pageIndex], pageIndex, pdfX, pdfY);
+
+        bool selectedLine = false;
+        if (selected == null)
+        {
+            var line = PdfiumTextHitTest.FindLineAtPoint(
+                _pageTextLines[pageIndex], pageIndex, pdfX, pdfY);
+
+            if (line != null)
+            {
+                selected = new PdfiumTextWordInfo(
+                    line.PageIndex,
+                    line.LineIndex,
+                    -1,
+                    line.Text,
+                    line.Left,
+                    line.Bottom,
+                    line.Right,
+                    line.Top,
+                    line.Characters.Where(character => character.FontSize > 0)
+                        .Select(character => character.FontSize)
+                        .DefaultIfEmpty(0)
+                        .Average(),
+                    line.Characters.Select(character => character.FontName)
+                        .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)),
+                    line.Characters);
+                selectedLine = true;
+            }
+        }
+
+        _selectedTextWords[pageIndex] = selected;
+        UpdateTextSelectionMarker(pageIndex);
+
+        if (selected == null)
+        {
+            StatusText.Text = "Nenhuma palavra ou linha de texto foi encontrada nesse ponto.";
+        }
+        else
+        {
+            string kind = selectedLine ? "Bloco selecionado" : "Palavra selecionada";
+            StatusText.Text = $"Página {pageIndex + 1} | {kind}: “{selected.Text}”";
+        }
+
+        e.Handled = true;
+    }
+
+    private void UpdateTextSelectionMarker(int pageIndex)
+    {
+        if (pageIndex < 0 ||
+            pageIndex >= _textSelectionMarkers.Count ||
+            pageIndex >= _textSelectionOverlays.Count ||
+            pageIndex >= _pageDimensions.Count ||
+            pageIndex >= _selectedTextWords.Count)
+            return;
+
+        var marker = _textSelectionMarkers[pageIndex];
+        var word = _selectedTextWords[pageIndex];
+        var overlay = _textSelectionOverlays[pageIndex];
+        var dimensions = _pageDimensions[pageIndex];
+
+        if (word == null ||
+            overlay.Width <= 0 ||
+            overlay.Height <= 0)
+        {
+            marker.IsVisible = false;
+            return;
+        }
+
+        var rect = PdfiumPageCoordinateMapper.PdfToViewRect(
+            word.Left,
+            word.Bottom,
+            word.Right,
+            word.Top,
+            overlay.Width,
+            overlay.Height,
+            dimensions.Width,
+            dimensions.Height);
+
+        Canvas.SetLeft(marker, rect.X);
+        Canvas.SetTop(marker, rect.Y);
+        marker.Width = Math.Max(2, rect.Width);
+        marker.Height = Math.Max(2, rect.Height);
+        marker.IsVisible = true;
+    }
+
+    private void ApplyZoom()
+    {
+        if (_pageImages.Count == 0 || PdfScrollViewer.Bounds.Width <= 0 ||
+            PdfScrollViewer.Bounds.Height <= 0)
+            return;
+
+        double maxWidth = _pageBitmaps.Max(bitmap => bitmap.PixelSize.Width);
+        double maxHeight = _pageBitmaps.Max(bitmap => bitmap.PixelSize.Height);
+        double availableWidth = Math.Max(120, PdfScrollViewer.Bounds.Width - 90);
+        double availableHeight = Math.Max(120, PdfScrollViewer.Bounds.Height - 90);
+        double fitScale = Math.Min(availableWidth / maxWidth, availableHeight / maxHeight);
+        double scale = fitScale * _zoom;
+
+        for (int i = 0; i < _pageImages.Count; i++)
+        {
+            var size = _pageBitmaps[i].PixelSize;
+            _pageImages[i].Width = size.Width * scale;
+            _pageImages[i].Height = size.Height * scale;
+            _signatureOverlays[i].Width = size.Width * scale;
+            _signatureOverlays[i].Height = size.Height * scale;
+            _textSelectionOverlays[i].Width = size.Width * scale;
+            _textSelectionOverlays[i].Height = size.Height * scale;
+            UpdateTextSelectionMarker(i);
+            foreach (var child in _signatureOverlays[i].Children)
+            {
+                if (child is not Button marker || marker.Tag is not SignatureWidgetInfo widget)
+                    continue;
+
+                Canvas.SetLeft(marker, widget.NormalizedX * _signatureOverlays[i].Width);
+                Canvas.SetTop(marker, widget.NormalizedY * _signatureOverlays[i].Height);
+                marker.Width = Math.Max(54, widget.NormalizedWidth * _signatureOverlays[i].Width);
+                marker.Height = Math.Max(26, widget.NormalizedHeight * _signatureOverlays[i].Height);
+            }
+            _pageCards[i].Width = size.Width * scale + 30;
+        }
+
+        PdfScrollViewer.Cursor = new Cursor(
+            _zoom > 1.001 ? StandardCursorType.Hand : StandardCursorType.Arrow);
+    }
+
+    private void ChangeZoom(double factor)
+    {
+        double nextZoom = Math.Clamp(_zoom * factor, 0.5, 5.0);
+        if (Math.Abs(nextZoom - _zoom) < 0.0001)
+            return;
+
+        _zoom = nextZoom;
+        RerenderPagesForZoom();
+        ApplyZoom();
+    }
+
+    private void RerenderPagesForZoom()
+    {
+        if (_pdfDocument == null || _pageBitmaps.Count == 0)
+            return;
+
+        // A home usa o PDFium para rasterizar. Aumentamos a resolução real
+        // conforme o zoom para não ampliar indefinidamente a imagem inicial.
+        float requestedScale = 1.5f * (float)Math.Max(1.0, _zoom);
+        if (requestedScale <= _renderScale * 1.20f)
+            return;
+
+        var replacements = new List<WriteableBitmap>(_pageBitmaps.Count);
+        try
+        {
+            for (int i = 0; i < _pageBitmaps.Count; i++)
+            {
+                var rendered = _pdfDocument.RenderPage(i, requestedScale);
+                replacements.Add(CreateBitmap(rendered));
+            }
+
+            for (int i = 0; i < replacements.Count; i++)
+            {
+                var previous = _pageBitmaps[i];
+                _pageBitmaps[i] = replacements[i];
+                _pageImages[i].Source = replacements[i];
+                _thumbnailImages[i].Source = replacements[i];
+                previous.Dispose();
+            }
+
+            _renderScale = requestedScale;
+        }
+        catch
+        {
+            foreach (var bitmap in replacements)
+                bitmap.Dispose();
+            throw;
+        }
+    }
+
+    private void MainWindow_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+            return;
+
+        if (e.Key == Key.Add || e.Key == Key.OemPlus)
+        {
+            ChangeZoom(1.15);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Subtract || e.Key == Key.OemMinus)
+        {
+            ChangeZoom(1.0 / 1.15);
+            e.Handled = true;
+        }
+    }
+
+    private void PdfScrollViewer_PointerWheelChanged(
+        object? sender,
+        PointerWheelEventArgs e)
+    {
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+            return;
+
+        if (e.Delta.Y == 0)
+            return;
+
+        ChangeZoom(e.Delta.Y > 0 ? 1.15 : 1.0 / 1.15);
+        e.Handled = true;
+    }
+
+    private void PdfScrollViewer_PointerPressed(
+        object? sender,
+        PointerPressedEventArgs e)
+    {
+        // Cliques em controles ou na camada de seleção não devem iniciar o arraste da página.
+        if (e.Source is Button || e.Source is Canvas)
+            return;
+
+        if (_zoom <= 1.001 ||
+            !e.GetCurrentPoint(PdfScrollViewer).Properties.IsLeftButtonPressed)
+            return;
+
+        _isPanning = true;
+        _panStart = e.GetPosition(PdfScrollViewer);
+        _panStartOffset = PdfScrollViewer.Offset;
+        PdfScrollViewer.Cursor = new Cursor(StandardCursorType.Hand);
+        e.Pointer.Capture(PdfScrollViewer);
+        e.Handled = true;
+    }
+
+    private void PdfScrollViewer_PointerMoved(
+        object? sender,
+        PointerEventArgs e)
+    {
+        if (!_isPanning)
+            return;
+
+        var current = e.GetPosition(PdfScrollViewer);
+        var delta = current - _panStart;
+        PdfScrollViewer.Offset = new Vector(
+            Math.Max(0, _panStartOffset.X - delta.X),
+            Math.Max(0, _panStartOffset.Y - delta.Y));
+        e.Handled = true;
+    }
+
+    private void PdfScrollViewer_PointerReleased(
+        object? sender,
+        PointerReleasedEventArgs e)
+    {
+        if (!_isPanning)
+            return;
+
+        _isPanning = false;
+        e.Pointer.Capture(null);
+        PdfScrollViewer.Cursor = new Cursor(StandardCursorType.Hand);
+        e.Handled = true;
+    }
+
+    private async Task ExportPageAsync(int pageIndex)
+    {
+        if (string.IsNullOrWhiteSpace(_currentPdfPath) ||
+            _pdfDocument == null ||
+            pageIndex < 0 ||
+            pageIndex >= _pdfDocument.PageCount)
+            return;
+
+        try
+        {
+            var saveFile = await StorageProvider.SaveFilePickerAsync(
+                new FilePickerSaveOptions
+                {
+                    Title = "Exportar página como PDF",
+                    SuggestedFileName = $"pagina-{pageIndex + 1}.pdf",
+                    DefaultExtension = "pdf",
+                    FileTypeChoices = new[]
+                    {
+                        new FilePickerFileType("Documento PDF")
+                        {
+                            Patterns = new[] { "*.pdf" }
+                        }
+                    }
+                });
+
+            if (saveFile == null)
+                return;
+
+            string destinationPath = System.IO.Path.GetFullPath(saveFile.Path.LocalPath);
+            string sourcePath = System.IO.Path.GetFullPath(_currentPdfPath);
+            if (string.Equals(
+                sourcePath,
+                destinationPath,
+                OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal))
+            {
+                StatusText.Text = "Escolha outro nome para preservar o PDF original.";
+                return;
+            }
+
+            using var source = PdfReader.Open(
+                sourcePath,
+                PdfDocumentOpenMode.Import);
+            using var output = new PdfSharp.Pdf.PdfDocument();
+            output.AddPage(source.Pages[pageIndex]);
+            output.Save(destinationPath);
+
+            StatusText.Text = $"Página {pageIndex + 1} exportada: {destinationPath}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Não foi possível exportar a página: {ex.Message}";
+        }
+    }
+
+    private void RefreshCertificates_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        RefreshCertificates();
+    }
+
+    private void RefreshCertificates()
+    {
+        if (_loadingCertificates)
+            return;
+
+        _loadingCertificates = true;
+
+        try
+        {
+            CertificatePicker.SelectedItem = null;
+            CertificatePicker.ItemsSource = null;
+
+            DisposeCertificates();
+
+            var loaded = _certificateStore.LoadCertificates();
+            _certificates.AddRange(loaded);
+
+            CertificatePicker.ItemsSource = _certificates;
+
+            int ready = 0;
+
+            foreach (var item in _certificates)
+            {
+                if (item.CanAttemptSigning)
+                    ready++;
+            }
+
+            StatusText.Text = _certificates.Count == 0
+                ? "Nenhum certificado encontrado no repositório pessoal."
+                : $"{_certificates.Count} certificado(s); " +
+                  $"{ready} com chave privada acessível. " +
+                  "Assinatura ainda pendente de integração.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text =
+                "Não foi possível consultar os certificados. " +
+                $"Detalhe: {ex.Message}";
+        }
+        finally
+        {
+            _loadingCertificates = false;
+            UpdateActionButtons();
+        }
+    }
+
+    private void CertificatePicker_SelectionChanged(
+        object? sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_loadingCertificates)
+            return;
+
+        UpdateActionButtons();
+
+        if (CertificatePicker.SelectedItem is not CertificateInfo selected)
+        {
+            StatusText.Text = "Selecione um certificado digital.";
+            return;
+        }
+
+        StatusText.Text = selected.Details;
+    }
+
+
+    private void UpdateActionButtons()
+    {
+        bool hasPdf = _pdfDocument != null && !_operationInProgress;
+        bool hasCertificate =
+            CertificatePicker.SelectedItem is CertificateInfo selected &&
+            selected.CanAttemptSigning;
+
+        SignButton.IsEnabled = hasPdf && hasCertificate;
+        ValidateButton.IsEnabled = hasPdf;
+    }
+
+    private async void ValidatePdf_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_operationInProgress || string.IsNullOrWhiteSpace(_currentPdfPath))
+            return;
+
+        _operationInProgress = true;
+        UpdateActionButtons();
+
+        try
+        {
+            StatusText.Text = "Validando assinaturas digitais...";
+
+            // Mantém a mesma configuração de validação criptográfica usada
+            // pelo projeto Windows anterior. A consulta de revogação e a
+            // confiança nas raízes do sistema ficam separadas desta etapa.
+            var options = new ValidationOptions
+            {
+                CheckRevocation = false,
+                TrustSystemRoots = false
+            };
+
+            var validator = new PdfSignatureValidator(options);
+
+            await using var stream = new FileStream(
+                _currentPdfPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize: 81920,
+                useAsync: true);
+            var results = await validator.ValidateAsync(stream);
+
+            if (results.Count == 0)
+            {
+                StatusText.Text = "Nenhuma assinatura digital reconhecida neste PDF.";
+                await ShowValidationReportAsync(
+                    "Validação de assinatura",
+                    "Nenhuma assinatura digital compatível foi encontrada neste documento.\n\nIsso não significa necessariamente que o PDF seja inválido; ele pode simplesmente não estar assinado.");
+                return;
+            }
+
+            var report = new StringBuilder();
+            report.AppendLine($"RESULTADO DA VALIDAÇÃO — {results.Count} assinatura(s) encontrada(s)");
+            report.AppendLine(new string('=', 68));
+            report.AppendLine();
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                var result = results[i];
+                report.AppendLine($"ASSINATURA {i + 1}");
+                report.AppendLine(new string('-', 68));
+                report.AppendLine($"Campo: {result.FieldName}");
+                report.AppendLine($"Titular: {result.SignerName}");
+                report.AppendLine($"Data da assinatura (horário local): {(result.SigningTime.HasValue ? result.SigningTime.Value.ToLocalTime().ToString("dd/MM/yyyy 'às' HH:mm:ss zzz") : "Não informada")}");
+                report.AppendLine($"Data da assinatura (UTC): {(result.SigningTime.HasValue ? result.SigningTime.Value.ToUniversalTime().ToString("dd/MM/yyyy HH:mm:ss 'UTC'") : "Não informada")}");
+                report.AppendLine($"Integridade do documento: {(result.IsIntegrityValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Assinatura criptográfica: {(result.IsSignatureValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Cadeia de confiança: {(result.IsCertificateChainValid ? "CONFIÁVEL" : "NÃO CONFIRMADA NESTA ETAPA")}");
+                report.AppendLine($"Revogação: {(result.IsNotRevoked ? "Nenhuma revogação reportada" : "Não confirmada")}");
+                report.AppendLine($"Fonte de revogação: {result.RevocationSource}");
+                report.AppendLine($"Resultado informado pela biblioteca: {(result.IsValid ? "VÁLIDA" : "NÃO VALIDADA")}");
+
+                if (result.Errors.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("ERROS:");
+                    foreach (var error in result.Errors)
+                        report.AppendLine($" • {error}");
+                }
+
+                if (result.Warnings.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("AVISOS:");
+                    foreach (var warning in result.Warnings)
+                        report.AppendLine($" • {warning}");
+                }
+
+                report.AppendLine();
+            }
+
+            report.AppendLine(new string('=', 68));
+            report.AppendLine("Limites desta etapa: cadeia de confiança, revogação e carimbo do tempo não são atestados por esta verificação criptográfica. Para uma conclusão oficial ICP-Brasil, utilize também o serviço oficial de validação.");
+            StatusText.Text = $"Validação concluída: {results.Count} assinatura(s) encontrada(s).";
+            await ShowValidationReportAsync("Detalhes técnicos das assinaturas", report.ToString());
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Erro ao validar o PDF: {ex.Message}";
+        }
+        finally
+        {
+            _operationInProgress = false;
+            UpdateActionButtons();
+        }
+    }
+
+    private async Task ShowSignatureWidgetAsync(SignatureWidgetInfo widget)
+    {
+        if (string.IsNullOrWhiteSpace(_currentPdfPath))
+            return;
+
+        string status;
+        string technicalReport =
+            "Não foi possível associar este campo visual a um resultado de validação.";
+
+        try
+        {
+            var validator = new PdfSignatureValidator(new ValidationOptions
+            {
+                CheckRevocation = false,
+                TrustSystemRoots = false
+            });
+
+            await using var stream = new FileStream(
+                _currentPdfPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize: 81920,
+                useAsync: true);
+
+            var results = await validator.ValidateAsync(stream);
+            var match = results.FirstOrDefault(x =>
+                string.Equals(
+                    x.FieldName,
+                    widget.FieldName,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (match == null && results.Count == 1)
+                match = results[0];
+
+            if (match == null)
+            {
+                status = "O campo visual foi localizado, mas não foi possível relacioná-lo a uma assinatura validada. A aparência, sozinha, não comprova validade.";
+                if (results.Count > 0)
+                {
+                    var general = new StringBuilder();
+                    foreach (var result in results)
+                        general.AppendLine($"Campo: {result.FieldName} | Titular: {result.SignerName} | Integridade: {result.IsIntegrityValid} | Assinatura: {result.IsSignatureValid}");
+                    technicalReport = general.ToString();
+                }
+            }
+            else
+            {
+                status = match.IsIntegrityValid && match.IsSignatureValid
+                    ? "Este documento não foi alterado após a assinatura. A integridade criptográfica e a assinatura foram confirmadas nesta verificação."
+                    : "Não foi possível confirmar que este documento permaneceu inalterado após a assinatura. Consulte as propriedades e os avisos da validação.";
+
+                var report = new StringBuilder();
+                report.AppendLine("PROPRIEDADES DA ASSINATURA");
+                report.AppendLine(new string('=', 56));
+                report.AppendLine($"Campo: {match.FieldName}");
+                report.AppendLine($"Titular: {match.SignerName}");
+                report.AppendLine($"Data da assinatura (horário local): {(match.SigningTime.HasValue ? match.SigningTime.Value.ToLocalTime().ToString("dd/MM/yyyy 'às' HH:mm:ss zzz") : "Não informada")}");
+                report.AppendLine($"Data da assinatura (UTC): {(match.SigningTime.HasValue ? match.SigningTime.Value.ToUniversalTime().ToString("dd/MM/yyyy HH:mm:ss 'UTC'") : "Não informada")}");
+                report.AppendLine($"Integridade do documento: {(match.IsIntegrityValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Assinatura criptográfica: {(match.IsSignatureValid ? "VÁLIDA" : "INVÁLIDA / NÃO CONFIRMADA")}");
+                report.AppendLine($"Cadeia de confiança: {(match.IsCertificateChainValid ? "CONFIÁVEL" : "NÃO CONFIRMADA NESTA ETAPA")}");
+                report.AppendLine($"Revogação: {(match.IsNotRevoked ? "Nenhuma revogação reportada" : "Não confirmada")}");
+                report.AppendLine($"Fonte de revogação: {match.RevocationSource}");
+                report.AppendLine($"Resultado da biblioteca: {(match.IsValid ? "VÁLIDA" : "NÃO VALIDADA")}");
+
+                if (match.Errors.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("ERROS:");
+                    foreach (var error in match.Errors)
+                        report.AppendLine($" • {error}");
+                }
+
+                if (match.Warnings.Count > 0)
+                {
+                    report.AppendLine();
+                    report.AppendLine("AVISOS:");
+                    foreach (var warning in match.Warnings)
+                        report.AppendLine($" • {warning}");
+                }
+
+                report.AppendLine();
+                report.AppendLine("A consulta de revogação e a confiança nas raízes do sistema não foram executadas nesta etapa.");
+                technicalReport = report.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            status = $"Não foi possível validar esta assinatura: {ex.Message}";
+        }
+
+        var propertiesButton = new Button
+        {
+            Content = "Propriedades da assinatura",
+            MinWidth = 210,
+            Padding = new Thickness(14, 9)
+        };
+        var closeButton = new Button
+        {
+            Content = "Fechar",
+            MinWidth = 100,
+            Padding = new Thickness(14, 9)
+        };
+        var actions = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Spacing = 10
+        };
+        actions.Children.Add(propertiesButton);
+        actions.Children.Add(closeButton);
+
+        var dialog = new Window
+        {
+            Title = "Status da assinatura",
+            Width = 590,
+            Height = 260,
+            MinWidth = 480,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(22),
+                Spacing = 12,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"Assinatura: {widget.FieldName}  •  Página {widget.PageIndex + 1}",
+                        FontSize = 17,
+                        FontWeight = FontWeight.SemiBold
+                    },
+                    new TextBlock
+                    {
+                        Text = status,
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 14
+                    },
+                    actions
+                }
+            }
+        };
+
+        propertiesButton.Click += async (_, _) =>
+        {
+            dialog.Close();
+            await ShowValidationReportAsync("Propriedades da assinatura", technicalReport);
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowValidationReportAsync(string title, string report)
+    {
+        var reportText = new TextBox
+        {
+            Text = report,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 13,
+            Padding = new Thickness(16),
+        };
+
+        var closeButton = new Button
+        {
+            Content = "Fechar",
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            MinWidth = 100,
+            Margin = new Thickness(0, 12, 0, 0)
+        };
+
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 820,
+            Height = 650,
+            MinWidth = 620,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+            Content = new Grid
+            {
+                Margin = new Thickness(18),
+                RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = title,
+                        FontSize = 19,
+                        FontWeight = FontWeight.SemiBold,
+                        Margin = new Thickness(0, 0, 0, 12)
+                    },
+                    reportText,
+                    closeButton
+                }
+            }
+        };
+
+        var contentGrid = (Grid)dialog.Content!;
+        Grid.SetRow(reportText, 1);
+        Grid.SetRow(closeButton, 2);
+
+        closeButton.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
+    }
+
+    private async void SignPdf_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_operationInProgress || string.IsNullOrWhiteSpace(_currentPdfPath))
+            return;
+
+        if (CertificatePicker.SelectedItem is not CertificateInfo selected ||
+            !selected.CanAttemptSigning)
+        {
+            StatusText.Text = "Selecione um certificado válido com chave privada acessível.";
+            return;
+        }
+
+        if (_pdfDocument == null)
+            return;
+
+        var positioningWindow = new SignaturePositioningWindow(_pdfDocument);
+        await positioningWindow.ShowDialog(this);
+
+        _signaturePlacements.Clear();
+        _signaturePlacements.AddRange(positioningWindow.SelectedPlacements);
+
+        if (_signaturePlacements.Count == 0)
+        {
+            StatusText.Text = "Posicionamento cancelado ou nenhuma posição selecionada.";
+            return;
+        }
+
+        var placements = _signaturePlacements.ToArray();
+        var sourcePath = System.IO.Path.GetFullPath(_currentPdfPath);
+
+        _operationInProgress = true;
+        UpdateActionButtons();
+
+        string? temporaryPath = null;
+
+        try
+        {
+            StatusText.Text = "Escolha onde salvar o PDF assinado...";
+
+            var saveFile = await StorageProvider.SaveFilePickerAsync(
+                new FilePickerSaveOptions
+                {
+                    Title = "Salvar PDF assinado",
+                    SuggestedFileName =
+                        $"{System.IO.Path.GetFileNameWithoutExtension(sourcePath)}-assinado.pdf",
+                    DefaultExtension = "pdf",
+                    FileTypeChoices = new[]
+                    {
+                        new FilePickerFileType("Documento PDF")
+                        {
+                            Patterns = new[] { "*.pdf" }
+                        }
+                    }
+                });
+
+            if (saveFile == null)
+            {
+                StatusText.Text = "Assinatura cancelada pelo usuário.";
+                return;
+            }
+
+            var outputPath = System.IO.Path.GetFullPath(saveFile.Path.LocalPath);
+
+            if (string.Equals(
+                sourcePath,
+                outputPath,
+                OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal))
+            {
+                StatusText.Text = "Escolha outro arquivo. O PDF original será preservado.";
+                return;
+            }
+
+            using var signingCertificate =
+                new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                    selected.Certificate);
+
+            var signerName = signingCertificate.GetNameInfo(
+                System.Security.Cryptography.X509Certificates.X509NameType.SimpleName,
+                false);
+
+            var reason = SigningReasonTextBox.Text?.Trim();
+
+            byte[] signedBytes = await File.ReadAllBytesAsync(sourcePath);
+
+            for (int i = 0; i < placements.Length; i++)
+            {
+                var placement = placements[i];
+
+                if (placement.PageWidthPoints <= 0 ||
+                    placement.PageHeightPoints <= 0 ||
+                    placement.NormalizedX < 0 ||
+                    placement.NormalizedX > 1 ||
+                    placement.NormalizedY < 0 ||
+                    placement.NormalizedY > 1 ||
+                    placement.NormalizedWidth <= 0 ||
+                    placement.NormalizedHeight <= 0 ||
+                    placement.NormalizedX + placement.NormalizedWidth > 1.000001 ||
+                    placement.NormalizedY + placement.NormalizedHeight > 1.000001)
+                {
+                    throw new InvalidOperationException(
+                        $"A posição {i + 1} contém coordenadas inválidas.");
+                }
+
+                float pdfX = (float)(
+                    placement.NormalizedX * placement.PageWidthPoints);
+
+                float pdfY = (float)(
+                    (1.0 - placement.NormalizedY - placement.NormalizedHeight) *
+                    placement.PageHeightPoints);
+
+                StatusText.Text =
+                    $"Aplicando assinatura {i + 1} de {placements.Length}...";
+
+                signedBytes = await PadesSigner
+                    .Document(signedBytes)
+                    .WithCertificate(signingCertificate)
+                    .WithMetadata(new SignatureMetadata
+                    {
+                        SignerName = signerName,
+                        Reason = string.IsNullOrWhiteSpace(reason) ? null : reason,
+                        Location = "Future Soluções"
+                    })
+                    .WithAppearance(new SignatureAppearance
+                    {
+                        Page = placement.PageIndex + 1,
+                        X = pdfX,
+                        Y = pdfY,
+                        ShowDate = true,
+                        ShowReason = !string.IsNullOrWhiteSpace(reason),
+                        ShowLocation = true
+                    })
+                    .WithLevel(AdesBaselineProfile.Basic())
+                    .SignAsync();
+            }
+
+            var outputDirectory = System.IO.Path.GetDirectoryName(outputPath)
+                ?? throw new InvalidOperationException(
+                    "Não foi possível identificar a pasta de destino.");
+
+            temporaryPath = System.IO.Path.Combine(
+                outputDirectory,
+                $".assinapdf-{Guid.NewGuid():N}.tmp");
+
+            await File.WriteAllBytesAsync(temporaryPath, signedBytes);
+
+            if (!File.Exists(temporaryPath) ||
+                new FileInfo(temporaryPath).Length == 0)
+            {
+                throw new IOException("O arquivo temporário de assinatura está vazio.");
+            }
+
+            File.Move(temporaryPath, outputPath, overwrite: true);
+            temporaryPath = null;
+
+            StatusText.Text =
+                $"PDF assinado com sucesso! {placements.Length} assinatura(s) aplicada(s).\n" +
+                $"Arquivo: {outputPath}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text =
+                $"Não foi possível concluir a assinatura.\nDetalhe: {ex.Message}";
+        }
+        finally
+        {
+            if (temporaryPath != null)
+            {
+                try
+                {
+                    if (File.Exists(temporaryPath))
+                        File.Delete(temporaryPath);
+                }
+                catch
+                {
+                    // Não substituir o erro original por falha de limpeza.
+                }
+            }
+
+            _operationInProgress = false;
+            UpdateActionButtons();
+        }
+    }
+    private void DisposeCertificates()
+    {
+        foreach (var item in _certificates)
+            item.Dispose();
+
+        _certificates.Clear();
+    }
+}

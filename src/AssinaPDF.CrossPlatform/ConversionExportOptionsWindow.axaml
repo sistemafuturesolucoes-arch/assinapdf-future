@@ -1,0 +1,89 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.ConversionExportOptionsWindow"
+        Title="Central de exportação"
+        Width="560" Height="570" MinWidth="500" MinHeight="520"
+        WindowStartupLocation="CenterOwner" CanResize="False"
+        Background="#F1F3F6">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="White" Padding="22,18" BorderBrush="#DDE1E8" BorderThickness="0,0,0,1">
+      <StackPanel Spacing="5">
+        <TextBlock x:Name="DialogTitle" Text="Central de exportação" FontSize="21" FontWeight="SemiBold" Foreground="#303744"/>
+        <TextBlock x:Name="DialogDescription" Text="Configure o resultado antes de salvar." FontSize="12" Foreground="#687180" TextWrapping="Wrap"/>
+      </StackPanel>
+    </Border>
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="22,16" Spacing="13">
+        <StackPanel Spacing="5">
+          <TextBlock Text="TAMANHO DA PÁGINA" FontSize="10" FontWeight="SemiBold" Foreground="#687180"/>
+          <ComboBox x:Name="PageSizeCombo" SelectedIndex="0" SelectionChanged="PageSize_SelectionChanged">
+            <ComboBoxItem Content="Original"/>
+            <ComboBoxItem Content="A3"/>
+            <ComboBoxItem Content="A4"/>
+            <ComboBoxItem Content="A5"/>
+            <ComboBoxItem Content="Carta"/>
+            <ComboBoxItem Content="Ofício"/>
+            <ComboBoxItem Content="Personalizado"/>
+          </ComboBox>
+        </StackPanel>
+        <Border x:Name="CustomSizePanel" IsVisible="False" Background="White" BorderBrush="#DDE1E8" BorderThickness="1" CornerRadius="8" Padding="12">
+          <StackPanel Spacing="7">
+            <TextBlock Text="Dimensões personalizadas (milímetros)" FontWeight="SemiBold" Foreground="#343A46"/>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Largura (mm)" FontSize="11" Foreground="#687180"/>
+                <TextBox x:Name="CustomWidthBox" Text="210"/>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="4">
+                <TextBlock Text="Altura (mm)" FontSize="11" Foreground="#687180"/>
+                <TextBox x:Name="CustomHeightBox" Text="297"/>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Border>
+        <StackPanel Spacing="5">
+          <TextBlock Text="AJUSTE DO CONTEÚDO" FontSize="10" FontWeight="SemiBold" Foreground="#687180"/>
+          <ComboBox x:Name="FitModeCombo" SelectedIndex="0">
+            <ComboBoxItem Content="Ajustar e centralizar sem cortar"/>
+            <ComboBoxItem Content="Preencher a página (pode cortar)"/>
+          </ComboBox>
+        </StackPanel>
+        <Border x:Name="ImageOptionsPanel" IsVisible="True" Background="White" BorderBrush="#DDE1E8" BorderThickness="1" CornerRadius="8" Padding="13">
+          <StackPanel Spacing="12">
+            <TextBlock Text="FORMATO E QUALIDADE DA IMAGEM" FontSize="10" FontWeight="SemiBold" Foreground="#687180"/>
+            <StackPanel Spacing="5">
+              <TextBlock Text="Formato de saída" FontSize="11" Foreground="#687180"/>
+              <ComboBox x:Name="FormatCombo" SelectedIndex="0" SelectionChanged="Format_SelectionChanged">
+                <ComboBoxItem Content="JPG — arquivo compacto"/>
+                <ComboBoxItem Content="PNG — sem perda de qualidade"/>
+                <ComboBoxItem Content="TIFF — qualidade profissional"/>
+              </ComboBox>
+            </StackPanel>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+              <StackPanel Spacing="5">
+                <TextBlock Text="Resolução" FontSize="11" Foreground="#687180"/>
+                <ComboBox x:Name="DpiCombo" SelectedIndex="1">
+                  <ComboBoxItem Content="150 DPI"/>
+                  <ComboBoxItem Content="300 DPI"/>
+                  <ComboBoxItem Content="600 DPI"/>
+                </ComboBox>
+              </StackPanel>
+              <StackPanel x:Name="QualityPanel" Grid.Column="1" Spacing="5">
+                <TextBlock Text="Qualidade JPG (1–100)" FontSize="11" Foreground="#687180"/>
+                <TextBox x:Name="QualityBox" Text="92"/>
+              </StackPanel>
+            </Grid>
+            <TextBlock Text="As páginas PDF serão compostas sobre fundo branco para evitar áreas pretas inesperadas. PNG também poderá preservar transparência em uma etapa futura." FontSize="11" Foreground="#687180" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+        <TextBlock Text="Os arquivos originais não serão alterados. A exportação cria novos arquivos no destino escolhido." FontSize="11" Foreground="#687180" TextWrapping="Wrap"/>
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="2" Background="White" BorderBrush="#DDE1E8" BorderThickness="0,1,0,0" Padding="16,12">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="9">
+        <Button Content="Cancelar" Click="Cancel_Click" Padding="18,9"/>
+        <Button x:Name="ExportButton" Content="Continuar" Click="Export_Click" Background="#16804A" Foreground="White" Padding="22,9"/>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>

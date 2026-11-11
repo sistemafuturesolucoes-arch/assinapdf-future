@@ -1,0 +1,99 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:AssinaPDF.MacPrototype"
+        x:Class="AssinaPDF.MacPrototype.BatchSignatureWindow"
+        Title="AssinaPDF | Assinatura em Lote"
+        Width="1100" Height="700"
+        MinWidth="860" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        Background="#F3F4F6">
+
+  <Grid x:Name="RootLayout" RowDefinitions="Auto,Auto,*,Auto" Margin="10" RowSpacing="8">
+    <StackPanel Grid.Row="0" Spacing="3">
+      <TextBlock Text="Assinatura em Lote" FontSize="21" FontWeight="SemiBold" Foreground="#252A34"/>
+      <TextBlock Text="Adicione PDFs, atribua certificados e marque as áreas de assinatura diretamente na prévia."
+                 FontSize="11" Foreground="#737B87" TextWrapping="Wrap"/>
+    </StackPanel>
+
+    <WrapPanel Grid.Row="1" Orientation="Horizontal">
+      <Button Content="＋ Adicionar PDFs" Click="AddPdfs_Click" Margin="0,0,6,0"
+              Padding="11,7" Background="#6741B8" Foreground="White"/>
+      <Button Content="Remover selecionado" Click="RemoveSelected_Click" Margin="0,0,6,0"
+              Padding="11,7" Background="#E7E9ED" Foreground="#34383E"/>
+      <Button Content="Limpar lista" Click="ClearList_Click"
+              Padding="11,7" Background="#F4E9E9" Foreground="#8A3D3D"/>
+    </WrapPanel>
+
+    <Grid Grid.Row="2" ColumnDefinitions="220,235,*" ColumnSpacing="8">
+      <Border Grid.Column="0" Background="White" BorderBrush="#E0E3E8"
+              BorderThickness="1" CornerRadius="8" Padding="8">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Row="0" Spacing="3">
+            <TextBlock Text="DOCUMENTOS DA FILA" FontSize="10" FontWeight="SemiBold" Foreground="#555D69"/>
+            <TextBlock x:Name="CountText" Text="Nenhum PDF adicionado" FontSize="10" Foreground="#737B87"
+                       TextWrapping="Wrap"/>
+          </StackPanel>
+          <ListBox x:Name="DocumentsList" Grid.Row="1" Margin="0,6"
+                   SelectionChanged="DocumentsList_SelectionChanged">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:CompileBindings="False">
+                <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"
+                           FontSize="11" Foreground="#34383E" Margin="3,6"/>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Grid.Row="2" Spacing="4">
+            <TextBlock Text="CERTIFICADO PARA TODOS" FontSize="9" FontWeight="SemiBold" Foreground="#555D69"/>
+            <ComboBox x:Name="ApplyAllCertificatePicker" PlaceholderText="Escolha um certificado" MinHeight="32"/>
+            <Button Content="Aplicar a todos" Click="ApplyCertificateToAll_Click"
+                    Padding="8,6" Background="#E7E9ED" Foreground="#34383E"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" Background="White" BorderBrush="#E0E3E8"
+              BorderThickness="1" CornerRadius="8" Padding="9">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="8">
+            <TextBlock Text="CONFIGURAÇÃO" FontSize="10"
+                       FontWeight="SemiBold" Foreground="#555D69"/>
+            <StackPanel Spacing="3">
+              <TextBlock Text="Documento selecionado" FontSize="9" Foreground="#737B87"/>
+              <TextBlock x:Name="SelectedDocumentText" Text="Selecione um PDF na lista."
+                         FontSize="12" FontWeight="SemiBold" Foreground="#292D36" TextWrapping="Wrap"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Certificado deste documento" FontSize="10" FontWeight="SemiBold" Foreground="#454B55"/>
+              <ComboBox x:Name="CertificatePicker" PlaceholderText="Selecione o certificado"
+                        MinHeight="34" SelectionChanged="CertificatePicker_SelectionChanged"/>
+              <TextBlock x:Name="CertificateDetailsText" Text="O certificado selecionado será usado somente neste documento."
+                         FontSize="9" Foreground="#737B87" TextWrapping="Wrap"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Motivo da assinatura (opcional)" FontSize="10" FontWeight="SemiBold" Foreground="#454B55"/>
+              <TextBox x:Name="SigningReasonTextBox" PlaceholderText="Ex.: Aprovação do documento" MinHeight="32"/>
+            </StackPanel>
+            <TextBlock Text="Marque as áreas de assinatura na prévia. Cada PDF mantém suas próprias posições."
+                       FontSize="10" Foreground="#737B87" TextWrapping="Wrap"/>
+            <Button Content="Assinar todos os documentos" Click="SignAll_Click"
+                    Padding="11,9" Background="#27865A" Foreground="White"
+                    HorizontalAlignment="Stretch"/>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <Border Grid.Column="2" Background="White" BorderBrush="#E0E3E8"
+              BorderThickness="1" CornerRadius="8" Padding="8">
+        <local:BatchPdfPositioningControl x:Name="PreviewControl"/>
+      </Border>
+    </Grid>
+
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+      <TextBlock x:Name="StatusText" Text="Aguardando PDFs." FontSize="10"
+                 Foreground="#666D78" VerticalAlignment="Center" TextWrapping="Wrap"/>
+      <Button Grid.Column="1" Content="Fechar" Click="Close_Click"
+              Padding="11,7" Background="#E2E5EA" Foreground="#34383E"/>
+    </Grid>
+  </Grid>
+</Window>

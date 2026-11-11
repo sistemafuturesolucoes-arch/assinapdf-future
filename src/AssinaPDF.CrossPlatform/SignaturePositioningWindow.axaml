@@ -1,0 +1,122 @@
+﻿<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.SignaturePositioningWindow"
+        Title="AssinaPDF - Posicionar assinaturas"
+        Width="900"
+        Height="650"
+        MinWidth="740"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Background="#F0F1F5">
+
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="#302044" Padding="18,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="4">
+          <TextBlock Text="Posicionar assinaturas"
+                     FontSize="20"
+                     FontWeight="Bold"
+                     Foreground="White"/>
+          <TextBlock Text="Selecione uma página nas miniaturas e marque os locais de assinatura."
+                     FontSize="12"
+                     Foreground="#E5DDF0"/>
+        </StackPanel>
+        <TextBlock x:Name="PositionCountText"
+                   Grid.Column="1"
+                   Text="0 posições"
+                   FontSize="14"
+                   FontWeight="SemiBold"
+                   Foreground="White"
+                   VerticalAlignment="Center"/>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="150,*" Margin="12">
+      <Border Grid.Column="0"
+              Background="#E2E3E8"
+              BorderBrush="#D0D2D9"
+              BorderThickness="1"
+              CornerRadius="8"
+              Margin="0,0,10,0">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0"
+                     Text="PÁGINAS"
+                     FontSize="11"
+                     FontWeight="Bold"
+                     Foreground="#5A5362"
+                     Margin="12,12,8,8"/>
+          <ScrollViewer Grid.Row="1"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="ThumbnailsPanel"
+                        Spacing="8"
+                        Margin="8,0,8,10"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1"
+              Background="#D9DBE2"
+              BorderBrush="#C8CAD2"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="10">
+        <Grid RowDefinitions="*,Auto">
+          <ScrollViewer x:Name="PdfScrollViewer"
+                        Grid.Row="0"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto">
+            <Border Background="White"
+                    Padding="10"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+              <Grid x:Name="PdfPageSurface"
+                    PointerPressed="PdfPageSurface_PointerPressed"
+                    PointerMoved="PdfPageSurface_PointerMoved"
+                    PointerReleased="PdfPageSurface_PointerReleased">
+                <Image x:Name="PdfPageImage"
+                       Stretch="Uniform"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+                <Canvas x:Name="MarkerCanvas"
+                        IsHitTestVisible="False"/>
+              </Grid>
+            </Border>
+          </ScrollViewer>
+          <TextBlock Grid.Row="1"
+                     x:Name="PageIndicator"
+                     Text="Página 1"
+                     HorizontalAlignment="Center"
+                     Margin="0,8,0,0"
+                     FontWeight="SemiBold"
+                     Foreground="#514B5B"/>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" Background="#E0E3E7" Padding="12">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
+        <TextBlock Grid.Column="0"
+                   x:Name="PositionStatusText"
+                   Text="Clique e arraste para desenhar a área da assinatura."
+                   VerticalAlignment="Center"
+                   Foreground="#454951"
+                   TextTrimming="CharacterEllipsis"/>
+        <Button Grid.Column="1"
+                Content="Limpar posições"
+                Padding="14,9"
+                Click="ClearPositions_Click"/>
+        <Button Grid.Column="2"
+                Content="Cancelar"
+                Padding="14,9"
+                Click="Cancel_Click"/>
+        <Button Grid.Column="3"
+                Content="Concluir posicionamentos"
+                Padding="16,9"
+                Background="#6037A5"
+                Foreground="White"
+                Click="Complete_Click"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

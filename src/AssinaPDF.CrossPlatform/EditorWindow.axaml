@@ -1,0 +1,129 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.EditorWindow"
+        Title="AssinaPDF | Editor de PDF"
+        Width="1180" Height="780"
+        MinWidth="820" MinHeight="560"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+  <Grid RowDefinitions="64,88,*,42">
+    <Border Grid.Row="0" Background="#292D36" Padding="20,8">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+        <StackPanel VerticalAlignment="Center" Spacing="2">
+          <TextBlock Text="AssinaPDF  /  Editor de PDF" FontSize="18"
+                     FontWeight="SemiBold" Foreground="White"/>
+          <TextBlock x:Name="DocumentNameText" Text="Cópia de trabalho"
+                     FontSize="11" Foreground="#D5D8DE"/>
+        </StackPanel>
+        <Button Grid.Column="1" Content="Salvar como PDF" Click="SaveAs_Click"
+                VerticalAlignment="Center" Padding="18,10"
+                Background="#FFFFFF" Foreground="#292D36" BorderThickness="0"/>
+        <Button Grid.Column="2" Content="Fechar" Click="CloseEditor_Click"
+                VerticalAlignment="Center" Padding="18,10"
+                Background="#555C68" Foreground="White" BorderThickness="0"/>
+      </Grid>
+    </Border>
+
+    <!-- Barra principal reduzida: somente comandos já ligados a operações existentes. -->
+    <Border Grid.Row="1" Background="#FFFFFF"
+            BorderBrush="#D9DCE0" BorderThickness="0,0,0,1" Padding="10,6">
+      <Grid RowDefinitions="Auto,Auto" RowSpacing="5">
+        <Grid Grid.Row="0"
+              ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto"
+              ColumnSpacing="7">
+          <Button Grid.Column="0" Content="Abrir PDF" Click="OpenPdf_Click"
+                  Padding="13,7" Background="#292D36" Foreground="White"
+                  BorderThickness="0" VerticalAlignment="Center"/>
+          <Button x:Name="SelectModeButton" Grid.Column="1" Content="Selecionar"
+                  Click="SelectMode_Click" Padding="12,7"
+                  Background="#E9E3F5" Foreground="#4C3482"
+                  BorderBrush="#CFC3E8" VerticalAlignment="Center"
+                  ToolTip.Tip="Selecionar texto no PDF"/>
+          <Button x:Name="AddTextModeButton" Grid.Column="2" Content="T  Texto"
+                  Click="AddTextMode_Click" Padding="12,7"
+                  Background="#F0F1F4" Foreground="#34383E"
+                  BorderBrush="#D9DCE0" VerticalAlignment="Center"
+                  ToolTip.Tip="Clique na página para inserir texto"/>
+          <Button Grid.Column="3" Content="↶" Click="Undo_Click"
+                  Padding="13,7" Background="#F0F1F4" BorderBrush="#D9DCE0"
+                  ToolTip.Tip="Desfazer última alteração" VerticalAlignment="Center"/>
+          <Button Grid.Column="4" Content="↷" Click="Redo_Click"
+                  Padding="13,7" Background="#F0F1F4" BorderBrush="#D9DCE0"
+                  ToolTip.Tip="Refazer alteração" VerticalAlignment="Center"/>
+          <ScrollViewer Grid.Column="5" HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Disabled">
+            <ContentControl x:Name="EditorFormattingToolbarHost"
+                            VerticalAlignment="Center"/>
+          </ScrollViewer>
+          <TextBlock x:Name="EditorZoomText" Grid.Column="6" Text="100%"
+                     FontSize="11" FontWeight="SemiBold" Foreground="#4C3482"
+                     VerticalAlignment="Center"
+                     ToolTip.Tip="Zoom: use Ctrl + rolagem do mouse"/>
+        </Grid>
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+          <TextBlock x:Name="SelectedTextLabel" Grid.Column="0"
+                     IsVisible="False" FontSize="10" Foreground="#4C3482"
+                     VerticalAlignment="Center" MaxWidth="360"
+                     TextTrimming="CharacterEllipsis"/>
+          <Button x:Name="EditSelectedTextButton" Grid.Column="1"
+                  Content="Editar trecho" Click="EditSelectedText_Click"
+                  IsVisible="False" Padding="9,3"
+                  Background="#E9E3F5" Foreground="#4C3482"
+                  BorderThickness="0" VerticalAlignment="Center"/>
+          <Button x:Name="DeleteSelectedTextButton" Grid.Column="2"
+                  Content="Excluir seleção" Click="DeleteSelectedText_Click"
+                  IsVisible="False" Padding="9,3"
+                  Background="#FCE8E8" Foreground="#A12626"
+                  BorderThickness="0" VerticalAlignment="Center"/>
+          <TextBlock Grid.Column="3"
+                     Text="Selecione um trecho para editar ou escolha T para inserir texto."
+                     FontSize="10" Foreground="#737B87"
+                     VerticalAlignment="Center"/>
+          <TextBlock Grid.Column="4" Text="Ferramentas essenciais"
+                     FontSize="10" Foreground="#737B87"
+                     VerticalAlignment="Center"/>
+        </Grid>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="156,*" Background="#D9DCE0">
+      <Border Grid.Column="0" Background="#ECEEF2"
+              BorderBrush="#D0D4DB" BorderThickness="0,0,1,0" Padding="8,10">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+          <TextBlock Text="PÁGINAS" FontSize="10" FontWeight="Bold"
+                     Foreground="#626A76" Margin="4,0,0,2"/>
+          <ScrollViewer Grid.Row="1"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Visible">
+            <StackPanel x:Name="EditorThumbnailsPanel" Spacing="8"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="#D9DCE0" Padding="18">
+        <ScrollViewer x:Name="EditorDocumentScrollViewer"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Visible"
+                      PointerWheelChanged="EditorDocumentScrollViewer_PointerWheelChanged"
+                      Focusable="True">
+          <StackPanel x:Name="EditorPagesPanel" Spacing="20"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top"/>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="3" Background="#E7E9ED" Padding="14,5">
+      <TextBlock x:Name="EditorStatusText"
+                 Text="Documento aberto em uma cópia de trabalho. O arquivo original permanece preservado."
+                 FontSize="11" Foreground="#555B63" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis"/>
+    </Border>
+
+    <!-- Campos auxiliares mantidos para compatibilidade com busca e substituição existentes. -->
+    <StackPanel IsVisible="False">
+      <TextBox x:Name="SearchTextBox"/>
+      <TextBox x:Name="ReplaceTextBox"/>
+    </StackPanel>
+  </Grid>
+</Window>
