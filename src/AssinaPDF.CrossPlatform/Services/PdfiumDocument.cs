@@ -288,6 +288,67 @@ public sealed class PdfiumDocument : IDisposable
         }
     }
 
+    internal (float Width, float Height) GetPageDimensionsPoints(int pageIndex)
+    {
+        ThrowIfDisposed();
+        if (pageIndex < 0 || pageIndex >= PageCount)
+            throw new ArgumentOutOfRangeException(nameof(pageIndex));
+
+        lock (PdfiumNative.SyncRoot)
+        {
+            ThrowIfDisposed();
+            IntPtr page = PdfiumNative.LoadPage(_document, pageIndex);
+            if (page == IntPtr.Zero)
+                throw new InvalidDataException($"Não foi possível carregar a página {pageIndex + 1}.");
+
+            try
+            {
+                return (PdfiumNative.GetPageWidth(page), PdfiumNative.GetPageHeight(page));
+            }
+            finally
+            {
+                PdfiumNative.ClosePage(page);
+            }
+        }
+    }
+
+    internal void RenderPageToPrinter(
+        int pageIndex,
+        IntPtr deviceContext,
+        int x,
+        int y,
+        int width,
+        int height)
+    {
+        ThrowIfDisposed();
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("A renderização direta para impressora está disponível somente no Windows.");
+        if (pageIndex < 0 || pageIndex >= PageCount)
+            throw new ArgumentOutOfRangeException(nameof(pageIndex));
+        if (deviceContext == IntPtr.Zero || width <= 0 || height <= 0)
+            throw new ArgumentException("A área de impressão é inválida.");
+
+        lock (PdfiumNative.SyncRoot)
+        {
+            ThrowIfDisposed();
+            IntPtr page = PdfiumNative.LoadPage(_document, pageIndex);
+            if (page == IntPtr.Zero)
+                throw new InvalidDataException($"Não foi possível carregar a página {pageIndex + 1}.");
+
+            try
+            {
+                // FPDF_RenderPage desenha os elementos PDF diretamente no DC da
+                // impressora, preservando texto e vetores na saída de impressão.
+                PdfiumNative.RenderPageToDevice(
+                    deviceContext, page, x, y, width, height, 0, 0x01);
+            }
+            finally
+            {
+                PdfiumNative.ClosePage(page);
+            }
+        }
+    }
+
     /// <summary>
     /// Inspeciona os objetos nativos de uma página sem depender dos fragmentos
     /// de texto produzidos pelo Aspose. As coordenadas retornadas usam o sistema
