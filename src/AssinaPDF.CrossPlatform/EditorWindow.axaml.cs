@@ -748,6 +748,48 @@ public partial class EditorWindow : Window
             return;
         try
         {
+            // Primeiro tenta selecionar o objeto de texto inteiro do PDF (em vez
+            // de somente a palavra sob o mouse). Assim, um texto recém-inserido
+            // pode ser clicado e arrastado como um único bloco, inclusive após reabrir.
+            using (var source = Document.Open(_workingCopyPath))
+            {
+                var absorber = new TextFragmentAbsorber();
+                source.Pages[pageInfo.PageIndex + 1].Accept(absorber);
+                var fragment = absorber.TextFragments
+                    .Where(item => item.Rectangle != null && !string.IsNullOrWhiteSpace(item.Text))
+                    .Select(item => new
+                    {
+                        Fragment = item,
+                        Bounds = item.Rectangle!,
+                        Distance = Math.Pow(
+                            pdfX < item.Rectangle!.LLX ? item.Rectangle.LLX - pdfX :
+                            pdfX > item.Rectangle.URX ? pdfX - item.Rectangle.URX : 0, 2) +
+                            Math.Pow(
+                            pdfY < item.Rectangle.LLY ? item.Rectangle.LLY - pdfY :
+                            pdfY > item.Rectangle.URY ? pdfY - item.Rectangle.URY : 0, 2)
+                    })
+                    .Where(item => item.Distance <= 25)
+                    .OrderBy(item => item.Distance)
+                    .FirstOrDefault();
+
+                if (fragment != null)
+                {
+                    var objectCharacters = _document.InspectPageCharacters(pageInfo.PageIndex)
+                        .Where(ch => ch.Right >= fragment.Bounds.LLX - 1 &&
+                                     ch.Left <= fragment.Bounds.URX + 1 &&
+                                     ch.Top >= fragment.Bounds.LLY - 1 &&
+                                     ch.Bottom <= fragment.Bounds.URY + 1 &&
+                                     !string.IsNullOrEmpty(ch.Text))
+                        .OrderBy(ch => ch.CharacterIndex)
+                        .ToArray();
+                    if (objectCharacters.Length > 0)
+                    {
+                        SetTextSelection(image, pageInfo, objectCharacters, fragment.Fragment.Text);
+                        return;
+                    }
+                }
+            }
+
             var characters = _document.InspectPageCharacters(pageInfo.PageIndex);
             var lines = PdfiumTextGrouping.GroupIntoLines(characters, pageInfo.PageIndex);
             var word = PdfiumTextHitTest.FindWordAtPoint(lines, pageInfo.PageIndex, pdfX, pdfY, 3.0);
