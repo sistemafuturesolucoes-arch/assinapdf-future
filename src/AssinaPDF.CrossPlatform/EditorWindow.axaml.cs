@@ -1632,8 +1632,8 @@ public partial class EditorWindow : Window
                             NormalizePdfFontFamily(run.FontFamily),
                             NormalizePdfFontFamily(originalFontName),
                             StringComparison.OrdinalIgnoreCase) ||
-                         run.IsBold != originalBold ||
-                         run.IsItalic != originalItalic))
+                         (!IsPdfInternalFontResource(originalPdfFontResourceName) &&
+                          (run.IsBold != originalBold || run.IsItalic != originalItalic))))
                     .Select(run => run.FontFamily!)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
@@ -1692,7 +1692,10 @@ public partial class EditorWindow : Window
                         double oy = (originalBounds.LLY + originalBounds.URY) / 2;
                         double distance = Math.Sqrt(Math.Pow(cx - ox, 2) + Math.Pow(cy - oy, 2));
 
-                        if (string.Equals(fragment.Text, originalText, StringComparison.Ordinal) &&
+                        if (string.Equals(
+                                NormalizePdfText(fragment.Text),
+                                NormalizePdfText(originalText),
+                                StringComparison.Ordinal) &&
                             distance < closest)
                         {
                             closest = distance;
@@ -1707,11 +1710,12 @@ public partial class EditorWindow : Window
                         // caracteres PDFium separados em objetos de texto diferentes.
                         // Só prossegue se o resultado representar exatamente o texto
                         // selecionado; não substitui fragmentos vizinhos por aproximação.
-                        var exactSearch = new TextFragmentAbsorber(originalText);
-                        document.Pages[pageIndex + 1].Accept(exactSearch);
-                        target = exactSearch.TextFragments
-                            .Where(fragment => string.Equals(
-                                fragment.Text, originalText, StringComparison.Ordinal))
+                        target = pageAbsorber.TextFragments
+                            .Where(fragment => fragment.Rectangle != null &&
+                                string.Equals(
+                                    NormalizePdfText(fragment.Text),
+                                    NormalizePdfText(originalText),
+                                    StringComparison.Ordinal))
                             .OrderBy(fragment =>
                             {
                                 var rectangle = fragment.Rectangle;
@@ -2900,6 +2904,21 @@ public partial class EditorWindow : Window
 
     private static string NormalizePdfText(string? value) =>
         new string((value ?? string.Empty).Where(character => !char.IsWhiteSpace(character)).ToArray());
+
+    private static bool IsPdfInternalFontResource(string? value)
+    {
+        string name = (value ?? string.Empty).Trim();
+        if (name.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Type 3 fonts may be exposed by Aspose with resource names such as T3Font_1.
+        int marker = name.IndexOf("Font_", StringComparison.OrdinalIgnoreCase);
+        return marker > 1 &&
+               name.StartsWith("T", StringComparison.OrdinalIgnoreCase) &&
+               name.AsSpan(1, marker - 1).ToString().All(char.IsDigit) &&
+               name.AsSpan(marker + 5).Length > 0 &&
+               name.AsSpan(marker + 5).ToString().All(char.IsDigit);
+    }
 
     internal static string NormalizePdfFontFamily(string? value)
     {
