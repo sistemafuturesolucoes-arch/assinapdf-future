@@ -1593,7 +1593,17 @@ public partial class EditorWindow : Window
 
             Aspose.Pdf.Rectangle? expectedBounds = null;
 
-            var formattingTrace = new List<string>();
+            var formattingTrace = new List<string>
+            {
+                $"DIAGNÓSTICO DO EDITOR: parágrafos={editedParagraphs.Count}; " +
+                $"tamanhos=[{string.Join(",", editedParagraphs.Select(paragraph =>
+                    paragraph.Inlines.OfType<RichRun>().Sum(run => run.Text?.Length ?? 0)))}]; " +
+                $"texto enviado='{replacementText.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n")}'; " +
+                $"comprimento={replacementText.Length}; " +
+                $"códigos=[{string.Join(" ", replacementText.Select(character => $"U+{(int)character:X4}"))}]; " +
+                $"fontes=[{string.Join("; ", editedRuns.Select(run =>
+                    $"início={run.Start}, tamanho={run.Length}, fonte={run.FontFamily}, pt={run.FontSize:0.##}"))}]"
+            };
             ApplyPdfEdit(document =>
             {
                 bool cidFontSwapApplied = false;
@@ -2316,7 +2326,7 @@ public partial class EditorWindow : Window
             $"requestedBold={run.IsBold}; originalItalic={originalItalic}; " +
             $"requestedItalic={run.IsItalic}; stateFont='{state.FontName}'; " +
             $"stateBold={state.IsBold}; stateStyle={state.FontStyle}; " +
-            $"stateFontEmbedded={state.Font?.IsEmbedded}");
+            $"stateFontSize={state.FontSize:0.##}; stateFontEmbedded={state.Font?.IsEmbedded}");
 
         bool preserveEmbeddedFace =
             originalFontEmbedded &&
@@ -2397,7 +2407,8 @@ public partial class EditorWindow : Window
             $"stateBold={state.IsBold}; stateStyle={state.FontStyle}; " +
             $"fontName='{state.Font?.FontName}'; baseFont='{state.Font?.BaseFont}'; " +
             $"decodedFont='{state.Font?.DecodedFontName}'; " +
-            $"fontEmbedded={state.Font?.IsEmbedded}; fontBold={state.Font?.IsBold}");
+            $"fontEmbedded={state.Font?.IsEmbedded}; fontBold={state.Font?.IsBold}; " +
+            $"stateFontSize={state.FontSize:0.##}");
 
         // Assign colours directly to the final owned state. The setters retain the
         // values consumed by the PDF writer; on absorbed text they also perform the
