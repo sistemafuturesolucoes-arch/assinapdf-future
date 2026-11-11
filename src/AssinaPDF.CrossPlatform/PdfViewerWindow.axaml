@@ -2,17 +2,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.PdfViewerWindow"
         Title="AssinaPDF | Visualizador de PDF"
-        Width="1200" Height="820"
-        MinWidth="850" MinHeight="580"
+        Width="980" Height="700"
+        MinWidth="700" MinHeight="480"
+        SizeToContent="Manual"
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
   <Grid RowDefinitions="58,* ,34">
     <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#D9DDE3" BorderThickness="0,0,0,1" Padding="14,8">
       <Grid ColumnDefinitions="Auto,*,Auto">
         <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-          <Button Content="‹" Width="34" Click="PreviousPage_Click" ToolTip.Tip="Página anterior"/>
           <TextBlock x:Name="PageCounterText" Text="Página 1 de 1" VerticalAlignment="Center" MinWidth="100" TextAlignment="Center"/>
-          <Button Content="›" Width="34" Click="NextPage_Click" ToolTip.Tip="Próxima página"/>
           <Border Width="1" Height="28" Background="#D9DDE3" Margin="7,0"/>
           <Button Content="−" Width="34" Click="ZoomOut_Click" ToolTip.Tip="Diminuir zoom"/>
           <TextBlock x:Name="ZoomText" Text="100%" VerticalAlignment="Center" MinWidth="52" TextAlignment="Center"/>
