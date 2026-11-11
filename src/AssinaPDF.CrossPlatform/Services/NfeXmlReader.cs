@@ -105,6 +105,8 @@ public static class NfeXmlReader
 
         string invoiceNumber = RequiredValue(ide, "nNF");
         string series = RequiredValue(ide, "serie");
+        int invoiceNumberValue = ParsePositiveInt(invoiceNumber, "nNF");
+        int seriesValue = ParseNonNegativeInt(series, "serie");
         string issueDateText = RequiredValue(ide, "dhEmi");
         if (!DateTimeOffset.TryParse(
             issueDateText,
@@ -133,7 +135,7 @@ public static class NfeXmlReader
         string recipientDocument = FirstValue(recipient, "CNPJ", "CPF");
         ValidateDocument(issuerDocument, "emitente");
         ValidateDocument(recipientDocument, "destinatário");
-        ValidateKeyMatchesInvoice(accessKey, issueDate, issuerDocument, invoiceNumber, series);
+        ValidateKeyMatchesInvoice(accessKey, issueDate, issuerDocument, invoiceNumberValue, seriesValue);
 
         string issuerName = RequiredValue(issuer, "xNome");
         string recipientName = RequiredValue(recipient, "xNome");
@@ -237,8 +239,8 @@ public static class NfeXmlReader
         string accessKey,
         DateTimeOffset issueDate,
         string issuerDocument,
-        string invoiceNumber,
-        string series)
+        int invoiceNumber,
+        int series)
     {
         string keyIssuer = accessKey.Substring(6, 14);
         string issuerDigits = DigitsOnly(issuerDocument);
@@ -253,14 +255,12 @@ public static class NfeXmlReader
         if (accessKey.Substring(20, 2) != "55")
             throw new InvalidDataException("O modelo informado na chave de acesso não é 55.");
 
-        if (int.TryParse(invoiceNumber, NumberStyles.None, CultureInfo.InvariantCulture, out int invoice) &&
-            int.TryParse(accessKey.Substring(25, 9), NumberStyles.None, CultureInfo.InvariantCulture, out int keyInvoice) &&
-            invoice != keyInvoice)
+        int keyInvoice = int.Parse(accessKey.Substring(25, 9), CultureInfo.InvariantCulture);
+        if (invoiceNumber != keyInvoice)
             throw new InvalidDataException("O número da NF-e não corresponde à chave de acesso.");
 
-        if (int.TryParse(series, NumberStyles.None, CultureInfo.InvariantCulture, out int seriesNumber) &&
-            int.TryParse(accessKey.Substring(22, 3), NumberStyles.None, CultureInfo.InvariantCulture, out int keySeries) &&
-            seriesNumber != keySeries)
+        int keySeries = int.Parse(accessKey.Substring(22, 3), CultureInfo.InvariantCulture);
+        if (series != keySeries)
             throw new InvalidDataException("A série da NF-e não corresponde à chave de acesso.");
     }
 
@@ -300,6 +300,13 @@ public static class NfeXmlReader
     private static int ParsePositiveInt(string value, string field)
     {
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int result) || result <= 0)
+            throw new InvalidDataException($"O campo {field} possui valor inválido.");
+        return result;
+    }
+
+    private static int ParseNonNegativeInt(string value, string field)
+    {
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int result) || result < 0)
             throw new InvalidDataException($"O campo {field} possui valor inválido.");
         return result;
     }
