@@ -288,6 +288,20 @@ internal static class PdfiumNative
 
     [DllImport(
         LibraryName,
+        EntryPoint = "FPDF_RenderPage",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void RenderPageToDevice(
+        IntPtr deviceContext,
+        IntPtr page,
+        int startX,
+        int startY,
+        int sizeX,
+        int sizeY,
+        int rotate,
+        int flags);
+
+    [DllImport(
+        LibraryName,
         EntryPoint = "FPDF_ClosePage",
         CallingConvention = NativeCallingConvention)]
     internal static extern void ClosePage(IntPtr page);
