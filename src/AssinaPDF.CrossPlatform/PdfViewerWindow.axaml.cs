@@ -32,6 +32,7 @@ public partial class PdfViewerWindow : Window
         DocumentNameText.Text = Path.GetFileName(_originalPath);
         Title = $"AssinaPDF | {Path.GetFileName(_originalPath)}";
         Opened += (_, _) => LoadDocument(_originalPath);
+        PageScrollViewer.ScrollChanged += PageScrollViewer_ScrollChanged;
         Closed += (_, _) => DisposeResources();
         PageScrollViewer.AddHandler(
             InputElement.PointerWheelChangedEvent,
@@ -173,8 +174,6 @@ public partial class PdfViewerWindow : Window
         }
     }
 
-    private void PreviousPage_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SelectPage(_pageIndex - 1);
-    private void NextPage_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SelectPage(_pageIndex + 1);
     private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SetZoom(_zoom * 1.2);
     private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SetZoom(_zoom / 1.2);
     private void FitWidth_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -188,6 +187,21 @@ public partial class PdfViewerWindow : Window
     {
         _zoom = Math.Clamp(value, 0.35, 4.0);
         RenderCurrentPage();
+    }
+
+    private void PageScrollViewer_ScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (_document == null || _loading || PageScrollViewer.Extent.Height <= 0) return;
+        // Continuous scroll navigation: estimate current page from vertical scroll position.
+        int index = (int)Math.Round(
+            PageScrollViewer.Offset.Y / Math.Max(1, PageScrollViewer.Extent.Height) * _document.PageCount);
+        index = Math.Clamp(index, 0, _document.PageCount - 1);
+        if (index != _pageIndex)
+        {
+            _pageIndex = index;
+            RenderCurrentPage();
+            BuildThumbnails();
+        }
     }
 
     private void PageScrollViewer_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
