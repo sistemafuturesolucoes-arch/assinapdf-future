@@ -63,7 +63,6 @@ public class NfeXmlReaderTests
     {
         string xml = AuthorizedXml.Replace("<cStat>100</cStat>", "<cStat>110</cStat>");
         var exception = Assert.Throws<InvalidDataException>(() => NfeXmlReader.Parse(xml));
-
         Assert.Contains("não autorizada", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -74,15 +73,55 @@ public class NfeXmlReaderTests
             "<chNFe>42261067934283000110550010000000041000888804</chNFe>",
             "<chNFe>52261067934283000110550010000000041000888804</chNFe>");
         var exception = Assert.Throws<InvalidDataException>(() => NfeXmlReader.Parse(xml));
-
         Assert.Contains("não corresponde", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Parse_InvalidAccessKeyCheckDigit_IsRejected()
+    {
+        string xml = AuthorizedXml.Replace(
+            "NFe42261067934283000110550010000000041000888804",
+            "NFe42261067934283000110550010000000041000888805");
+
+        var exception = Assert.Throws<InvalidDataException>(() => NfeXmlReader.Parse(xml));
+        Assert.Contains("dígito verificador", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Parse_InvalidIssueDate_IsRejected()
+    {
+        string xml = AuthorizedXml.Replace(
+            "2026-10-22T15:11:09-03:00",
+            "data-invalida");
+
+        var exception = Assert.Throws<InvalidDataException>(() => NfeXmlReader.Parse(xml));
+        Assert.Contains("data de emissão", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Parse_InvalidNumericItemValue_IsRejectedInsteadOfBecomingZero()
+    {
+        string xml = AuthorizedXml.Replace("<vProd>24.00</vProd>", "<vProd>valor</vProd>");
+
+        var exception = Assert.Throws<InvalidDataException>(() => NfeXmlReader.Parse(xml));
+        Assert.Contains("vProd", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Parse_IssuerDocumentMismatchWithAccessKey_IsRejected()
+    {
+        string xml = AuthorizedXml.Replace(
+            "<CNPJ>67934283000110</CNPJ>",
+            "<CNPJ>67934283000111</CNPJ>");
+
+        var exception = Assert.Throws<InvalidDataException>(() => NfeXmlReader.Parse(xml));
+        Assert.Contains("CNPJ do emitente", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void Parse_Dtd_IsRejected()
     {
         const string xml = """<!DOCTYPE nfeProc [<!ENTITY x "unsafe">]><nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">&x;</nfeProc>""";
-
         Assert.Throws<System.Xml.XmlException>(() => NfeXmlReader.Parse(xml));
     }
 }
