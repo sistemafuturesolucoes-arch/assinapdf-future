@@ -249,18 +249,37 @@ public partial class BatchSignatureWindow : Window
             return;
         }
 
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        IReadOnlyList<IStorageFolder> folders;
+        try
         {
-            Title = "Escolher pasta para salvar os PDFs assinados",
-            AllowMultiple = false
-        });
+            folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Escolher pasta para salvar os PDFs assinados",
+                AllowMultiple = false
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Não foi possível selecionar a pasta de destino: " + ex.Message;
+            return;
+        }
+
         if (folders.Count == 0)
             return;
 
-        string outputDirectory = Path.GetFullPath(folders[0].Path.LocalPath);
-        if (!Directory.Exists(outputDirectory))
+        string outputDirectory;
+        try
         {
-            StatusText.Text = "A pasta de destino não existe ou não está acessível.";
+            outputDirectory = Path.GetFullPath(folders[0].Path.LocalPath);
+            if (!Directory.Exists(outputDirectory))
+            {
+                StatusText.Text = "A pasta de destino não existe ou não está acessível.";
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Pasta de destino inválida: " + ex.Message;
             return;
         }
 
@@ -361,7 +380,7 @@ public partial class BatchSignatureWindow : Window
             SetControlsEnabled(true);
         }
 
-        string summary = $"{succeeded} de {_documents.Count} PDF(s) assinado(s) com sucesso.";
+        string summary = $"{succeeded} de {_documents.Count} PDF(s) assinado(s) com sucesso.\nPasta de destino: {outputDirectory}";
         if (failures.Count > 0)
             summary += "\nFalhas:\n" + string.Join("\n", failures);
         StatusText.Text = summary;
