@@ -81,7 +81,7 @@
                          Foreground="#6741B8"/>
               <TextBlock x:Name="PlacementText" Text="Nenhuma posição configurada."
                          FontSize="11" Foreground="#454B55" TextWrapping="Wrap"/>
-              <Button Content="Configurar posições no PDF selecionado"
+              <Button Content="Configurar posições deste PDF"
                       Click="ConfigurePlacement_Click" Padding="10,8"
                       Background="#6741B8" Foreground="White"/>
             </StackPanel>
