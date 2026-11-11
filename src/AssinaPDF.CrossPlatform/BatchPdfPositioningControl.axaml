@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="AssinaPDF.MacPrototype.BatchPdfPositioningControl">
   <Grid RowDefinitions="Auto,*,Auto" RowSpacing="6">
-    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4">
       <TextBlock Text="VISUALIZAÇÃO DO PDF" FontSize="10" FontWeight="SemiBold"
                  Foreground="#555D69" VerticalAlignment="Center"/>
       <Button Grid.Column="1" x:Name="PreviousPageButton" Content="‹" ToolTip.Tip="Página anterior"
@@ -15,7 +15,8 @@
       <TextBlock Grid.Column="5" x:Name="ZoomText" Text="100%" FontSize="10"
                  VerticalAlignment="Center" HorizontalAlignment="Center" MinWidth="42"/>
       <Button Grid.Column="6" Content="+" Click="ZoomIn_Click" Padding="8,3"/>
-      <Button Grid.Column="7" Content="Limpar" ToolTip.Tip="Limpar posições deste PDF"
+      <Button Grid.Column="7" Content="Ajustar largura" Click="FitWidth_Click" Padding="8,3"/>
+      <Button Grid.Column="8" Content="Limpar" ToolTip.Tip="Limpar posições deste PDF"
               Click="ClearPositions_Click" Padding="8,3"/>
     </Grid>
     <Border Grid.Row="1" Background="#D9DBE2" CornerRadius="6" Padding="6">
