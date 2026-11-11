@@ -30,6 +30,8 @@
                   Foreground="White" BorderThickness="0" Padding="17,8"/>
           <Button Content="Assinatura digital" Click="DashboardSign_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
+          <Button Content="Assinatura em lote" Click="DashboardBatchSign_Click"
+                  Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
           <Button Content="Validação" Click="DashboardValidate_Click"
                   Background="Transparent" Foreground="#F5F5F6" BorderThickness="0" Padding="17,8"/>
           <Button Content="Editar PDF" Click="DashboardEdit_Click"
@@ -50,7 +52,7 @@
                        FontSize="14" Foreground="#737B87"/>
           </StackPanel>
 
-          <Grid ColumnDefinitions="*,*,*" RowDefinitions="160,160"
+          <Grid ColumnDefinitions="*,*,*" RowDefinitions="160,160,160"
                 ColumnSpacing="16" RowSpacing="16">
             <Button Grid.Row="0" Grid.Column="0" Click="DashboardSign_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
@@ -117,6 +119,18 @@
                 <TextBlock Text="Converter arquivos" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
                 <TextBlock Text="Converta imagens em PDF ou exporte páginas para JPG."
                            FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Button>
+
+            <Button Grid.Row="2" Grid.Column="0" Click="DashboardBatchSign_Click"
+                    Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
+              <StackPanel VerticalAlignment="Center" Spacing="10">
+                <TextBlock Text="✍" FontSize="29" Foreground="#6741B8"/>
+                <TextBlock Text="Assinatura em lote" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+                <TextBlock Text="Assine vários PDFs em uma operação e escolha um certificado para cada documento."
+                           FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+                <TextBlock Text="Certificados individuais por PDF" FontSize="10" Foreground="#6D9293"/>
               </StackPanel>
             </Button>
           </Grid>
