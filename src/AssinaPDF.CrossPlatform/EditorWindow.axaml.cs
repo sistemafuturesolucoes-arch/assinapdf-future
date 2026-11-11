@@ -962,7 +962,7 @@ public partial class EditorWindow : Window
                 if (candidates.Length > 1 && Math.Abs(candidates[1].Distance - candidates[0].Distance) < 1)
                     throw new InvalidOperationException("Há blocos idênticos próximos. Não movi nenhum para evitar alterar o texto errado.");
                 var position = candidates[0].Fragment.Position;
-                candidates[0].Fragment.Position = new Position(position.X + dx, position.Y + dy);
+                candidates[0].Fragment.Position = new Position(position.XIndent + dx, position.YIndent + dy);
             }, "Texto reposicionado no PDF.", savedDocument =>
             {
                 var verify = new TextFragmentAbsorber();
