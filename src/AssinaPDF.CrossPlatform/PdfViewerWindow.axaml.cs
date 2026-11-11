@@ -177,7 +177,12 @@ public partial class PdfViewerWindow : Window
     private void NextPage_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SelectPage(_pageIndex + 1);
     private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SetZoom(_zoom * 1.2);
     private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SetZoom(_zoom / 1.2);
-    private void FitWidth_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SetZoom(1.0);
+    private void FitWidth_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_pageBitmap == null) return;
+        double availableWidth = Math.Max(200, PageScrollViewer.Bounds.Width - 56);
+        SetZoom(availableWidth / _pageBitmap.PixelSize.Width);
+    }
 
     private void SetZoom(double value)
     {
