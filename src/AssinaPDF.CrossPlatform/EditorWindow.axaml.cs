@@ -730,10 +730,6 @@ public partial class EditorWindow : Window
         _isDraggingSelection = false;
         e.Pointer.Capture(null);
 
-        double width = Math.Abs(_selectionEnd.X - _selectionStart.X);
-        double height = Math.Abs(_selectionEnd.Y - _selectionStart.Y);
-        bool isClick = width < 4 && height < 4;
-
         SelectTextInRectangle(image, pageInfo, _selectionStart, _selectionEnd);
 
         // Selecionar texto não abre o editor automaticamente. A edição de
@@ -866,9 +862,11 @@ public partial class EditorWindow : Window
             var current = args.GetPosition(surface.Overlay);
             args.Pointer.Capture(null);
             double dx = current.X - dragStart.X, dy = current.Y - dragStart.Y;
-            surface.Overlay.IsHitTestVisible = false;
             if (Math.Abs(dx) >= 2 || Math.Abs(dy) >= 2)
+            {
+                surface.Overlay.IsHitTestVisible = false;
                 _ = MoveSelectedTextAsync(pageInfo, image, dx, dy);
+            }
             args.Handled = true;
         };
         Canvas.SetLeft(highlight, rect.X);
@@ -886,16 +884,16 @@ public partial class EditorWindow : Window
         if (_selectedTextBounds is not { } selectedBounds || string.IsNullOrWhiteSpace(_selectedText))
             return;
         string selectedText = _selectedText;
-        if (!PdfiumPageCoordinateMapper.TryViewToPdf(0, 0, image.Bounds.Width, image.Bounds.Height,
-                pageInfo.WidthPoints, pageInfo.HeightPoints, out double originX, out double originY) ||
-            !PdfiumPageCoordinateMapper.TryViewToPdf(deltaViewX, deltaViewY, image.Bounds.Width, image.Bounds.Height,
-                pageInfo.WidthPoints, pageInfo.HeightPoints, out double movedX, out double movedY))
+        if (image.Bounds.Width <= 0 || image.Bounds.Height <= 0)
         {
             EditorStatusText.Text = "Não foi possível calcular a nova posição do texto.";
             LoadDocumentPreview();
             return;
         }
-        double dx = movedX - originX, dy = movedY - originY;
+        // A prévia mantém a proporção da página; converter o deslocamento
+        // diretamente evita falhas quando o arraste começa perto das bordas.
+        double dx = deltaViewX * pageInfo.WidthPoints / image.Bounds.Width;
+        double dy = -deltaViewY * pageInfo.HeightPoints / image.Bounds.Height;
         if (Math.Abs(dx) < 0.1 && Math.Abs(dy) < 0.1) { LoadDocumentPreview(); return; }
         double expectedCx = (selectedBounds.Left + selectedBounds.Right) / 2 + dx;
         double expectedCy = (selectedBounds.Bottom + selectedBounds.Top) / 2 + dy;
