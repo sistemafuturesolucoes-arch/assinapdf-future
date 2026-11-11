@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
 
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="16" RowSpacing="10">
+  <Grid x:Name="RootLayout" RowDefinitions="Auto,Auto,*,Auto" Margin="16" RowSpacing="10">
     <StackPanel Grid.Row="0" Spacing="4">
       <TextBlock Text="Assinatura em Lote" FontSize="23" FontWeight="SemiBold" Foreground="#252A34"/>
       <TextBlock Text="Adicione vários PDFs, atribua um certificado a cada documento e assine a fila em uma única operação."
