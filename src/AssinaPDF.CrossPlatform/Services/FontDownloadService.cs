@@ -61,6 +61,12 @@ internal static class FontDownloadService
         if (string.IsNullOrWhiteSpace(family) || IsAvailable(family))
             return true;
 
+        // Nomes como T3Font_1 são chaves de recursos internos do PDF
+        // (normalmente fontes Type 3), não nomes de famílias instaláveis.
+        // Nunca consulte catálogos externos nem solicite arquivos para esses IDs.
+        if (IsPdfResourceIdentifier(family))
+            return true;
+
         bool accepted = await AskPermissionAsync(owner, family);
         if (!accepted)
             return false;
@@ -172,6 +178,27 @@ internal static class FontDownloadService
 
         FontRepository.LoadFonts();
         return IsAvailable(family);
+    }
+
+    private static bool IsPdfResourceIdentifier(string value)
+    {
+        string candidate = value.Trim();
+        if (candidate.StartsWith("CIDFONT+", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Type 3 resource names commonly appear as T3Font_1, T3Font_2, etc.
+        if (candidate.StartsWith("T", StringComparison.OrdinalIgnoreCase) &&
+            candidate.EndsWith("_", StringComparison.OrdinalIgnoreCase) == false)
+        {
+            int marker = candidate.IndexOf("Font_", StringComparison.OrdinalIgnoreCase);
+            if (marker > 1 &&
+                candidate.AsSpan(1, marker - 1).ToString().All(char.IsDigit) &&
+                candidate.AsSpan(marker + 5).Length > 0 &&
+                candidate.AsSpan(marker + 5).ToString().All(char.IsDigit))
+                return true;
+        }
+
+        return false;
     }
 
     private static string CleanFamilyName(string? value)
