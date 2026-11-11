@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.ValidationWindow"
+        Title="AssinaPDF | Validação de Assinaturas"
+        Width="1180" Height="780" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+  <Grid RowDefinitions="72,*,38">
+    <Border Grid.Row="0" Background="White" Padding="22,10">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="3" VerticalAlignment="Center">
+          <TextBlock Text="Central de validação" FontSize="21" FontWeight="SemiBold" Foreground="#292D36"/>
+          <TextBlock Text="Analise as assinaturas digitais e confira o documento no visualizador." FontSize="12" Foreground="#747B86"/>
+        </StackPanel>
+        <Button Grid.Column="1" Content="← Fechar" Click="Close_Click" VerticalAlignment="Center"
+                Background="#ECEEF2" Foreground="#34383E" BorderThickness="0" Padding="16,9"/>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1" ColumnDefinitions="350,*" ColumnSpacing="0">
+      <Border Grid.Column="0" Background="White" BorderBrush="#D9DDE3" BorderThickness="0,1,1,0" Padding="18">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="12">
+          <TextBlock Text="DOCUMENTO" FontSize="11" FontWeight="Bold" Foreground="#68717D"/>
+          <Button Grid.Row="1" Content="Selecionar PDF para validar" Click="OpenPdf_Click"
+                  Background="#5C626C" Foreground="White" Padding="12,10" HorizontalContentAlignment="Center"/>
+          <TextBlock x:Name="FileNameText" Grid.Row="2" Text="Nenhum PDF selecionado."
+                     FontSize="12" Foreground="#555B63" TextWrapping="Wrap"/>
+          <Button x:Name="ValidateButton" Grid.Row="3" Content="Validar assinaturas" Click="Validate_Click"
+                  IsEnabled="False" Background="#27865A" Foreground="White" Padding="12,11"
+                  HorizontalContentAlignment="Center"/>
+          <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="9">
+              <TextBlock Text="RESULTADO DA ANÁLISE" FontSize="11" FontWeight="Bold" Foreground="#68717D"/>
+              <Border Background="#F3F5F7" CornerRadius="6" Padding="11">
+                <TextBlock x:Name="SummaryText" Text="Selecione um PDF e clique em Validar assinaturas."
+                           FontSize="12" Foreground="#454B55" TextWrapping="Wrap"/>
+              </Border>
+              <TextBox x:Name="ReportText" IsReadOnly="True" AcceptsReturn="True"
+                       TextWrapping="Wrap" MinHeight="180" Background="White"
+                       BorderBrush="#E1E4E8" FontSize="11"/>
+            </StackPanel>
+          </ScrollViewer>
+          <TextBlock Grid.Row="5" Text="A análise informa integridade criptográfica, assinatura, cadeia de confiança e revogação conforme os recursos efetivamente habilitados."
+                     FontSize="10" Foreground="#818894" TextWrapping="Wrap"/>
+        </Grid>
+      </Border>
+      <Grid Grid.Column="1" RowDefinitions="48,*" Background="#D9DCE0">
+        <Border Grid.Row="0" Background="#E8EAED" Padding="12,6">
+          <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+            <Button Content="−" Click="ZoomOut_Click" Padding="12,5" Background="White" Foreground="#34383E"/>
+            <TextBlock x:Name="ZoomText" Grid.Column="1" Text="100%" VerticalAlignment="Center" Foreground="#454B55"/>
+            <Button Grid.Column="2" Content="+" Click="ZoomIn_Click" Padding="12,5" Background="White" Foreground="#34383E"/>
+            <TextBlock Grid.Column="4" x:Name="PageText" Text="Página — / —" VerticalAlignment="Center" Foreground="#454B55" Margin="8,0"/>
+            <Button Grid.Column="5" Content="‹ Anterior" Click="PreviousPage_Click" Padding="10,5" Background="White" Foreground="#34383E"/>
+            <Button Grid.Column="6" Content="Próxima ›" Click="NextPage_Click" Padding="10,5" Background="White" Foreground="#34383E"/>
+          </Grid>
+        </Border>
+        <Border Grid.Row="1" Margin="12" Background="#AEB3BA" BorderBrush="#C9CDD2" BorderThickness="1">
+          <Grid>
+            <ScrollViewer x:Name="PdfScrollViewer" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto" IsVisible="False">
+              <Image x:Name="PdfPageImage" Stretch="Uniform" HorizontalAlignment="Center"
+                     VerticalAlignment="Top" Margin="16"/>
+            </ScrollViewer>
+            <StackPanel x:Name="ViewerPlaceholder" HorizontalAlignment="Center"
+                        VerticalAlignment="Center" Spacing="10">
+              <TextBlock Text="Visualizador de PDF" FontSize="23" FontWeight="SemiBold"
+                         Foreground="#555B63" HorizontalAlignment="Center"/>
+              <TextBlock Text="O documento selecionado aparecerá aqui." FontSize="13"
+                         Foreground="#777D85" HorizontalAlignment="Center"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+    <Border Grid.Row="2" Background="#E0E3E7" Padding="14,5">
+      <TextBlock x:Name="StatusText" Text="Pronto para validar documentos."
+                 FontSize="11" Foreground="#454951" VerticalAlignment="Center"/>
+    </Border>
+  </Grid>
+</Window>
