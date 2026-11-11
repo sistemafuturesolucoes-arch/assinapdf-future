@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Security.Cryptography.X509Certificates;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
@@ -380,10 +381,7 @@ public partial class BatchSignatureWindow : Window
 
     private void SetControlsEnabled(bool enabled)
     {
-        DocumentsList.IsEnabled = enabled;
-        CertificatePicker.IsEnabled = enabled;
-        ApplyAllCertificatePicker.IsEnabled = enabled;
-        SigningReasonTextBox.IsEnabled = enabled;
+        RootLayout.IsEnabled = enabled;
     }
 
     private void UpdateCount()
@@ -394,13 +392,29 @@ public partial class BatchSignatureWindow : Window
 
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
-    private sealed class BatchPdfItem
+    private sealed class BatchPdfItem : INotifyPropertyChanged
     {
+        private CertificateInfo? _certificate;
+
         public string SourcePath { get; }
         public int PageCount { get; }
-        public CertificateInfo? Certificate { get; set; }
+        public CertificateInfo? Certificate
+        {
+            get => _certificate;
+            set
+            {
+                if (ReferenceEquals(_certificate, value))
+                    return;
+
+                _certificate = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+            }
+        }
+
         public string DisplayName => $"{Path.GetFileName(SourcePath)} · {PageCount} página(s)" +
             (Certificate == null ? " · sem certificado" : " · certificado atribuído");
+
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         public BatchPdfItem(string sourcePath, int pageCount)
         {
