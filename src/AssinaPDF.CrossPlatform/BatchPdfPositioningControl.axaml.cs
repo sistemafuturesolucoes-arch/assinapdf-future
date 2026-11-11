@@ -249,6 +249,14 @@ public partial class BatchPdfPositioningControl : UserControl
         }
     }
 
+    private void ClearPositions_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _placements.Clear();
+        RefreshMarkers();
+        PlacementsChanged?.Invoke(Array.Empty<SignaturePlacement>());
+        PreviewStatusText.Text = "Todas as posições deste PDF foram removidas.";
+    }
+
     private void ZoomIn_Click(object? s, Avalonia.Interactivity.RoutedEventArgs e)
     { _zoom=Math.Min(2.5,_zoom+0.15); ShowPage(_pageIndex); }
     private void ZoomOut_Click(object? s, Avalonia.Interactivity.RoutedEventArgs e)
