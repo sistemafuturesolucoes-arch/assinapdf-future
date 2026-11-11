@@ -12,7 +12,7 @@ public partial class MainWindow : Window
         {
             var window = new BatchSignatureWindow();
             await window.ShowDialog(this);
-            DashboardStatusText.Text = "Central de assinatura em lote fechada.";
+            StatusText.Text = "Central de assinatura em lote fechada.";
         }
         catch (Exception ex)
         {
