@@ -271,7 +271,8 @@ public partial class MainWindow : Window
                 return;
 
             string originalPath = files[0].Path.LocalPath;
-            var viewer = new PdfViewerWindow(originalPath, async () =>
+            PdfViewerWindow? viewer = null;
+            viewer = new PdfViewerWindow(originalPath, async () =>
             {
                 var entry = _editorHistory.CreateWorkingCopy(originalPath);
                 string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
@@ -283,7 +284,7 @@ public partial class MainWindow : Window
                         entry.WorkingCopyPath,
                         entry.OriginalPath,
                         documentDirectory);
-                    await editor.ShowDialog(viewer);
+                    await editor.ShowDialog(viewer!);
                     _editorHistory.Touch(entry.Id);
                     return entry.WorkingCopyPath;
                 }
