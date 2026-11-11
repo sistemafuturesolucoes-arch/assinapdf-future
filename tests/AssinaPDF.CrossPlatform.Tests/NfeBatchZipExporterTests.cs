@@ -139,6 +139,33 @@ public sealed class NfeBatchZipExporterTests
         }
     }
 
+
+    [Fact]
+    public void Create_DoesNotOverwriteOriginalDanfe()
+    {
+        string directory = CreateTempDirectory();
+        string xmlPath = Path.Combine(directory, "original.xml");
+        string pdfPath = Path.Combine(directory, "original.pdf");
+        try
+        {
+            File.WriteAllText(xmlPath, "<xml />");
+            File.WriteAllBytes(pdfPath, new byte[] { 1, 2, 3 });
+            byte[] original = File.ReadAllBytes(pdfPath);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                NfeBatchZipExporter.Create(
+                    pdfPath,
+                    new[] { new NfeZipDocument(xmlPath, null, pdfPath, "inválido") },
+                    NfeZipGroupingMode.Recipient));
+
+            Assert.Equal(original, File.ReadAllBytes(pdfPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), "nfe-zip-tests-" + Guid.NewGuid().ToString("N"));
