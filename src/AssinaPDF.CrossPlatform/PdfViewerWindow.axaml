@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:web="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
         x:Class="AssinaPDF.MacPrototype.PdfViewerWindow"
         Title="AssinaPDF | Visualizador de PDF"
         Width="980" Height="700"
@@ -17,6 +18,7 @@
           <TextBlock x:Name="ZoomText" Text="100%" VerticalAlignment="Center" MinWidth="52" TextAlignment="Center"/>
           <Button Content="+" Width="34" Click="ZoomIn_Click" ToolTip.Tip="Aumentar zoom"/>
           <Button Content="Ajustar largura" Click="FitWidth_Click" Padding="10,6"/>
+          <Button Content="Imprimir" Click="PrintPdf_Click" Padding="12,6"/>
         </StackPanel>
         <TextBlock x:Name="DocumentNameText" Grid.Column="1" VerticalAlignment="Center"
                    HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="#343A44"
@@ -38,13 +40,8 @@
           </ScrollViewer>
         </Grid>
       </Border>
-      <Border Grid.Column="1" Background="#AEB4BD" Padding="16">
-        <ScrollViewer x:Name="PageScrollViewer"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Auto"
-                      Background="#AEB4BD">
-          <StackPanel x:Name="PagesPanel" Spacing="18" HorizontalAlignment="Center" Margin="0,0,0,18"/>
-        </ScrollViewer>
+      <Border Grid.Column="1" Background="#AEB4BD" Padding="0">
+        <web:NativeWebView x:Name="PdfNativeView"/>
       </Border>
     </Grid>
 
