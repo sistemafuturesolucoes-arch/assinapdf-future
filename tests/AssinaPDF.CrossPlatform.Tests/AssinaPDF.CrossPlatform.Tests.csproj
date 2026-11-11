@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
@@ -16,5 +16,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\NfeAuthorized.Synthetic.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

@@ -218,6 +218,14 @@ public sealed class PdfiumDocument : IDisposable
                     throw new InvalidOperationException(
                         "O PDFium não conseguiu criar a imagem da página.");
 
+                // Inicializa o bitmap com fundo branco totalmente opaco.
+                PdfiumNative.BitmapFillRect(
+                    bitmap,
+                    0,
+                    0,
+                    width,
+                    height,
+                    0xFFFFFFFF);
                 if (_formHandle != IntPtr.Zero)
                     PdfiumNative.FormOnAfterLoadPage(page, _formHandle);
 

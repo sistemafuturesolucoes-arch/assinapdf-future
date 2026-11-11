@@ -205,6 +205,17 @@ internal static class PdfiumNative
 
     [DllImport(
         LibraryName,
+        EntryPoint = "FPDFBitmap_FillRect",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern void BitmapFillRect(
+        IntPtr bitmap,
+        int left,
+        int top,
+        int width,
+        int height,
+        uint color);
+    [DllImport(
+        LibraryName,
         EntryPoint = "FPDF_RenderPageBitmap",
         CallingConvention = NativeCallingConvention)]
     internal static extern void RenderPageBitmap(

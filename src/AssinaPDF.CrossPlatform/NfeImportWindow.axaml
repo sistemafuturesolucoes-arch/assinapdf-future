@@ -1,65 +1,216 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:services="clr-namespace:AssinaPDF.MacPrototype.Services"
         x:Class="AssinaPDF.MacPrototype.NfeImportWindow"
         Title="AssinaPDF | Central XML Fiscal"
-        Width="960" Height="650" MinWidth="760" MinHeight="520"
-        WindowStartupLocation="CenterOwner" Background="#F3F4F6">
+        Width="1400" Height="850"
+        MinWidth="1050" MinHeight="650"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+
   <Grid RowDefinitions="Auto,*,Auto" Margin="14">
+
     <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,10">
-      <TextBlock Text="Central XML Fiscal · NF-e" FontSize="22" FontWeight="SemiBold" Foreground="#252A34"/>
-      <TextBlock Text="Importe XMLs autorizados, confira os dados e gere o DANFE. Os arquivos originais permanecem no computador."
-                 FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+      <TextBlock Text="Central XML Fiscal · DANFE em lote"
+                 FontSize="22" FontWeight="SemiBold"
+                 Foreground="#252A34"/>
+      <TextBlock Text="Importe XMLs autorizados. Os DANFEs são gerados automaticamente e organizados em sequência. Os XMLs originais permanecem intactos."
+                 FontSize="12" Foreground="#737B87"
+                 TextWrapping="Wrap"/>
     </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="250,*" ColumnSpacing="10">
-      <Border Grid.Column="0" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="8" Padding="10">
+    <Grid Grid.Row="1"
+          ColumnDefinitions="245,175,*"
+          ColumnSpacing="9">
+
+      <!-- Lista de NF-e -->
+      <Border Grid.Column="0"
+              Background="White"
+              BorderBrush="#E0E3E8"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="9">
+
         <Grid RowDefinitions="Auto,*,Auto">
-          <StackPanel Grid.Row="0" Spacing="6">
-            <Button Content="Adicionar XMLs" Click="AddXml_Click" Background="#6741B8" Foreground="White" Padding="10,8"/>
-            <TextBlock x:Name="CountText" Text="Nenhum XML adicionado" FontSize="11" Foreground="#737B87"/>
+          <StackPanel Grid.Row="0" Spacing="7">
+            <Button Content="＋ Adicionar XMLs"
+                    Click="AddXml_Click"
+                    Padding="10,9"
+                    Background="#6741B8"
+                    Foreground="White"/>
+            <TextBlock x:Name="CountText"
+                       Text="Nenhuma NF-e importada"
+                       FontSize="11"
+                       Foreground="#737B87"/>
+
+            <TextBlock Text="AGRUPAR EMPRESAS POR"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="#555D69"
+                       Margin="0,5,0,0"/>
+
+            <ComboBox x:Name="GroupingModeCombo"
+                      SelectedIndex="0"
+                      Padding="7,5">
+              <ComboBoxItem Content="Destinatário"/>
+              <ComboBoxItem Content="Emitente"/>
+            </ComboBox>
+
+            <Button Content="Exportar todas as empresas (ZIP)"
+                    Click="ExportZip_Click"
+                    Padding="8,7"
+                    Background="#6741B8"
+                    Foreground="White"/>
+
+            <Button Content="Exportar empresa selecionada (ZIP)"
+                    Click="ExportSelectedCompanyZip_Click"
+                    Padding="8,7"
+                    Background="#E7E9ED"
+                    Foreground="#34383E"/>
           </StackPanel>
-          <ListBox x:Name="DocumentsList" Grid.Row="1" Margin="0,8,0,8"
+
+          <ListBox x:Name="DocumentsList"
+                   Grid.Row="1"
+                   Margin="0,8"
                    SelectionChanged="DocumentsList_SelectionChanged">
             <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="services:NfeDocumentSummary">
-                <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" FontSize="11"
-                           Foreground="#34383E" Margin="3,5"/>
+              <DataTemplate x:CompileBindings="False">
+                <TextBlock Text="{Binding DisplayName}"
+                           TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="#34383E"
+                           Margin="3,6"/>
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
+
           <StackPanel Grid.Row="2" Spacing="6">
-            <Button Content="Remover selecionado" Click="RemoveSelected_Click" Padding="8,7"
-                    Background="#E7E9ED" Foreground="#34383E"/>
-            <Button Content="Limpar lista" Click="ClearList_Click" Padding="8,7"
-                    Background="#F4E9E9" Foreground="#8A3D3D"/>
+            <Button Content="Remover selecionado"
+                    Click="RemoveSelected_Click"
+                    Padding="8,7"
+                    Background="#E7E9ED"
+                    Foreground="#34383E"/>
+            <Button Content="Limpar lista"
+                    Click="ClearList_Click"
+                    Padding="8,7"
+                    Background="#F4E9E9"
+                    Foreground="#8A3D3D"/>
           </StackPanel>
         </Grid>
       </Border>
 
-      <Border Grid.Column="1" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="8" Padding="14">
+      <!-- Miniaturas de todas as páginas -->
+      <Border Grid.Column="1"
+              Background="White"
+              BorderBrush="#E0E3E8"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="7">
+
         <Grid RowDefinitions="Auto,*">
-          <StackPanel Grid.Row="0" Spacing="3">
-            <TextBlock Text="Documento selecionado" FontSize="16" FontWeight="SemiBold" Foreground="#292D36"/>
-            <TextBlock x:Name="SelectionHint" Text="Selecione um XML na lista para conferir os dados."
-                       FontSize="11" Foreground="#737B87" TextWrapping="Wrap"/>
-            <Button Content="Gerar e exportar DANFE PDF" Click="ExportDanfe_Click"
-                    HorizontalAlignment="Left" Padding="12,7"
-                    Background="#6741B8" Foreground="White"/>
-          </StackPanel>
-          <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
-            <TextBlock x:Name="DetailsText" Text="Nenhum documento selecionado."
-                       FontSize="12" Foreground="#454B55" TextWrapping="Wrap" LineHeight="19"/>
+          <TextBlock Grid.Row="0"
+                     Text="PÁGINAS"
+                     FontSize="11"
+                     FontWeight="SemiBold"
+                     Foreground="#555D69"
+                     Margin="3,3,3,8"/>
+
+          <ScrollViewer Grid.Row="1"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="ThumbnailsPanel" Spacing="7"/>
           </ScrollViewer>
         </Grid>
       </Border>
+
+      <!-- Visualização contínua -->
+      <Border Grid.Column="2"
+              Background="White"
+              BorderBrush="#E0E3E8"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="10">
+
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+
+          <Grid Grid.Row="0"
+                ColumnDefinitions="*,Auto"
+                ColumnSpacing="8">
+
+            <StackPanel Grid.Column="0" Spacing="2">
+              <TextBlock Text="Pré-visualização contínua dos DANFEs"
+                         FontSize="15"
+                         FontWeight="SemiBold"
+                         Foreground="#292D36"/>
+              <TextBlock Text="Ctrl + roda do mouse para ajustar o zoom"
+                         FontSize="10"
+                         Foreground="#737B87"/>
+            </StackPanel>
+
+            <WrapPanel Grid.Column="1"
+                       Orientation="Horizontal"
+                       HorizontalAlignment="Right">
+
+              <Button Content="Exportar selecionado"
+                      Click="ExportDanfe_Click"
+                      Padding="9,7"
+                      Margin="2"
+                      Background="#E7E9ED"
+                      Foreground="#34383E"/>
+
+              <Button Content="Exportar todos em um PDF"
+                      Click="ExportAllDanfe_Click"
+                      Padding="9,7"
+                      Margin="2"
+                      Background="#6741B8"
+                      Foreground="White"/>
+            </WrapPanel>
+          </Grid>
+
+          <Border Grid.Row="1"
+                  Background="#E9EBEF"
+                  BorderBrush="#D9DDE4"
+                  BorderThickness="1"
+                  CornerRadius="5"
+                  Padding="8">
+
+            <ScrollViewer x:Name="DocumentScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          Background="#E9EBEF">
+
+              <StackPanel x:Name="PagesPanel"
+                          Spacing="14"
+                          HorizontalAlignment="Center"/>
+            </ScrollViewer>
+          </Border>
+
+          <Grid Grid.Row="2"
+                ColumnDefinitions="*,Auto"
+                ColumnSpacing="8">
+            <TextBlock x:Name="PageIndicator"
+                       Grid.Column="0"
+                       Text="Nenhuma página gerada"
+                       FontSize="11"
+                       Foreground="#737B87"
+                       VerticalAlignment="Center"/>
+
+            <Button Grid.Column="1"
+                    Content="Fechar"
+                    Click="Close_Click"
+                    Padding="14,7"
+                    Background="#E2E5EA"
+                    Foreground="#34383E"/>
+          </Grid>
+        </Grid>
+      </Border>
     </Grid>
 
-    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
-      <TextBlock x:Name="StatusText" Text="Aguardando XML de NF-e." FontSize="10"
-                 Foreground="#666D78" VerticalAlignment="Center" TextWrapping="Wrap"/>
-      <Button Grid.Column="1" Content="Fechar" Click="Close_Click" Padding="16,7"
-              Background="#E2E5EA" Foreground="#34383E"/>
-    </Grid>
+    <TextBlock x:Name="StatusText"
+               Grid.Row="2"
+               Margin="0,9,0,0"
+               Text="Aguardando XML de NF-e."
+               FontSize="10"
+               Foreground="#666D78"
+               TextWrapping="Wrap"/>
   </Grid>
 </Window>
