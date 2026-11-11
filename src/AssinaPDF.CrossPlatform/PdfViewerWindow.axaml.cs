@@ -19,7 +19,8 @@ public partial class PdfViewerWindow : Window
     private readonly Func<Task<string?>> _editAction;
     private PdfiumDocument? _document;
     private readonly List<WriteableBitmap> _thumbnails = new();
-    private WriteableBitmap? _pageBitmap;
+    private readonly List<WriteableBitmap> _pageBitmaps = new();
+    private readonly List<Border> _pageSurfaces = new();
     private int _pageIndex;
     private double _zoom = 1.0;
     private bool _loading;
@@ -54,7 +55,7 @@ public partial class PdfViewerWindow : Window
             {
                 for (int i = 0; i < newDocument.PageCount; i++)
                 {
-                    var rendered = newDocument.RenderPage(i, 0.28f);
+                    var rendered = newDocument.RenderPage(i, 0.22f);
                     newThumbnails.Add(CreateBitmap(rendered));
                 }
 
@@ -65,8 +66,8 @@ public partial class PdfViewerWindow : Window
                 _document = newDocument;
                 _pageIndex = 0;
                 BuildThumbnails();
-                RenderCurrentPage();
-                ViewerStatusText.Text = $"Documento carregado. {newDocument.PageCount} página(s). Use Ctrl + roda do mouse para ajustar o zoom.";
+                BuildContinuousPages();
+                ViewerStatusText.Text = $"Documento carregado. {newDocument.PageCount} página(s). Role o mouse para navegar entre as páginas.";
             }
             catch
             {
@@ -88,74 +89,125 @@ public partial class PdfViewerWindow : Window
         for (int i = 0; i < _thumbnails.Count; i++)
         {
             int index = i;
-            var image = new Image
-            {
-                Source = _thumbnails[i],
-                Width = 128,
-                Height = 164,
-                Stretch = Stretch.Uniform,
-                IsHitTestVisible = false
-            };
             var content = new StackPanel { Spacing = 4 };
-            content.Children.Add(image);
+            content.Children.Add(new Image
+            {
+                Source = _thumbnails[i], Width = 128, Height = 164,
+                Stretch = Stretch.Uniform, IsHitTestVisible = false
+            });
             content.Children.Add(new TextBlock
             {
-                Text = $"Página {i + 1}",
-                FontSize = 11,
+                Text = $"Página {i + 1}", FontSize = 11,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                 Foreground = new SolidColorBrush(Color.FromRgb(65, 70, 78))
             });
             var button = new Button
             {
-                Content = content,
-                Padding = new Thickness(5),
+                Content = content, Padding = new Thickness(5),
                 Background = i == _pageIndex ? new SolidColorBrush(Color.FromRgb(224, 232, 245)) : Brushes.White,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(190, 197, 207)),
                 BorderThickness = new Thickness(i == _pageIndex ? 2 : 1),
-                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
-                Tag = index
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
             };
             button.Click += (_, _) => SelectPage(index);
             ThumbnailsPanel.Children.Add(button);
         }
     }
 
+    private void BuildContinuousPages()
+    {
+        PagesPanel.Children.Clear();
+        foreach (var bitmap in _pageBitmaps) bitmap.Dispose();
+        _pageBitmaps.Clear();
+        _pageSurfaces.Clear();
+        if (_document == null) return;
+
+        for (int i = 0; i < _document.PageCount; i++)
+        {
+            // Renderização moderada para manter o consumo de memória mais previsível.
+            var bitmap = CreateBitmap(_document.RenderPage(i, 0.85f));
+            _pageBitmaps.Add(bitmap);
+            var image = new Image
+            {
+                Source = bitmap, Stretch = Stretch.Uniform,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+            };
+            var surface = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(197, 201, 208)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(10),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                Child = image
+            };
+            _pageSurfaces.Add(surface);
+            PagesPanel.Children.Add(surface);
+        }
+        ApplyZoomToPages();
+        PageCounterText.Text = $"Página 1 de {_document.PageCount}";
+    }
+
     private void SelectPage(int index)
     {
         if (_document == null || index < 0 || index >= _document.PageCount) return;
         _pageIndex = index;
-        RenderCurrentPage();
-        BuildThumbnails();
+        double y = 0;
+        for (int i = 0; i < index; i++)
+            y += _pageSurfaces[i].Bounds.Height + PagesPanel.Spacing;
+        PageScrollViewer.Offset = new Vector(PageScrollViewer.Offset.X, y);
+        UpdatePageSelection();
     }
 
-    private void RenderCurrentPage()
+    private void ApplyZoomToPages()
     {
-        if (_document == null) return;
-        try
+        for (int i = 0; i < _pageBitmaps.Count; i++)
         {
-            _pageBitmap?.Dispose();
-            var rendered = _document.RenderPage(_pageIndex, 1.25f);
-            _pageBitmap = CreateBitmap(rendered);
-            PageImage.Source = _pageBitmap;
-            PageImage.Width = Math.Max(1, _pageBitmap.PixelSize.Width * _zoom);
-            PageImage.Height = Math.Max(1, _pageBitmap.PixelSize.Height * _zoom);
-            PageCounterText.Text = $"Página {_pageIndex + 1} de {_document.PageCount}";
-            ZoomText.Text = $"{_zoom:P0}";
-            ViewerStatusText.Text = $"Página {_pageIndex + 1} de {_document.PageCount} · Ctrl + roda do mouse para zoom";
+            if (_pageSurfaces[i].Child is Image image)
+            {
+                image.Width = Math.Max(1, _pageBitmaps[i].PixelSize.Width * _zoom);
+                image.Height = Math.Max(1, _pageBitmaps[i].PixelSize.Height * _zoom);
+            }
         }
-        catch (Exception ex)
+        ZoomText.Text = $"{_zoom:P0}";
+    }
+
+    private void UpdateCurrentPageFromScroll()
+    {
+        if (_document == null || _pageSurfaces.Count == 0) return;
+        double viewportCenter = PageScrollViewer.Offset.Y + PageScrollViewer.Bounds.Height / 2;
+        double accumulated = 0;
+        int visiblePage = 0;
+        for (int i = 0; i < _pageSurfaces.Count; i++)
         {
-            ViewerStatusText.Text = $"Falha ao renderizar a página: {ex.Message}";
+            double height = _pageSurfaces[i].Bounds.Height + PagesPanel.Spacing;
+            if (viewportCenter < accumulated + height / 2)
+            {
+                visiblePage = i;
+                break;
+            }
+            accumulated += height;
+            visiblePage = i;
         }
+        if (visiblePage != _pageIndex)
+        {
+            _pageIndex = visiblePage;
+            UpdatePageSelection();
+        }
+        PageCounterText.Text = $"Página {_pageIndex + 1} de {_document.PageCount}";
+    }
+
+    private void UpdatePageSelection()
+    {
+        PageCounterText.Text = $"Página {_pageIndex + 1} de {_document?.PageCount ?? 0}";
+        BuildThumbnails();
     }
 
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
     {
         var bitmap = new WriteableBitmap(
-            new PixelSize(page.Width, page.Height),
-            new Vector(96, 96),
-            PixelFormat.Bgra8888,
-            AlphaFormat.Unpremul);
+            new PixelSize(page.Width, page.Height), new Vector(96, 96),
+            PixelFormat.Bgra8888, AlphaFormat.Unpremul);
         try
         {
             using var framebuffer = bitmap.Lock();
@@ -167,41 +219,28 @@ public partial class PdfViewerWindow : Window
             }
             return bitmap;
         }
-        catch
-        {
-            bitmap.Dispose();
-            throw;
-        }
+        catch { bitmap.Dispose(); throw; }
     }
 
     private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SetZoom(_zoom * 1.2);
     private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => SetZoom(_zoom / 1.2);
     private void FitWidth_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_pageBitmap == null) return;
+        if (_pageBitmaps.Count == 0) return;
         double availableWidth = Math.Max(200, PageScrollViewer.Bounds.Width - 56);
-        SetZoom(availableWidth / _pageBitmap.PixelSize.Width);
+        SetZoom(availableWidth / _pageBitmaps[Math.Clamp(_pageIndex, 0, _pageBitmaps.Count - 1)].PixelSize.Width);
     }
 
     private void SetZoom(double value)
     {
-        _zoom = Math.Clamp(value, 0.35, 4.0);
-        RenderCurrentPage();
+        _zoom = Math.Clamp(value, 0.25, 2.5);
+        ApplyZoomToPages();
     }
 
     private void PageScrollViewer_ScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
         if (_document == null || _loading || PageScrollViewer.Extent.Height <= 0) return;
-        // Continuous scroll navigation: estimate current page from vertical scroll position.
-        int index = (int)Math.Round(
-            PageScrollViewer.Offset.Y / Math.Max(1, PageScrollViewer.Extent.Height) * _document.PageCount);
-        index = Math.Clamp(index, 0, _document.PageCount - 1);
-        if (index != _pageIndex)
-        {
-            _pageIndex = index;
-            RenderCurrentPage();
-            BuildThumbnails();
-        }
+        UpdateCurrentPageFromScroll();
     }
 
     private void PageScrollViewer_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
@@ -233,10 +272,7 @@ public partial class PdfViewerWindow : Window
                 LoadDocument(editedPath);
             }
         }
-        catch (Exception ex)
-        {
-            ViewerStatusText.Text = $"Não foi possível abrir o editor: {ex.Message}";
-        }
+        catch (Exception ex) { ViewerStatusText.Text = $"Não foi possível abrir o editor: {ex.Message}"; }
     }
 
     private void CloseViewer_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
@@ -245,9 +281,10 @@ public partial class PdfViewerWindow : Window
     {
         _document?.Dispose();
         _document = null;
-        _pageBitmap?.Dispose();
-        _pageBitmap = null;
+        foreach (var bitmap in _pageBitmaps) bitmap.Dispose();
+        _pageBitmaps.Clear();
         foreach (var bitmap in _thumbnails) bitmap.Dispose();
         _thumbnails.Clear();
+        _pageSurfaces.Clear();
     }
 }
