@@ -18,7 +18,6 @@ public partial class BatchPdfPositioningControl : UserControl
     private PdfiumDocument? _document;
     private string? _currentPath;
     private readonly List<SignaturePlacement> _placements = new();
-    private readonly Dictionary<int, Bitmap> _thumbnailCache = new();
     private WriteableBitmap? _bitmap;
     private int _pageIndex;
     private float _pageWidthPoints;
@@ -60,14 +59,14 @@ public partial class BatchPdfPositioningControl : UserControl
             PageIndicator.Text = "Página —";
             PdfPageImage.Source = null;
             MarkerCanvas.Children.Clear();
-            ThumbnailsPanel.Children.Clear();
+            PreviousPageButton.IsEnabled = false;
+            NextPageButton.IsEnabled = false;
             return;
         }
 
         try
         {
             _document = new PdfiumDocument(path);
-            BuildThumbnails();
             ShowPage(0);
             PreviewStatusText.Text = "Clique e arraste sobre o PDF para criar uma área de assinatura. As posições ficam salvas neste documento.";
         }
@@ -81,8 +80,6 @@ public partial class BatchPdfPositioningControl : UserControl
     {
         _bitmap?.Dispose();
         _bitmap = null;
-        foreach (var image in _thumbnailCache.Values) image.Dispose();
-        _thumbnailCache.Clear();
         _document?.Dispose();
         _document = null;
     }
@@ -101,34 +98,6 @@ public partial class BatchPdfPositioningControl : UserControl
             return bitmap;
         }
         catch { bitmap.Dispose(); throw; }
-    }
-
-    private void BuildThumbnails()
-    {
-        if (_document == null) return;
-        ThumbnailsPanel.Children.Clear();
-        for (int i = 0; i < _document.PageCount; i++)
-        {
-            int page = i;
-            var button = new Button { Padding = new Thickness(3), Background = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(205,205,215)),
-                BorderThickness = new Thickness(1) };
-            var stack = new StackPanel { Spacing = 3 };
-            var image = new Image { Height = 92, Stretch = Stretch.Uniform };
-            var label = new TextBlock { Text = $"Pág. {i+1}", FontSize = 10,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center };
-            stack.Children.Add(image); stack.Children.Add(label); button.Content = stack;
-            button.Click += (_, _) => ShowPage(page);
-            ThumbnailsPanel.Children.Add(button);
-            try
-            {
-                var thumb = CreateBitmap(_document.RenderPage(i, 0.18f));
-                _thumbnailCache[i] = thumb;
-                image.Source = thumb;
-            }
-            catch { label.Text = $"Pág. {i+1}"; }
-        }
-        UpdateThumbnailSelection();
     }
 
     private void ShowPage(int index)
@@ -153,23 +122,12 @@ public partial class BatchPdfPositioningControl : UserControl
             PdfScrollViewer.Offset = new Vector(0,0);
             previous?.Dispose();
             RefreshMarkers();
-            UpdateThumbnailSelection();
-            PageIndicator.Text = $"Página {index+1} de {_document.PageCount}";
+            PageIndicator.Text = $"{index + 1}/{_document.PageCount}";
+            PreviousPageButton.IsEnabled = index > 0;
+            NextPageButton.IsEnabled = index < _document.PageCount - 1;
             ZoomText.Text = $"{_zoom:P0}";
         }
         catch (Exception ex) { PreviewStatusText.Text = "Erro ao renderizar página: " + ex.Message; }
-    }
-
-    private void UpdateThumbnailSelection()
-    {
-        for (int i=0; i<ThumbnailsPanel.Children.Count; i++)
-            if (ThumbnailsPanel.Children[i] is Button b)
-            {
-                bool selected = i == _pageIndex;
-                b.BorderBrush = selected ? new SolidColorBrush(Color.FromRgb(103,65,184))
-                    : new SolidColorBrush(Color.FromRgb(205,205,215));
-                b.BorderThickness = selected ? new Thickness(2) : new Thickness(1);
-            }
     }
 
     private void PdfPageSurface_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -257,6 +215,12 @@ public partial class BatchPdfPositioningControl : UserControl
         PlacementsChanged?.Invoke(Array.Empty<SignaturePlacement>());
         PreviewStatusText.Text = "Todas as posições deste PDF foram removidas.";
     }
+
+    private void PreviousPage_Click(object? s, Avalonia.Interactivity.RoutedEventArgs e)
+    { if (_pageIndex > 0) ShowPage(_pageIndex - 1); }
+
+    private void NextPage_Click(object? s, Avalonia.Interactivity.RoutedEventArgs e)
+    { if (_document != null && _pageIndex < _document.PageCount - 1) ShowPage(_pageIndex + 1); }
 
     private void ZoomIn_Click(object? s, Avalonia.Interactivity.RoutedEventArgs e)
     { _zoom=Math.Min(2.5,_zoom+0.15); ShowPage(_pageIndex); }
