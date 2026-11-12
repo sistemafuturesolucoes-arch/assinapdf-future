@@ -138,8 +138,8 @@ internal static class Type3EncodingGlyphInspector
         Console.WriteLine($"  Operação de texto: tipo={operation.GetType().FullName}; Bytes tipo={bytesProperty?.GetType().FullName ?? "(null)"}; Bytes valor={bytesProperty ?? "(null)"}");
         byte[] selectedBytes = bytesProperty switch
         {
-            ReadOnlyMemory<byte> memory => memory.ToArray(),
-            Memory<byte> memory => memory.ToArray(),
+            ReadOnlyMemory<byte> readOnlyMemory => readOnlyMemory.ToArray(),
+            Memory<byte> writableMemory => writableMemory.ToArray(),
             byte[] array => array,
             _ => Array.Empty<byte>()
         };
