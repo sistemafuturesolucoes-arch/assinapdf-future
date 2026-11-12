@@ -6,82 +6,95 @@ internal static class PdfFontReflectionInspector
 {
     public static void Run(PdfDocument document)
     {
-        Console.WriteLine("INSPEÇÃO DE ESTRUTURAS DE FONTE (reflection; somente leitura)");
+        Console.WriteLine("INSPEÇÃO DOS DICIONÁRIOS PDF DAS FONTES (somente leitura)");
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var pageNumber in Enumerable.Range(1, document.NumberOfPages))
         {
             var page = document.GetPage(pageNumber);
             foreach (var letter in page.Letters)
             {
-                string key = letter.FontName + "|" + letter.Font.GetType().AssemblyQualifiedName;
-                if (!seen.Add(key)) continue;
-                object font = letter.Font;
-                Console.WriteLine($"  FONTE: nome={letter.FontName}; letraExemplo='{Escape(letter.Value)}'; tipo={font.GetType().FullName}");
-                DumpMembers(font, "    ", 0);
+                var reference = letter.Font.FontDictionaryReference;
+                string id = reference.ObjectNumber.ToString();
+                if (!seen.Add(id)) continue;
+                Console.WriteLine($"  FONTE: {letter.FontName}; objeto={id} 0");
+                try
+                {
+                    var getObject = document.Structure.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                        .First(m => m.Name == "GetObject" && m.GetParameters().Length == 1 &&
+                                    m.GetParameters()[0].ParameterType.IsInstanceOfType(reference));
+                    object? objectToken = getObject.Invoke(document.Structure, new object[] { reference });
+                    if (objectToken is null) { Console.WriteLine("    objeto não resolvido"); continue; }
+                    object? dictionary = objectToken.GetType().GetProperty("Data")?.GetValue(objectToken);
+                    if (dictionary is null) { Console.WriteLine($"    token sem Data: {objectToken.GetType().Name}"); continue; }
+                    DumpDictionary(dictionary, document, "    ", 0, new HashSet<string>());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"    falha ao inspecionar objeto: {ex.GetType().Name}: {ex.Message}");
+                }
             }
         }
-        Console.WriteLine($"  Tipos de fonte inspecionados: {seen.Count}");
-        Console.WriteLine("  Limite: inspeção de metadados/API em memória; não altera nem salva PDF.");
+        Console.WriteLine($"  Dicionários de fonte inspecionados: {seen.Count}");
+        Console.WriteLine("  Limite: leitura de objetos/dicionários; nenhum conteúdo é alterado ou salvo.");
         Console.WriteLine();
     }
 
-    private static void DumpMembers(object instance, string indent, int depth)
+    private static void DumpDictionary(object dictionary, PdfDocument document, string indent, int depth, HashSet<string> visited)
     {
-        Type type = instance.GetType();
-        foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                     .Where(p => p.GetIndexParameters().Length == 0).OrderBy(p => p.Name))
+        if (depth > 4) return;
+        object? data = dictionary.GetType().GetProperty("Data")?.GetValue(dictionary) ?? dictionary;
+        if (data is not IEnumerable entries) { Console.WriteLine($"{indent}dicionário não enumerável: {dictionary.GetType().Name}"); return; }
+        foreach (object? entry in entries)
         {
-            object? value;
-            try { value = property.GetValue(instance); }
-            catch (Exception ex) { Console.WriteLine($"{indent}{property.Name}: <getter {ex.GetType().Name}>"); continue; }
-            PrintValue(property.Name, property.PropertyType, value, indent, depth);
+            if (entry is null) continue;
+            Type et = entry.GetType();
+            object? key = et.GetProperty("Key")?.GetValue(entry);
+            object? value = et.GetProperty("Value")?.GetValue(entry);
+            if (key is null || value is null) continue;
+            string keyText = key.ToString() ?? "?";
+            string type = value.GetType().Name;
+            Console.WriteLine($"{indent}{keyText}: {type}");
+            if (type == "IndirectReferenceToken")
+            {
+                object? reference = value.GetType().GetProperty("Data")?.GetValue(value);
+                if (reference is null) continue;
+                string refId = reference.GetType().GetProperty("ObjectNumber")?.GetValue(reference)?.ToString() ?? reference.ToString() ?? "?";
+                if (!visited.Add(refId)) { Console.WriteLine($"{indent}  referência já visitada: {refId}"); continue; }
+                try
+                {
+                    var method = document.Structure.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                        .First(m => m.Name == "GetObject" && m.GetParameters().Length == 1 &&
+                                    m.GetParameters()[0].ParameterType.IsInstanceOfType(reference));
+                    object? resolved = method.Invoke(document.Structure, new[] { reference });
+                    object? resolvedData = resolved?.GetType().GetProperty("Data")?.GetValue(resolved);
+                    if (resolvedData is not null && resolvedData.GetType().Name.Contains("Dictionary"))
+                        DumpDictionary(resolvedData, document, indent + "  ", depth + 1, visited);
+                    else if (resolvedData is not null)
+                        Console.WriteLine($"{indent}  resolvido como {resolvedData.GetType().Name}");
+                }
+                catch (Exception ex) { Console.WriteLine($"{indent}  falha ao resolver: {ex.GetType().Name}"); }
+            }
+            else if (type.Contains("Dictionary"))
+                DumpDictionary(value, document, indent + "  ", depth + 1, visited);
+            else if (type == "ArrayToken")
+                DumpArray(value, document, indent + "  ", depth + 1, visited);
         }
-
-        foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                     .OrderBy(f => f.Name))
-        {
-            object? value;
-            try { value = field.GetValue(instance); }
-            catch { continue; }
-            PrintValue("campo:" + field.Name, field.FieldType, value, indent, depth);
-        }
-
-        var methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Where(m => !m.IsSpecialName && (m.Name.Contains("Unicode", StringComparison.OrdinalIgnoreCase) ||
-                m.Name.Contains("Code", StringComparison.OrdinalIgnoreCase) ||
-                m.Name.Contains("Glyph", StringComparison.OrdinalIgnoreCase) ||
-                m.Name.Contains("Encoding", StringComparison.OrdinalIgnoreCase) ||
-                m.Name.Contains("Character", StringComparison.OrdinalIgnoreCase) ||
-                m.Name.Contains("Font", StringComparison.OrdinalIgnoreCase)))
-            .Select(m => m.Name + "(" + string.Join(", ", m.GetParameters().Select(p => p.ParameterType.Name)) + "):" + m.ReturnType.Name)
-            .Distinct().Take(40).ToArray();
-        foreach (string method in methods) Console.WriteLine($"{indent}API: {method}");
     }
 
-    private static void PrintValue(string name, Type declaredType, object? value, string indent, int depth)
+    private static void DumpArray(object token, PdfDocument document, string indent, int depth, HashSet<string> visited)
     {
-        if (value is null) { Console.WriteLine($"{indent}{name}: null ({declaredType.Name})"); return; }
-        if (value is string s) { Console.WriteLine($"{indent}{name}: \"{Escape(s)}\""); return; }
-        if (value.GetType().IsPrimitive || value is decimal || value is Enum)
-        { Console.WriteLine($"{indent}{name}: {value} ({declaredType.Name})"); return; }
-        if (value is IDictionary dictionary)
-        { Console.WriteLine($"{indent}{name}: {value.GetType().Name}, itens={dictionary.Count}"); return; }
-        if (value is IEnumerable enumerable && value is not string)
+        if (depth > 4) return;
+        object? data = token.GetType().GetProperty("Data")?.GetValue(token);
+        if (data is not IEnumerable values) return;
+        int index = 0;
+        foreach (object? value in values)
         {
-            int count = 0;
-            foreach (var _ in enumerable) { count++; if (count >= 1000) break; }
-            Console.WriteLine($"{indent}{name}: {value.GetType().Name}, itens~={count}");
-            return;
+            if (value is null) continue;
+            Console.WriteLine($"{indent}[{index++}]: {value.GetType().Name} {Preview(value.ToString() ?? "", 100)}");
+            if (value.GetType().Name.Contains("Dictionary"))
+                DumpDictionary(value, document, indent + "  ", depth + 1, visited);
         }
-        Console.WriteLine($"{indent}{name}: objeto {value.GetType().FullName}");
-        if (depth == 0 && (name.Contains("Encoding", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("CMap", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("Unicode", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("Dictionary", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("Font", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("Program", StringComparison.OrdinalIgnoreCase)))
-            DumpMembers(value, indent + "  ", depth + 1);
     }
 
-    private static string Escape(string value) => value.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\"", "\\\"");
+    private static string Preview(string value, int max) => value.Length <= max ? value : value[..max] + "…";
 }
