@@ -1920,6 +1920,7 @@ public partial class EditorWindow : Window
 
                     if (target == null || closest > 8.0)
                     {
+                        target = null!;
                         // A seleção pode reunir vários TextFragments (por exemplo,
                         // uma linha com estilos diferentes). Só reconstruímos o trecho
                         // quando os fragmentos inteiramente contidos na seleção,
@@ -1953,11 +1954,7 @@ public partial class EditorWindow : Window
                         }
                     }
 
-                    if (target == null || closest > 8.0 &&
-                        !string.Equals(
-                            NormalizePdfText(target.Text),
-                            NormalizePdfText(originalText),
-                            StringComparison.Ordinal))
+                    if (target == null)
                     {
                         const double selectionTolerance = 2.0;
                         var selectedFragments = pageAbsorber.TextFragments
