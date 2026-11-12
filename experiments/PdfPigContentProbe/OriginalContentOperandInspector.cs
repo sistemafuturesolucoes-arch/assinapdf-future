@@ -45,7 +45,7 @@ internal static class OriginalContentOperandInspector
                     totalFound++;
                     locatedForPage.Add((item with { RawHex = Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), ContextHex = GetContextHex(bytes, item.Start, item.End) }, id));
                     if (samples.Count < 40)
-                         samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes), Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), GetContext(bytes, item.Start)));
+                         samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes), Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), GetContextHex(bytes, item.Start, item.End)));
                 }
                 totalParsed++;
             }
