@@ -105,7 +105,36 @@ Run("overlapping byte removals are rejected", () =>
     Assert(rejected, "Overlapping encoded ranges must fail closed.");
 });
 
-Console.WriteLine($"PDF glyph lab: {passed}/8 checks passed.");
+
+Run("tokenizer identifies Tj literal string operand", () =>
+{
+    const string content = "BT /F1 12 Tf 10 20 Td (A\\\\(B\\\\)C) Tj ET";
+    var tokens = PdfContentTokenizer.Tokenize(content);
+    var literal = tokens.Single(x => x.Kind == PdfContentTokenKind.LiteralString);
+    Assert(literal.Raw == "(A\\\\(B\\\\)C)" && tokens.Any(x => x.Raw == "Tj"),
+        "Literal string escapes and Tj operator boundary must be retained.");
+});
+
+Run("tokenizer identifies TJ array and hex strings", () =>
+{
+    const string content = "[<0041> -120 (B)] TJ";
+    var tokens = PdfContentTokenizer.Tokenize(content);
+    Assert(tokens[0].Kind == PdfContentTokenKind.ArrayStart &&
+        tokens.Any(x => x.Kind == PdfContentTokenKind.HexString && x.Raw == "<0041>") &&
+        tokens.Any(x => x.Kind == PdfContentTokenKind.ArrayEnd) &&
+        tokens.Any(x => x.Raw == "TJ"),
+        "TJ arrays must retain hex/literal strings and numeric adjustments.");
+});
+
+Run("tokenizer rejects unterminated strings", () =>
+{
+    bool rejected = false;
+    try { PdfContentTokenizer.Tokenize("(broken Tj"); }
+    catch (FormatException) { rejected = true; }
+    Assert(rejected, "Malformed PDF literal strings must fail closed.");
+});
+
+Console.WriteLine($"PDF glyph lab: {passed}/11 checks passed.");
 
 void Run(string name, Action test)
 {
