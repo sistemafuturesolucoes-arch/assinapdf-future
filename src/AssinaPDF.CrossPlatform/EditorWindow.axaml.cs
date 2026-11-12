@@ -490,7 +490,7 @@ public partial class EditorWindow : Window
                                 {
                                     Source = bitmap,
                                     Stretch = Avalonia.Media.Stretch.Uniform,
-                                    Tag = new PagePreviewInfo(i, rendered.PageWidthPoints, rendered.PageHeightPoints, rendered.PageRotation)
+                                    Tag = new PagePreviewInfo(i, rendered.OriginalPageWidthPoints, rendered.OriginalPageHeightPoints, rendered.PageRotation)
                                 },
                                 new Canvas
                                 {
