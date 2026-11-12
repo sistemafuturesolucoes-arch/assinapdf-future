@@ -7,7 +7,7 @@ This project is intentionally isolated from `src/AssinaPDF.CrossPlatform` and is
 - Mapping a drag rectangle to individual PDFium glyph boxes.
 - Selecting a phrase even when its characters are represented by separate text runs.
 - Avoiding adjacent glyphs when the selection only touches a small portion of them.
-- Stable ordering by PDFium character index.
+- Stable ordering by PDFium character index.\n- Explicit glyph-to-source provenance (content stream, operator, string operand, encoded byte span, and font resource).\n- Adjacent encoded bytes are grouped only when they belong to the same source operand.\n- Missing, ambiguous, invalid, or overlapping source mappings fail closed.
 
 Run from the repository root:
 
@@ -15,16 +15,16 @@ Run from the repository root:
 dotnet run --project experiments/PdfGlyphEditLab/PdfGlyphEditLab.csproj
 ```
 
-Expected result: `PDF glyph lab: 3/3 checks passed.`
+Expected result: `PDF glyph lab: 5/5 checks passed.`
 
 ## Explicit limitation
 
-This is only the geometry/selection stage. It does **not** yet remove or replace glyphs in a PDF content stream, preserve font encodings, rewrite `Tj/TJ` operators, or save a modified PDF. A passing result here is not proof of PDF editing correctness.
+This is still a model/provenance stage. The source mapper consumes explicit byte spans supplied by a future PDF content interpreter; it does **not** parse a PDF, discover the operator behind a PDFium glyph, rewrite `Tj/TJ`, preserve font encodings, or save a modified PDF. A passing result is not proof of PDF editing correctness.
 
 ## Next acceptance gates
 
 1. Adapter from the existing PDFium character inspection to `GlyphBox`, preserving page and character indices.
-2. Map selected glyphs to their actual PDF content operators and font resources. Do not infer operator membership from visual adjacency alone.
+2. Connect a real content-stream interpreter to this provenance model and prove its character-to-byte mapping for simple and composite fonts. Do not infer operator membership from visual adjacency alone.
 3. Remove selected glyphs while retaining all unselected glyphs, text positioning, kerning, and graphics state.
 4. Test embedded TrueType/OpenType, CID/Type0, Type3, ligatures, rotated text, vertical writing, clipping, and transformed content streams.
 5. Save, reopen, re-render, and re-extract text. Confirm unselected text and artwork are unchanged.
