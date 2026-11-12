@@ -1716,11 +1716,13 @@ public partial class EditorWindow : Window
                 annotation.Color = Aspose.Pdf.Color.FromRgb(0.42, 0.29, 0.75);
                 annotation.InteriorColor = Aspose.Pdf.Color.FromRgb(0.88, 0.84, 0.96);
                 annotation.Opacity = 0.22;
+                annotation.Flags = Aspose.Pdf.Annotations.AnnotationFlags.Print;
                 page.Annotations.Add(annotation);
                 annotation.UpdateAppearances();
             }, isEllipse ? "Elipse inserida no PDF." : "Retângulo inserido no PDF.", savedDocument =>
             {
                 return savedDocument.Pages[pageInfo.PageIndex + 1].Annotations
+                    .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
                     .Any(annotation => string.Equals(
                         annotation.Name, annotationName, StringComparison.Ordinal));
             });
@@ -1754,7 +1756,7 @@ public partial class EditorWindow : Window
                 {
                     new FilePickerFileType("Imagens")
                     {
-                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp" }
+                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg" }
                     }
                 }
             });
