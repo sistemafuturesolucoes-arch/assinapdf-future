@@ -143,6 +143,13 @@ internal static class Type3EncodingGlyphInspector
             Console.WriteLine($"  Operando original associado à seleção: {Convert.ToHexString(memory.Span)}");
         Console.WriteLine("  FontMatrix: " + Value(fontDictionary, "FontMatrix"));
         Console.WriteLine("  FontBBox: " + Value(fontDictionary, "FontBBox"));
+        Console.WriteLine("  Geometria da letra selecionada: " + DescribeGeometry(selected));
+        var sameFontB = document.GetPages().SelectMany(x => x.Letters)
+            .Where(x => string.Equals(x.FontName, selected.FontName, StringComparison.Ordinal) && x.Value == "B")
+            .Take(5).ToArray();
+        Console.WriteLine($"  Amostras de 'B' extraídas na mesma fonte: {sameFontB.Length}");
+        foreach (var sample in sameFontB)
+            Console.WriteLine("    " + DescribeGeometry(sample));
         Console.WriteLine("  Conclusão: presença de nome/código e CharProc é evidência estrutural; não prova equivalência visual nem autoriza reescrita.");
         Console.WriteLine();
     }
@@ -212,14 +219,44 @@ internal static class Type3EncodingGlyphInspector
 
     private static object? Resolve(PdfDocument document, object referenceOrToken)
     {
-        if (referenceOrToken.GetType().Name != "IndirectReferenceToken")
-            return referenceOrToken;
-        object? reference = Get(referenceOrToken, "Data");
-        if (reference is null) return null;
-        var method = document.Structure.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .First(m => m.Name == "GetObject" && m.GetParameters().Length == 1 &&
-                        m.GetParameters()[0].ParameterType.IsInstanceOfType(reference));
-        return method.Invoke(document.Structure, new[] { reference });
+        object current = referenceOrToken;
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        for (int depth = 0; depth < 16; depth++)
+        {
+            if (!visited.Add(current)) return null;
+            string type = current.GetType().Name;
+            if (type == "IndirectReferenceToken")
+            {
+                object? reference = Get(current, "Data");
+                if (reference is null) return null;
+                var method = document.Structure.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .First(m => m.Name == "GetObject" && m.GetParameters().Length == 1 &&
+                                m.GetParameters()[0].ParameterType.IsInstanceOfType(reference));
+                object? resolved = method.Invoke(document.Structure, new[] { reference });
+                if (resolved is null) return null;
+                current = resolved;
+                continue;
+            }
+            if (type == "ObjectToken")
+            {
+                object? inner = Get(current, "Data");
+                if (inner is null || ReferenceEquals(inner, current)) return null;
+                current = inner;
+                continue;
+            }
+            return current;
+        }
+        return null;
+    }
+
+    private static string DescribeGeometry(Letter letter)
+    {
+        string rectangle = Get(letter, "GlyphRectangle")?.ToString() ?? "(GlyphRectangle indisponível)";
+        string width = Get(letter, "Width")?.ToString() ?? "(Width indisponível)";
+        string height = Get(letter, "Height")?.ToString() ?? "(Height indisponível)";
+        string start = Get(letter, "StartBaseLine")?.ToString() ?? "(StartBaseLine indisponível)";
+        string end = Get(letter, "EndBaseLine")?.ToString() ?? "(EndBaseLine indisponível)";
+        return $"texto='{letter.Value}'; rectangle={rectangle}; width={width}; height={height}; baseline={start} -> {end}";
     }
 
     private static object? Get(object? instance, string property) =>
