@@ -14,6 +14,7 @@ public sealed class RenderedPdfPage
     public byte[] Pixels { get; }
     public float PageWidthPoints { get; }
     public float PageHeightPoints { get; }
+    public int PageRotation { get; }
 
     internal RenderedPdfPage(
         int width,
@@ -21,7 +22,8 @@ public sealed class RenderedPdfPage
         int stride,
         byte[] pixels,
         float pageWidthPoints,
-        float pageHeightPoints)
+        float pageHeightPoints,
+        int pageRotation)
     {
         Width = width;
         Height = height;
@@ -29,6 +31,7 @@ public sealed class RenderedPdfPage
         Pixels = pixels;
         PageWidthPoints = pageWidthPoints;
         PageHeightPoints = pageHeightPoints;
+        PageRotation = pageRotation;
     }
 }
 
@@ -183,8 +186,15 @@ public sealed class PdfiumDocument : IDisposable
                         "O PDF possui dimensões de página inválidas.");
                 }
 
-                double requestedWidth = pageWidth * scale;
-                double requestedHeight = pageHeight * scale;
+                int pageRotation = PdfiumNative.GetPageRotation(page);
+                if (pageRotation is < 0 or > 3)
+                    throw new InvalidDataException("O PDF contém um valor /Rotate inválido.");
+
+                bool quarterTurn = pageRotation is 1 or 3;
+                double displayWidthPoints = quarterTurn ? pageHeight : pageWidth;
+                double displayHeightPoints = quarterTurn ? pageWidth : pageHeight;
+                double requestedWidth = displayWidthPoints * scale;
+                double requestedHeight = displayHeightPoints * scale;
 
                 double dimensionScale = Math.Min(
                     1.0,
@@ -202,10 +212,10 @@ public sealed class PdfiumDocument : IDisposable
                     Math.Min(dimensionScale, pixelScale);
 
                 int width = Math.Max(
-                    1, (int)Math.Ceiling(pageWidth * finalScale));
+                    1, (int)Math.Ceiling(displayWidthPoints * finalScale));
 
                 int height = Math.Max(
-                    1, (int)Math.Ceiling(pageHeight * finalScale));
+                    1, (int)Math.Ceiling(displayHeightPoints * finalScale));
 
                 bitmap = PdfiumNative.BitmapCreateEx(
                     width,
@@ -236,7 +246,7 @@ public sealed class PdfiumDocument : IDisposable
                     0,
                     width,
                     height,
-                    0,
+                    pageRotation,
                     1);
 
                 // Widgets de formulários, incluindo campos de assinatura,
@@ -251,7 +261,7 @@ public sealed class PdfiumDocument : IDisposable
                         0,
                         width,
                         height,
-                        0,
+                        pageRotation,
                         1);
                 }
 
@@ -270,7 +280,7 @@ public sealed class PdfiumDocument : IDisposable
                     0,
                     pixels.Length);
 
-                return new RenderedPdfPage(width, height, stride, pixels, pageWidth, pageHeight);
+                return new RenderedPdfPage(width, height, stride, pixels, pageWidth, pageHeight, pageRotation);
             }
             finally
             {
