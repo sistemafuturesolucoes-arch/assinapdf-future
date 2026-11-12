@@ -40,4 +40,6 @@ The probe also inspects each page's `/Contents` entry through PdfPig's public do
 - Reports stream object number, stored/decoded lengths, filter pipeline, and visible `Tj`/`TJ` operator counts.
 - Uses Latin-1 only for diagnostic preview so each decoded byte remains represented by one character; it does not claim these preview characters are decoded PDF text.
 
-This is still read-only. It does not modify stream bytes, serialize a PDF, or establish a glyph-to-byte mapping. The next validation must correlate the parsed operands with exact string-token offsets in the decoded content stream, including multi-stream pages and `TJ` arrays.
+A second read-only pass tokenizes decoded content-stream bytes and locates literal/hex string operands immediately preceding `Tj`. It reports the operand's starting byte offset within the decoded stream, stream object number, operand length, and a small sample of bytes. It compares the number of located `Tj` operands with PdfPig's page-level `Tj` count. `TJ` arrays are deliberately not treated as single-string operands.
+
+Important: the reported offset is within the decoded stream, not the compressed bytes in the PDF file. This pass does not yet correlate each located operand with a specific `Letter`/glyph or prove that the byte sequence maps one-to-one to Unicode. Literal-string escapes are decoded for diagnostic byte values; unusual inline-image data and malformed content may still require separate handling. No stream bytes are modified, no PDF is serialized, and no file is saved.
