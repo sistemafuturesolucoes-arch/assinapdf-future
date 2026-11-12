@@ -8,6 +8,9 @@ From the repository root:
 
 ```powershell
 dotnet run --project experiments/PdfPigContentProbe/PdfPigContentProbe.csproj -c Release
+
+# Short report with only key diagnostic lines
+dotnet run --project experiments/PdfPigContentProbe/PdfPigContentProbe.csproj -c Release -- --summary
 ```
 
 The probe selects the latest existing working copy in the AssinaPDF edit history. To inspect a specific file:
@@ -130,3 +133,8 @@ Isso evita confundir fontes distintas que compartilham o mesmo nome exibido pelo
 
 
 A inspeção também lista candidatos Unicode `B` com sua referência de fonte e bytes de origem, explicitando se a referência coincide com a fonte selecionada. Para CharProcs decodificados, tenta extrair a métrica inicial Type3 (`wx wy d0/d1`), que representa o avanço declarado pelo programa. A ausência de candidato com referência idêntica permanece inconclusiva: não se deve inferir um código substituto a partir de outra fonte.
+
+
+## Resumo e identidade exata da fonte
+
+A opção `--summary` mantém a análise completa, mas imprime somente as linhas principais do relatório para facilitar o compartilhamento do resultado. A simulação de substituição agrupa códigos observados pela referência exata do objeto de fonte, não apenas pelo nome exibido da fonte. Se não houver um código substituto observado na mesma referência, a simulação é recusada. Essa verificação evita misturar códigos de fontes Type3 diferentes que compartilham o rótulo genérico "Type3". A simulação continua sendo somente em memória e não salva nem modifica o PDF.
