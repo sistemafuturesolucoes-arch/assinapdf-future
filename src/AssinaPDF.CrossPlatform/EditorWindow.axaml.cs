@@ -1712,6 +1712,7 @@ public partial class EditorWindow : Window
             : "AssinaPDF Editor Rectangle";
         try
         {
+            SelectMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
             ApplyPdfEdit(document =>
             {
                 var page = document.Pages[pageInfo.PageIndex + 1];
@@ -1738,7 +1739,6 @@ public partial class EditorWindow : Window
                     .Any(annotation => string.Equals(
                         annotation.Name, annotationName, StringComparison.Ordinal));
             });
-            SelectMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
         }
         catch (Exception ex)
         {
@@ -1797,6 +1797,7 @@ public partial class EditorWindow : Window
             double right = left + width;
             double top = bottom + height;
 
+            SelectMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
             int previousImageCount = -1;
             ApplyPdfEdit(document =>
             {
