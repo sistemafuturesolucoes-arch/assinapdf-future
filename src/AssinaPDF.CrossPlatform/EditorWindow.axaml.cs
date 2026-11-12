@@ -1646,6 +1646,9 @@ public partial class EditorWindow : Window
                 BorderThickness = new Thickness(2),
                 Background = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.FromArgb(35, 109, 75, 195)),
+                CornerRadius = _toolMode == EditorToolMode.DrawEllipse
+                    ? new CornerRadius(999)
+                    : new CornerRadius(0),
                 IsHitTestVisible = false
             };
             surface.Overlay.Children.Add(_rectanglePreview);
