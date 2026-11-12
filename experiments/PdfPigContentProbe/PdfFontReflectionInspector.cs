@@ -235,14 +235,18 @@ internal static class PdfFontReflectionInspector
                 if (line.Contains('['))
                 {
                     int cursor = 0;
-                    foreach (Match destination in Regex.Matches(line, "<([0-9A-Fa-f]+)>"))
+                    var destinationTokens = Regex.Matches(line, "<([0-9A-Fa-f]+)>").Cast<Match>().Skip(2);
+                    foreach (Match destination in destinationTokens)
                     {
                         string value = destination.Groups[1].Value;
                         if (cursor > last - first) break;
                         if (TryDecodeUnicodeHex(value, out string unicode))
                             mappings[NormalizeHex((first + cursor).ToString($"X{sourceWidth}"))] = unicode;
+                        else
+                            malformed++;
                         cursor++;
                     }
+                    if (cursor != last - first + 1) malformed++;
                 }
                 else if (TryParseHex(hex[2], out long destinationStart))
                 {
