@@ -973,100 +973,225 @@ public partial class EditorWindow : Window
         EditorStatusText.Text = "Trecho selecionado. Você pode editar, excluir ou arrastar o texto.";
     }
 
-    private async Task MoveSelectedTextAsync(PagePreviewInfo pageInfo, AvaloniaImage image, double deltaViewX, double deltaViewY)
+    private async Task MoveSelectedTextAsync(
+        PagePreviewInfo pageInfo,
+        AvaloniaImage image,
+        double deltaViewX,
+        double deltaViewY)
     {
-        if (_selectedTextBounds is not { } selectedBounds || string.IsNullOrWhiteSpace(_selectedText))
+        if (_selectedTextBounds is not { } selectedBounds ||
+            string.IsNullOrWhiteSpace(_selectedText))
             return;
+
         string selectedText = _selectedText;
+        string normalizedSelection = NormalizePdfText(selectedText);
+
         if (image.Bounds.Width <= 0 || image.Bounds.Height <= 0)
         {
             EditorStatusText.Text = "Não foi possível calcular a nova posição do texto.";
             LoadDocumentPreview();
             return;
         }
-        // A prévia mantém a proporção da página; converter o deslocamento
-        // diretamente evita falhas quando o arraste começa perto das bordas.
-        double dx = deltaViewX * pageInfo.WidthPoints / image.Bounds.Width;
-        double dy = -deltaViewY * pageInfo.HeightPoints / image.Bounds.Height;
-        if (Math.Abs(dx) < 0.1 && Math.Abs(dy) < 0.1) { LoadDocumentPreview(); return; }
-        double expectedCx = 0;
-        double expectedCy = 0;
+
+        // Converta o deslocamento pelos dois pontos da tela usando a rotação
+        // real da página. Multiplicar X/Y diretamente pela largura/altura falha
+        // em páginas com /Rotate 90 ou 270 graus.
+        var selectedViewRect = PdfiumPageCoordinateMapper.PdfToViewRect(
+            selectedBounds.Left, selectedBounds.Bottom,
+            selectedBounds.Right, selectedBounds.Top,
+            image.Bounds.Width, image.Bounds.Height,
+            pageInfo.WidthPoints, pageInfo.HeightPoints, pageInfo.Rotation);
+
+        double viewCenterX = selectedViewRect.X + selectedViewRect.Width / 2;
+        double viewCenterY = selectedViewRect.Y + selectedViewRect.Height / 2;
+
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+                viewCenterX, viewCenterY,
+                image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints,
+                out double startPdfX, out double startPdfY, pageInfo.Rotation) ||
+            !PdfiumPageCoordinateMapper.TryViewToPdf(
+                viewCenterX + deltaViewX, viewCenterY + deltaViewY,
+                image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints,
+                out double endPdfX, out double endPdfY, pageInfo.Rotation))
+        {
+            EditorStatusText.Text = "O novo posicionamento ultrapassaria a página. O texto não foi movido.";
+            LoadDocumentPreview();
+            return;
+        }
+
+        double dx = endPdfX - startPdfX;
+        double dy = endPdfY - startPdfY;
+        if (Math.Abs(dx) < 0.1 && Math.Abs(dy) < 0.1)
+        {
+            LoadDocumentPreview();
+            return;
+        }
+
+        double newLeft = selectedBounds.Left + dx;
+        double newRight = selectedBounds.Right + dx;
+        double newBottom = selectedBounds.Bottom + dy;
+        double newTop = selectedBounds.Top + dy;
+        if (newLeft < 0 || newBottom < 0 ||
+            newRight > pageInfo.WidthPoints || newTop > pageInfo.HeightPoints)
+        {
+            EditorStatusText.Text = "O texto não pode ser movido para fora dos limites da página.";
+            LoadDocumentPreview();
+            return;
+        }
+
+        double expectedCx = (selectedBounds.Left + selectedBounds.Right) / 2 + dx;
+        double expectedCy = (selectedBounds.Bottom + selectedBounds.Top) / 2 + dy;
+
         try
         {
             ApplyPdfEdit(document =>
             {
                 var absorber = new TextFragmentAbsorber();
                 document.Pages[pageInfo.PageIndex + 1].Accept(absorber);
-                string normalizedSelection = NormalizePdfText(selectedText);
-                var candidates = absorber.TextFragments
+
+                var pageFragments = absorber.TextFragments
+                    .Where(fragment => fragment.Rectangle != null &&
+                        !string.IsNullOrWhiteSpace(fragment.Text))
+                    .ToArray();
+
+                var exact = pageFragments
                     .Where(fragment => string.Equals(
-                        NormalizePdfText(fragment.Text ?? string.Empty),
-                        normalizedSelection, StringComparison.Ordinal))
-                    .Select(fragment => new { Fragment = fragment, Bounds = fragment.Rectangle })
-                    .Where(item => item.Bounds != null)
-                    .Select(item => new
+                        NormalizePdfText(fragment.Text),
+                        normalizedSelection,
+                        StringComparison.Ordinal))
+                    .Select(fragment => new
                     {
-                        item.Fragment, Bounds = item.Bounds!,
-                        Distance = Math.Pow((item.Bounds!.LLX + item.Bounds.URX) / 2 -
+                        Fragment = fragment,
+                        Bounds = fragment.Rectangle!,
+                        Distance = Math.Pow(
+                            (fragment.Rectangle!.LLX + fragment.Rectangle.URX) / 2 -
                             (selectedBounds.Left + selectedBounds.Right) / 2, 2) +
-                            Math.Pow((item.Bounds.LLY + item.Bounds.URY) / 2 -
+                            Math.Pow(
+                            (fragment.Rectangle.LLY + fragment.Rectangle.URY) / 2 -
                             (selectedBounds.Bottom + selectedBounds.Top) / 2, 2)
-                    }).OrderBy(item => item.Distance).ToArray();
+                    })
+                    .Where(item => item.Distance <= 2500)
+                    .OrderBy(item => item.Distance)
+                    .ToArray();
 
-                // O retângulo desenhado pelo PDFium pode ser ligeiramente diferente
-                // do retângulo tipográfico do Aspose. A correspondência do texto é
-                // normalizada e a distância serve apenas para desambiguar repetições.
-                if (candidates.Length == 0 || candidates[0].Distance > 2500)
-                    throw new InvalidOperationException("Não encontrei um único bloco editável correspondente à seleção. O PDF original foi preservado.");
-                if (candidates.Length > 1 && Math.Abs(candidates[1].Distance - candidates[0].Distance) < 1)
-                    throw new InvalidOperationException("Há blocos idênticos na mesma posição. Não movi nenhum para evitar alterar o texto errado.");
-
-                var target = candidates[0];
-                expectedCx = (target.Bounds.LLX + target.Bounds.URX) / 2 + dx;
-                expectedCy = (target.Bounds.LLY + target.Bounds.URY) / 2 + dy;
-                var position = target.Fragment.Position ??
-                    new Position(target.Bounds.LLX, target.Bounds.LLY);
-                // O fragmento absorvido pode ser apenas uma representação agregada.
-                // Atualize também a posição de cada segmento físico para regravar os
-                // operadores de texto (Tj/TJ), não apenas a moldura lógica.
-                target.Fragment.Position = new Position(
-                    position.XIndent + dx, position.YIndent + dy);
-                foreach (TextSegment segment in target.Fragment.Segments)
+                List<TextFragment> targets;
+                if (exact.Length > 0)
                 {
-                    if (segment.Position is { } segmentPosition)
-                    {
-                        segment.Position = new Position(
-                            segmentPosition.XIndent + dx,
-                            segmentPosition.YIndent + dy);
-                    }
+                    if (exact.Length > 1 &&
+                        Math.Abs(exact[1].Distance - exact[0].Distance) < 1)
+                        throw new InvalidOperationException(
+                            "Há blocos idênticos na mesma posição. Nenhum texto foi movido.");
 
-                    if (segment.BaselinePosition is { } baseline)
+                    targets = new List<TextFragment> { exact[0].Fragment };
+                }
+                else
+                {
+                    const double tolerance = 2.0;
+                    targets = pageFragments.Where(fragment =>
                     {
-                        segment.BaselinePosition = new Position(
-                            baseline.XIndent + dx,
-                            baseline.YIndent + dy);
+                        var rectangle = fragment.Rectangle!;
+                        return rectangle.LLX >= selectedBounds.Left - tolerance &&
+                               rectangle.LLY >= selectedBounds.Bottom - tolerance &&
+                               rectangle.URX <= selectedBounds.Right + tolerance &&
+                               rectangle.URY <= selectedBounds.Top + tolerance;
+                    }).ToList();
+
+                    string groupedText = string.Concat(targets.Select(fragment => fragment.Text));
+                    if (targets.Count == 0 ||
+                        !string.Equals(
+                            NormalizePdfText(groupedText),
+                            normalizedSelection,
+                            StringComparison.Ordinal))
+                        throw new InvalidOperationException(
+                            "Não encontrei objetos que correspondam exatamente ao texto selecionado.");
+
+                    bool partialOverlap = pageFragments.Any(fragment =>
+                        fragment.Rectangle is { } rectangle &&
+                        rectangle.URX >= selectedBounds.Left &&
+                        rectangle.LLX <= selectedBounds.Right &&
+                        rectangle.URY >= selectedBounds.Bottom &&
+                        rectangle.LLY <= selectedBounds.Top &&
+                        !targets.Contains(fragment));
+                    if (partialOverlap)
+                        throw new InvalidOperationException(
+                            "Outro objeto de texto cruza a seleção. O movimento foi cancelado para preservar o conteúdo vizinho.");
+                }
+
+                foreach (TextFragment target in targets)
+                {
+                    var bounds = target.Rectangle ??
+                        throw new InvalidOperationException("Um dos objetos selecionados perdeu seus limites.");
+
+                    var position = target.Position ??
+                        new Position(bounds.LLX, bounds.LLY);
+                    target.Position = new Position(
+                        position.XIndent + dx,
+                        position.YIndent + dy);
+
+                    foreach (TextSegment segment in target.Segments)
+                    {
+                        if (segment.Position is { } segmentPosition)
+                        {
+                            segment.Position = new Position(
+                                segmentPosition.XIndent + dx,
+                                segmentPosition.YIndent + dy);
+                        }
+
+                        if (segment.BaselinePosition is { } baseline)
+                        {
+                            segment.BaselinePosition = new Position(
+                                baseline.XIndent + dx,
+                                baseline.YIndent + dy);
+                        }
                     }
                 }
             }, "Texto reposicionado no PDF.", savedDocument =>
             {
                 var verify = new TextFragmentAbsorber();
                 savedDocument.Pages[pageInfo.PageIndex + 1].Accept(verify);
-                return verify.TextFragments.Where(fragment =>
+
+                var savedFragments = verify.TextFragments
+                    .Where(fragment => fragment.Rectangle != null &&
+                        !string.IsNullOrWhiteSpace(fragment.Text))
+                    .ToArray();
+
+                bool exactAtDestination = savedFragments.Any(fragment =>
                     string.Equals(
-                        NormalizePdfText(fragment.Text ?? string.Empty),
-                        NormalizePdfText(selectedText), StringComparison.Ordinal)).Any(fragment =>
+                        NormalizePdfText(fragment.Text),
+                        normalizedSelection,
+                        StringComparison.Ordinal) &&
+                    Math.Pow(
+                        (fragment.Rectangle!.LLX + fragment.Rectangle.URX) / 2 - expectedCx, 2) +
+                    Math.Pow(
+                        (fragment.Rectangle.LLY + fragment.Rectangle.URY) / 2 - expectedCy, 2) < 900);
+
+                if (exactAtDestination)
+                    return true;
+
+                const double verifyTolerance = 5.0;
+                var movedFragments = savedFragments.Where(fragment =>
                 {
-                    var bounds = fragment.Rectangle;
-                    if (bounds == null) return false;
-                    double cx = (bounds.LLX + bounds.URX) / 2, cy = (bounds.LLY + bounds.URY) / 2;
-                    return Math.Pow(cx - expectedCx, 2) + Math.Pow(cy - expectedCy, 2) < 900;
-                });
+                    var rectangle = fragment.Rectangle!;
+                    return rectangle.LLX >= newLeft - verifyTolerance &&
+                           rectangle.LLY >= newBottom - verifyTolerance &&
+                           rectangle.URX <= newRight + verifyTolerance &&
+                           rectangle.URY <= newTop + verifyTolerance;
+                }).ToArray();
+
+                return movedFragments.Length > 0 &&
+                    string.Equals(
+                        NormalizePdfText(string.Concat(movedFragments.Select(fragment => fragment.Text))),
+                        normalizedSelection,
+                        StringComparison.Ordinal);
             });
         }
         catch (Exception ex)
         {
             LoadDocumentPreview();
-            EditorStatusText.Text = $"Não foi possível mover o texto no PDF; a versão anterior foi preservada. {ex.Message}";
+            EditorStatusText.Text =
+                $"Não foi possível mover o texto com segurança; a versão anterior foi preservada. {ex.Message}";
         }
     }
 
