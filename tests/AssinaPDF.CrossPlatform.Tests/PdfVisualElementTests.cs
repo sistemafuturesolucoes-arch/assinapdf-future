@@ -40,6 +40,19 @@ public sealed class PdfVisualElementTests
                 page.Annotations.Add(rectangle);
                 rectangle.UpdateAppearances();
 
+                var ellipse = new CircleAnnotation(
+                    page, new Rectangle(180, 200, 280, 300))
+                {
+                    Name = "FutureEditorEllipse-Test",
+                    Title = "AssinaPDF",
+                    Subject = "AssinaPDF Editor Ellipse",
+                    Color = Color.FromRgb(0.42, 0.29, 0.75),
+                    InteriorColor = Color.FromRgb(0.88, 0.84, 0.96),
+                    Opacity = 0.22
+                };
+                page.Annotations.Add(ellipse);
+                ellipse.UpdateAppearances();
+
                 var image = new ImageStamp(imagePath)
                 {
                     X = 40,
@@ -62,6 +75,12 @@ public sealed class PdfVisualElementTests
                     .Where(item => item.Name == "FutureEditorRectangle-Test"));
                 rectangle.Rect = new Rectangle(140, 150, 280, 250);
                 rectangle.UpdateAppearances();
+
+                var ellipse = Assert.Single(page.Annotations
+                    .OfType<CircleAnnotation>()
+                    .Where(item => item.Name == "FutureEditorEllipse-Test"));
+                ellipse.Rect = new Rectangle(300, 320, 440, 420);
+                ellipse.UpdateAppearances();
 
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
@@ -97,6 +116,14 @@ public sealed class PdfVisualElementTests
                 Assert.Equal(280, rectangle.Rect.URX, 1);
                 Assert.Equal(250, rectangle.Rect.URY, 1);
 
+                var ellipse = Assert.Single(page.Annotations
+                    .OfType<CircleAnnotation>()
+                    .Where(item => item.Name == "FutureEditorEllipse-Test"));
+                Assert.Equal(300, ellipse.Rect!.LLX, 1);
+                Assert.Equal(320, ellipse.Rect.LLY, 1);
+                Assert.Equal(440, ellipse.Rect.URX, 1);
+                Assert.Equal(420, ellipse.Rect.URY, 1);
+
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
                 var placement = Assert.Single(absorber.ImagePlacements);
@@ -106,6 +133,7 @@ public sealed class PdfVisualElementTests
                 Assert.InRange(Math.Abs(placement.Rectangle.URY - 266), 0, 2);
 
                 page.Annotations.Delete(rectangle);
+                page.Annotations.Delete(ellipse);
                 reopened.Save(pdfPath);
             }
 
@@ -113,6 +141,9 @@ public sealed class PdfVisualElementTests
             Assert.Empty(finalDocument.Pages[1].Annotations
                 .OfType<SquareAnnotation>()
                 .Where(item => item.Name == "FutureEditorRectangle-Test"));
+            Assert.Empty(finalDocument.Pages[1].Annotations
+                .OfType<CircleAnnotation>()
+                .Where(item => item.Name == "FutureEditorEllipse-Test"));
         }
         finally
         {
