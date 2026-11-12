@@ -15,14 +15,14 @@ internal static class ToUnicodeCMapParser
     private const int MaxSourceBytes = 4;
 
     private static readonly Regex TokenPattern = new(
-        @"<[^>]*>|\\[|\\]|[A-Za-z][A-Za-z0-9]*|[0-9]+",
+        @"<[^>]*>|\[|\]|[A-Za-z][A-Za-z0-9]*|[0-9]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public static CMapParseResult Parse(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        string withoutComments = Regex.Replace(source, @"%[^\\r\\n]*", "");
+        string withoutComments = Regex.Replace(source, @"%[^\r\n]*", "");
         var tokens = TokenPattern.Matches(withoutComments)
             .Select(match => match.Value)
             .ToArray();
