@@ -2,9 +2,15 @@ using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 
+internal sealed record CMapCodeSpaceRange(string FirstHex, string LastHex);
+
+internal sealed record CMapDecodedCode(string CodeHex, string Unicode);
+
 internal sealed record CMapParseResult(
     IReadOnlyDictionary<string, string> Mappings,
+    IReadOnlyList<CMapCodeSpaceRange> CodeSpaces,
     int MalformedEntries,
+    int ParsedCodeSpaceRanges,
     int ParsedBfCharEntries,
     int ParsedBfRangeEntries);
 
@@ -27,11 +33,16 @@ internal static class ToUnicodeCMapParser
             .ToArray();
 
         var mappings = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        int malformed = 0, bfCharCount = 0, bfRangeCount = 0;
+        var codeSpaces = new List<CMapCodeSpaceRange>();
+        int malformed = 0, codeSpaceCount = 0, bfCharCount = 0, bfRangeCount = 0;
 
         for (int i = 0; i < tokens.Length; i++)
         {
-            if (tokens[i] == "beginbfchar")
+            if (tokens[i] == "begincodespacerange")
+            {
+                i = ParseCodeSpaceBlock(tokens, i + 1, codeSpaces, ref malformed, ref codeSpaceCount);
+            }
+            else if (tokens[i] == "beginbfchar")
             {
                 i = ParseBfCharBlock(tokens, i + 1, mappings, ref malformed, ref bfCharCount);
             }
@@ -41,7 +52,84 @@ internal static class ToUnicodeCMapParser
             }
         }
 
-        return new CMapParseResult(mappings, malformed, bfCharCount, bfRangeCount);
+        return new CMapParseResult(mappings, codeSpaces, malformed, codeSpaceCount, bfCharCount, bfRangeCount);
+    }
+
+    public static bool TryDecodeBytes(
+        ReadOnlySpan<byte> bytes, CMapParseResult cmap,
+        out IReadOnlyList<CMapDecodedCode> decoded)
+    {
+        var output = new List<CMapDecodedCode>();
+        int offset = 0;
+
+        while (offset < bytes.Length)
+        {
+            var matchingLengths = new List<(int Length, string Hex)>();
+            int maxLength = Math.Min(MaxSourceBytes, bytes.Length - offset);
+
+            for (int length = 1; length <= maxLength; length++)
+            {
+                string hex = Convert.ToHexString(bytes.Slice(offset, length));
+                if (cmap.CodeSpaces.Any(range =>
+                    range.FirstHex.Length == hex.Length &&
+                    string.CompareOrdinal(hex, range.FirstHex) >= 0 &&
+                    string.CompareOrdinal(hex, range.LastHex) <= 0))
+                {
+                    matchingLengths.Add((length, hex));
+                }
+            }
+
+            if (matchingLengths.Count != 1)
+            {
+                decoded = Array.Empty<CMapDecodedCode>();
+                return false;
+            }
+
+            var match = matchingLengths[0];
+            if (!cmap.Mappings.TryGetValue(match.Hex, out string? unicode))
+            {
+                decoded = Array.Empty<CMapDecodedCode>();
+                return false;
+            }
+
+            output.Add(new CMapDecodedCode(match.Hex, unicode));
+            offset += match.Length;
+        }
+
+        decoded = output;
+        return true;
+    }
+
+    private static int ParseCodeSpaceBlock(
+        string[] tokens, int index, List<CMapCodeSpaceRange> codeSpaces,
+        ref int malformed, ref int parsed)
+    {
+        while (index < tokens.Length && tokens[index] != "endcodespacerange")
+        {
+            if (index + 1 >= tokens.Length)
+            {
+                malformed++;
+                break;
+            }
+
+            if (!TryHexToken(tokens[index], out string first) ||
+                !TryHexToken(tokens[index + 1], out string last) ||
+                !TryNormalizeSource(first, out string normalizedFirst) ||
+                !TryNormalizeSource(last, out string normalizedLast) ||
+                normalizedFirst.Length != normalizedLast.Length ||
+                string.CompareOrdinal(normalizedLast, normalizedFirst) < 0)
+            {
+                malformed++;
+                index += 2;
+                continue;
+            }
+
+            codeSpaces.Add(new CMapCodeSpaceRange(normalizedFirst, normalizedLast));
+            parsed++;
+            index += 2;
+        }
+
+        return index;
     }
 
     private static int ParseBfCharBlock(
