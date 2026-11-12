@@ -2197,10 +2197,10 @@ public partial class EditorWindow : Window
                 var placement = absorber.ImagePlacements[imageIndex];
                 var currentBounds = placement.Rectangle;
                 if (currentBounds == null ||
-                    Math.Pow((currentBounds.LLX + currentBounds.URX) / 2 -
-                             (originalBounds.Left + originalBounds.Right) / 2, 2) +
-                    Math.Pow((currentBounds.LLY + currentBounds.URY) / 2 -
-                             (originalBounds.Bottom + originalBounds.Top) / 2, 2) > 900)
+                    Math.Abs(currentBounds.LLX - originalBounds.Left) > 2 ||
+                    Math.Abs(currentBounds.LLY - originalBounds.Bottom) > 2 ||
+                    Math.Abs(currentBounds.URX - originalBounds.Right) > 2 ||
+                    Math.Abs(currentBounds.URY - originalBounds.Top) > 2)
                     throw new InvalidOperationException("A imagem mudou desde a seleção. Selecione-a novamente.");
 
                 placement.Hide();
@@ -2304,8 +2304,10 @@ public partial class EditorWindow : Window
                 var placement = absorber.ImagePlacements[imageIndex];
                 var rectangle = placement.Rectangle;
                 if (rectangle == null ||
-                    Math.Pow((rectangle.LLX + rectangle.URX) / 2 - centerX, 2) +
-                    Math.Pow((rectangle.LLY + rectangle.URY) / 2 - centerY, 2) > 900)
+                    Math.Abs(rectangle.LLX - bounds.Left) > 2 ||
+                    Math.Abs(rectangle.LLY - bounds.Bottom) > 2 ||
+                    Math.Abs(rectangle.URX - bounds.Right) > 2 ||
+                    Math.Abs(rectangle.URY - bounds.Top) > 2)
                     throw new InvalidOperationException("A imagem mudou desde a seleção.");
                 placement.Hide();
             }, kind == VisualElementKind.Image
