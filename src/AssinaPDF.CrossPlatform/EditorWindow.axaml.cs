@@ -52,6 +52,7 @@ public partial class EditorWindow : Window
     private EditorToolMode _toolMode = EditorToolMode.Select;
     private bool _isDraggingSelection;
     private bool _isInlineEditorOpen;
+    private bool _autoTextBoxesVisible;
     private Avalonia.Point _selectionStart;
     private Avalonia.Point _selectionEnd;
     private AvaloniaImage? _activeSelectionImage;
@@ -480,6 +481,9 @@ public partial class EditorWindow : Window
             _pageSurfaces[i] = (pageImage, overlay);
             _pageCards[i] = page;
             EditorPagesPanel.Children.Add(page);
+
+            if (_autoTextBoxesVisible)
+                AddAutoTextBoxesForPage(i);
 
             // Miniatura reutiliza a mesma imagem renderizada da página principal.
             // Isso evita duplicar a rasterização e mantém a navegação leve.
@@ -1019,6 +1023,99 @@ public partial class EditorWindow : Window
         }
     }
 
+    private void AutoTextBoxesMode_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _autoTextBoxesVisible = !_autoTextBoxesVisible;
+        ClearTextSelection();
+
+        int total = 0;
+        foreach (int pageIndex in _pageSurfaces.Keys.OrderBy(index => index))
+        {
+            if (_autoTextBoxesVisible)
+                total += AddAutoTextBoxesForPage(pageIndex);
+            else if (_pageSurfaces.TryGetValue(pageIndex, out var surface))
+            {
+                foreach (var box in surface.Overlay.Children
+                             .Where(item => Equals(item.Tag, "FutureAutoTextBox")).ToArray())
+                    surface.Overlay.Children.Remove(box);
+                surface.Overlay.IsHitTestVisible = surface.Overlay.Children.Count > 0;
+            }
+        }
+
+        AutoTextBoxesModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            _autoTextBoxesVisible
+                ? Avalonia.Media.Color.FromRgb(233, 227, 245)
+                : Avalonia.Media.Color.FromRgb(240, 241, 244));
+        AutoTextBoxesModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            _autoTextBoxesVisible
+                ? Avalonia.Media.Color.FromRgb(76, 52, 130)
+                : Avalonia.Media.Color.FromRgb(52, 56, 62));
+
+        EditorStatusText.Text = _autoTextBoxesVisible
+            ? $"Edição por blocos ativada: {total} caixas de texto identificadas. Clique em uma caixa e escolha Editar trecho."
+            : "Caixas automáticas ocultadas. O texto original do PDF permanece intacto.";
+    }
+
+    private int AddAutoTextBoxesForPage(int pageIndex)
+    {
+        if (_document == null ||
+            !_pageSurfaces.TryGetValue(pageIndex, out var surface) ||
+            surface.Image.Tag is not PagePreviewInfo pageInfo ||
+            surface.Image.Bounds.Width <= 0 || surface.Image.Bounds.Height <= 0)
+            return 0;
+
+        foreach (var existing in surface.Overlay.Children
+                     .Where(item => Equals(item.Tag, "FutureAutoTextBox")).ToArray())
+            surface.Overlay.Children.Remove(existing);
+
+        var characters = _document.InspectPageCharacters(pageIndex);
+        var lines = PdfiumTextGrouping.GroupIntoLines(characters, pageIndex);
+        int count = 0;
+
+        foreach (var line in lines)
+        {
+            if (line.Characters.Count == 0 || string.IsNullOrWhiteSpace(line.Text))
+                continue;
+
+            var rect = PdfiumPageCoordinateMapper.PdfToViewRect(
+                line.Left, line.Bottom, line.Right, line.Top,
+                surface.Image.Bounds.Width, surface.Image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints);
+
+            var box = new Border
+            {
+                Tag = "FutureAutoTextBox",
+                Width = Math.Max(5, rect.Width),
+                Height = Math.Max(5, rect.Height),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromArgb(190, 105, 76, 165)),
+                Background = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromArgb(18, 105, 76, 165)),
+                Cursor = new Cursor(StandardCursorType.Hand),
+                IsHitTestVisible = true,
+                ToolTip = line.Text.Length > 120 ? line.Text[..117] + "..." : line.Text
+            };
+
+            box.PointerPressed += (_, args) =>
+            {
+                if (!args.GetCurrentPoint(box).Properties.IsLeftButtonPressed)
+                    return;
+
+                SetTextSelection(surface.Image, pageInfo, line.Characters, line.Text);
+                args.Handled = true;
+            };
+
+            Canvas.SetLeft(box, rect.X);
+            Canvas.SetTop(box, rect.Y);
+            surface.Overlay.Children.Add(box);
+            count++;
+        }
+
+        surface.Overlay.IsHitTestVisible = surface.Overlay.Children.Count > 0;
+        return count;
+    }
+
     private void SelectMode_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _toolMode = EditorToolMode.Select;
@@ -1097,7 +1194,12 @@ public partial class EditorWindow : Window
     private void ClearTextSelection()
     {
         foreach (var surface in _pageSurfaces.Values)
-            surface.Overlay.Children.Clear();
+        {
+            foreach (var child in surface.Overlay.Children
+                         .Where(item => !Equals(item.Tag, "FutureAutoTextBox")).ToArray())
+                surface.Overlay.Children.Remove(child);
+            surface.Overlay.IsHitTestVisible = surface.Overlay.Children.Count > 0;
+        }
 
         _selectedPageIndex = null;
         SelectedTextLabel.Text = string.Empty;
