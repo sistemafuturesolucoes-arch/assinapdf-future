@@ -165,8 +165,8 @@ try
     Console.WriteLine();
 
     Console.WriteLine("SIMULAÇÃO DE SUBSTITUIÇÃO EM MEMÓRIA (sem alterar/salvar PDF)");
-    const targetText = "CONFIRME";
-    const replacementText = "BONFIRME";
+    const string targetText = "CONFIRME";
+    const string replacementText = "BONFIRME";
     bool simulationCompleted = false;
     foreach (var pageGroup in glyphOperations.GroupBy(x => x.Page).OrderBy(x => x.Key))
     {
