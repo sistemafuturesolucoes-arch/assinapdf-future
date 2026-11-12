@@ -53,3 +53,7 @@ A inspeção também emite linhas `GLIFO-MAP` para correlacionar, na ordem das o
 
 
 A saída também agrupa por fonte a quantidade de operandos em que o número de bytes decodificados coincide com o número de `Letter`, os casos divergentes e os candidatos de um byte/uma letra Unicode. Essa igualdade é apenas uma triagem: não autoriza dividir operandos multibyte nem inferir a codificação completa da fonte.
+
+## Inspeção das estruturas internas de fonte
+
+O probe percorre as letras extraídas e inspeciona, por reflection e sem invocar métodos de conversão, as propriedades, campos e assinaturas de API do objeto de detalhes da fonte exposto por cada `Letter`. O objetivo é identificar quais estruturas de codificação, CMaps, mapas Unicode ou dicionários estão disponíveis nesta versão do PdfPig para investigar fontes incorporadas/subconjuntos. A inspeção é limitada a metadados e referências de objetos; não tenta adivinhar a codificação nem altera o documento.
