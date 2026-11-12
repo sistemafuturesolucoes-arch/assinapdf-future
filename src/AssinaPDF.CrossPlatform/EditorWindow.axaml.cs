@@ -48,9 +48,11 @@ public partial class EditorWindow : Window
     private int? _selectedPageIndex;
     private double _selectedPdfX;
     private double _selectedPdfY;
-    private enum EditorToolMode { Select, AddText }
+    private enum EditorToolMode { Select, AddText, AddImage, DrawRectangle }
     private EditorToolMode _toolMode = EditorToolMode.Select;
     private bool _isDraggingSelection;
+    private bool _isDrawingRectangle;
+    private Border? _rectanglePreview;
     private bool _isInlineEditorOpen;
     private bool _autoTextBoxesVisible;
     private Avalonia.Point _selectionStart;
@@ -685,6 +687,24 @@ public partial class EditorWindow : Window
             _ = AddTextAtPointAsync(pageInfo, point, image);
             return;
         }
+        if (_toolMode == EditorToolMode.AddImage)
+        {
+            e.Handled = true;
+            _ = AddImageAtPointAsync(pageInfo, point, image);
+            return;
+        }
+        if (_toolMode == EditorToolMode.DrawRectangle)
+        {
+            e.Handled = true;
+            _isDrawingRectangle = true;
+            _selectionStart = point;
+            _selectionEnd = point;
+            _activeSelectionImage = image;
+            _activeSelectionPage = pageInfo;
+            e.Pointer.Capture(image);
+            UpdateRectanglePreview(image, pageInfo, point, point);
+            return;
+        }
 
         // O segundo clique abre a edição do texto sob o ponteiro. O clique simples
         // continua reservado à seleção por arraste, sem abrir janelas acidentalmente.
@@ -752,12 +772,33 @@ public partial class EditorWindow : Window
                     surface.Overlay.Children.Remove(marker);
             }
         }
+        if (_isDrawingRectangle && ReferenceEquals(sender, _activeSelectionImage) &&
+            _activeSelectionPage is PagePreviewInfo drawingPage)
+        {
+            _selectionEnd = e.GetPosition(_activeSelectionImage);
+            UpdateRectanglePreview(_activeSelectionImage, drawingPage, _selectionStart, _selectionEnd);
+        }
+
         if (_isDraggingSelection && ReferenceEquals(sender, _activeSelectionImage))
             _selectionEnd = e.GetPosition(_activeSelectionImage);
     }
 
     private void PageImage_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_isDrawingRectangle && sender is AvaloniaImage drawingImage &&
+            _activeSelectionPage is PagePreviewInfo drawingPage)
+        {
+            _selectionEnd = e.GetPosition(drawingImage);
+            _isDrawingRectangle = false;
+            e.Pointer.Capture(null);
+            RemoveRectanglePreview(drawingPage.PageIndex);
+            _ = AddRectangleFromDragAsync(drawingPage, _selectionStart, _selectionEnd, drawingImage);
+            _activeSelectionImage = null;
+            _activeSelectionPage = null;
+            e.Handled = true;
+            return;
+        }
+
         if (!_isDraggingSelection || sender is not AvaloniaImage image ||
             _activeSelectionPage is not PagePreviewInfo pageInfo)
             return;
@@ -1389,6 +1430,240 @@ public partial class EditorWindow : Window
         SelectModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
         SelectModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
         EditorStatusText.Text = "Modo Adicionar texto: clique na página do PDF no ponto em que deseja inserir o texto.";
+    }
+
+    private void AddImageMode_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _toolMode = EditorToolMode.AddImage;
+        ClearTextSelection();
+        foreach (var surface in _pageSurfaces.Values)
+            surface.Image.Cursor = new Cursor(StandardCursorType.Hand);
+
+        AddImageModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(233, 227, 245));
+        AddImageModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(76, 52, 130));
+        SelectModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        AddTextModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        RectangleModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        EditorStatusText.Text = "Clique na página para escolher uma imagem e inseri-la no PDF.";
+    }
+
+    private void RectangleMode_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _toolMode = EditorToolMode.DrawRectangle;
+        ClearTextSelection();
+        foreach (var surface in _pageSurfaces.Values)
+            surface.Image.Cursor = new Cursor(StandardCursorType.Cross);
+
+        RectangleModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(233, 227, 245));
+        RectangleModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(76, 52, 130));
+        SelectModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        AddTextModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        AddImageModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        EditorStatusText.Text = "Arraste sobre a página para desenhar um retângulo.";
+    }
+
+    private void UpdateRectanglePreview(
+        AvaloniaImage image,
+        PagePreviewInfo pageInfo,
+        Avalonia.Point start,
+        Avalonia.Point end)
+    {
+        if (!_pageSurfaces.TryGetValue(pageInfo.PageIndex, out var surface))
+            return;
+
+        if (_rectanglePreview == null)
+        {
+            _rectanglePreview = new Border
+            {
+                Tag = "FutureRectanglePreview",
+                BorderBrush = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(109, 75, 195)),
+                BorderThickness = new Thickness(2),
+                Background = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromArgb(35, 109, 75, 195)),
+                IsHitTestVisible = false
+            };
+            surface.Overlay.Children.Add(_rectanglePreview);
+        }
+
+        double left = Math.Min(start.X, end.X);
+        double top = Math.Min(start.Y, end.Y);
+        _rectanglePreview.Width = Math.Max(2, Math.Abs(end.X - start.X));
+        _rectanglePreview.Height = Math.Max(2, Math.Abs(end.Y - start.Y));
+        Canvas.SetLeft(_rectanglePreview, left);
+        Canvas.SetTop(_rectanglePreview, top);
+        surface.Overlay.IsHitTestVisible = true;
+    }
+
+    private void RemoveRectanglePreview(int pageIndex)
+    {
+        if (_pageSurfaces.TryGetValue(pageIndex, out var surface))
+        {
+            foreach (var item in surface.Overlay.Children
+                         .Where(item => Equals(item.Tag, "FutureRectanglePreview")).ToArray())
+                surface.Overlay.Children.Remove(item);
+            surface.Overlay.IsHitTestVisible = surface.Overlay.Children.Count > 0;
+        }
+        _rectanglePreview = null;
+    }
+
+    private async Task AddRectangleFromDragAsync(
+        PagePreviewInfo pageInfo,
+        Avalonia.Point start,
+        Avalonia.Point end,
+        AvaloniaImage image)
+    {
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+                start.X, start.Y, image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints,
+                out double startX, out double startY, pageInfo.Rotation) ||
+            !PdfiumPageCoordinateMapper.TryViewToPdf(
+                end.X, end.Y, image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints,
+                out double endX, out double endY, pageInfo.Rotation))
+        {
+            EditorStatusText.Text = "Não foi possível calcular a área do retângulo.";
+            return;
+        }
+
+        double left = Math.Min(startX, endX);
+        double right = Math.Max(startX, endX);
+        double bottom = Math.Min(startY, endY);
+        double top = Math.Max(startY, endY);
+        if (right - left < 4 || top - bottom < 4)
+        {
+            EditorStatusText.Text = "O retângulo precisa ter pelo menos 4 pontos de largura e altura.";
+            return;
+        }
+
+        string annotationName = "FutureEditorRectangle-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            ApplyPdfEdit(document =>
+            {
+                var page = document.Pages[pageInfo.PageIndex + 1];
+                var annotation = new Aspose.Pdf.Annotations.SquareAnnotation(
+                    page, new Aspose.Pdf.Rectangle(left, bottom, right, top))
+                {
+                    Name = annotationName,
+                    Title = "AssinaPDF",
+                    Subject = "AssinaPDF Editor Rectangle",
+                    Contents = "Forma inserida pelo AssinaPDF",
+                    Color = Aspose.Pdf.Color.FromRgb(0.42, 0.29, 0.75),
+                    InteriorColor = Aspose.Pdf.Color.FromRgb(0.88, 0.84, 0.96),
+                    Opacity = 0.22
+                };
+                annotation.UpdateAppearances();
+                page.Annotations.Add(annotation);
+            }, "Retângulo inserido no PDF.", savedDocument =>
+            {
+                return savedDocument.Pages[pageInfo.PageIndex + 1].Annotations
+                    .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
+                    .Any(annotation => string.Equals(
+                        annotation.Name, annotationName, StringComparison.Ordinal));
+            });
+            SelectMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                $"Não foi possível inserir o retângulo. A versão anterior foi preservada. {ex.Message}";
+        }
+    }
+
+    private async Task AddImageAtPointAsync(
+        PagePreviewInfo pageInfo,
+        Avalonia.Point point,
+        AvaloniaImage image)
+    {
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+                point.X, point.Y, image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints,
+                out double pdfX, out double pdfY, pageInfo.Rotation))
+            return;
+
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Selecionar imagem para inserir no PDF",
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Imagens")
+                    {
+                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff" }
+                    }
+                }
+            });
+            if (files.Count == 0)
+                return;
+
+            string imagePath = Path.GetFullPath(files[0].Path.LocalPath);
+            using var bitmap = new Bitmap(imagePath);
+            if (bitmap.PixelSize.Width <= 0 || bitmap.PixelSize.Height <= 0)
+                throw new InvalidDataException("A imagem selecionada possui dimensões inválidas.");
+
+            double aspectRatio = (double)bitmap.PixelSize.Width / bitmap.PixelSize.Height;
+            double width = 140;
+            double height = width / aspectRatio;
+            if (height > 140)
+            {
+                height = 140;
+                width = height * aspectRatio;
+            }
+
+            if (width > pageInfo.WidthPoints || height > pageInfo.HeightPoints)
+                throw new InvalidOperationException("A imagem é maior que a página do PDF.");
+
+            double left = Math.Clamp(pdfX, 0, pageInfo.WidthPoints - width);
+            double bottom = Math.Clamp(pdfY - height, 0, pageInfo.HeightPoints - height);
+            double right = left + width;
+            double top = bottom + height;
+
+            ApplyPdfEdit(document =>
+            {
+                var stamp = new ImageStamp(imagePath)
+                {
+                    X = left,
+                    Y = bottom,
+                    DisplayWidth = width,
+                    DisplayHeight = height,
+                    Quality = 95,
+                    Opacity = 1.0,
+                    Background = false,
+                    AlternativeText = Path.GetFileName(imagePath)
+                };
+                document.Pages[pageInfo.PageIndex + 1].AddStamp(stamp);
+            }, "Imagem inserida no PDF.", savedDocument =>
+            {
+                var absorber = new ImagePlacementAbsorber();
+                savedDocument.Pages[pageInfo.PageIndex + 1].Accept(absorber);
+                return absorber.ImagePlacements.Any(placement =>
+                    placement.Rectangle != null &&
+                    placement.Rectangle.LLX <= right &&
+                    placement.Rectangle.URX >= left &&
+                    placement.Rectangle.LLY <= top &&
+                    placement.Rectangle.URY >= bottom);
+            });
+
+            SelectMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                $"Não foi possível inserir a imagem. A versão anterior foi preservada. {ex.Message}";
+        }
     }
 
     private async Task AddTextAtPointAsync(PagePreviewInfo pageInfo, Avalonia.Point point, AvaloniaImage image)
