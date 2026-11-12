@@ -35,6 +35,34 @@ internal static class ToUnicodeCMapParserSelfTests
                    result.Mappings["03"] == "C";
         });
 
+        Check("code spaces split mixed one-byte and two-byte codes", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "2 begincodespacerange <00> <7F> <8100> <81FF> endcodespacerange " +
+                "2 beginbfchar <41> <0041> <8101> <0042> endbfchar");
+            return ToUnicodeCMapParser.TryDecodeBytes(
+                       new byte[] { 0x41, 0x81, 0x01 }, cmap, out var decoded) &&
+                   decoded.Count == 2 &&
+                   decoded[0] == new CMapDecodedCode("41", "A") &&
+                   decoded[1] == new CMapDecodedCode("8101", "B");
+        });
+
+        Check("byte decoding fails closed when code has no Unicode mapping", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "1 begincodespacerange <00> <7F> endcodespacerange " +
+                "1 beginbfchar <41> <0041> endbfchar");
+            return !ToUnicodeCMapParser.TryDecodeBytes(new byte[] { 0x42 }, cmap, out _);
+        });
+
+        Check("overlapping code-space lengths are treated as ambiguous", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "2 begincodespacerange <00> <FF> <0000> <00FF> endcodespacerange " +
+                "2 beginbfchar <00> <0041> <0001> <0042> endbfchar");
+            return !ToUnicodeCMapParser.TryDecodeBytes(new byte[] { 0x00, 0x01 }, cmap, out _);
+        });
+
         Check("high-bit source codes remain unsigned and fixed-width", () =>
         {
             var result = ToUnicodeCMapParser.Parse("1 beginbfrange <80> <81> <0041> endbfrange");
