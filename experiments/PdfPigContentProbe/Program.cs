@@ -191,8 +191,15 @@ try
             }
 
             byte[][] original = window.Select(item => item.Bytes.ToArray()).ToArray();
+            byte[] replacementBytes = Convert.FromHexString(replacementCodes.Single());
+            if (replacementBytes.Length != original[0].Length)
+            {
+                Console.WriteLine($"  NÃO EXECUTADA: código substituto tem {replacementBytes.Length} byte(s), mas o original tem {original[0].Length}.");
+                simulationCompleted = true;
+                break;
+            }
             byte[][] simulated = original.Select(bytes => bytes.ToArray()).ToArray();
-            simulated[0] = Convert.FromHexString(replacementCodes.Single());
+            simulated[0] = replacementBytes;
 
             bool neighborsUnchanged = Enumerable.Range(1, targetText.Length - 1)
                 .All(index => original[index].SequenceEqual(simulated[index]));
