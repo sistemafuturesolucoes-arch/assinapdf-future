@@ -1844,6 +1844,7 @@ public partial class EditorWindow : Window
                     $"início={run.Start}, tamanho={run.Length}, fonte={run.FontFamily}, pt={run.FontSize:0.##}"))}]"
             };
             bool deletionByBoundsFallback = false;
+            bool replacementByBoundsFallback = false;
             ApplyPdfEdit(document =>
             {
                 bool cidFontSwapApplied = false;
@@ -1908,20 +1909,24 @@ public partial class EditorWindow : Window
 
                         if (target == null)
                         {
-                            // Exclusão geométrica como fallback quando o Aspose divide
-                            // a seleção em vários TextFragments. O retorno encerra esta
-                            // ação antes de qualquer acesso ao TextFragment inexistente.
+                            // Quando a seleção cruza vários TextFragments, remova
+                            // somente a região selecionada e recrie o conteúdo nessa
+                            // posição. Assim a edição não depende de um fragmento único.
+                            // A região vem dos limites da seleção feita pelo PDFium.
+                            pageAbsorber.RemoveAllText(
+                                document.Pages[pageIndex + 1], originalBounds);
+
                             if (replacementText.Length == 0)
                             {
-                                pageAbsorber.RemoveAllText(
-                                    document.Pages[pageIndex + 1], originalBounds);
                                 deletionByBoundsFallback = true;
                                 return;
                             }
 
-                            throw new InvalidOperationException(
-                                "O texto selecionado foi reconhecido pelo PDFium, mas o Aspose não encontrou um fragmento editável com o mesmo conteúdo. O PDF foi preservado sem alterações. " +
-                                "A seleção múltipla foi mantida para evitar substituir apenas uma letra ou apagar conteúdo vizinho.");
+                            target = new TextFragment(replacementText)
+                            {
+                                Position = new Position(originalBounds.LLX, originalBounds.LLY)
+                            };
+                            replacementByBoundsFallback = true;
                         }
                     }
 
@@ -1992,7 +1997,7 @@ public partial class EditorWindow : Window
                 // Primeiro anexe o fragmento à página; depois aplique os estilos aos
                 // segmentos já pertencentes ao documento. Para texto existente, ele já
                 // está anexado e a mesma rotina continua funcionando.
-                if (originalText == null)
+                if (originalText == null || replacementByBoundsFallback)
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
 
                 if (!cidFontSwapApplied && replacementText.Length > 0)
