@@ -58,6 +58,89 @@ internal static class PdfFontReflectionInspector
         Console.WriteLine();
     }
 
+    public static bool TryGetToUnicodeCMap(PdfDocument document, object letter, out CMapParseResult cmap)
+    {
+        cmap = null!;
+        object? fontDetails = GetProperty(letter, "FontDetails");
+        object? nullableReference = GetProperty(fontDetails, "FontDictionaryReference");
+        if (nullableReference is null) return false;
+
+        object? fontToken;
+        try { fontToken = ResolveReference(document, nullableReference); }
+        catch { return false; }
+
+        object? dictionary = GetProperty(fontToken, "Data");
+        if (dictionary is null) return false;
+
+        if (TryReadToUnicodeFromDictionary(document, dictionary, out cmap))
+            return true;
+
+        foreach (var (key, value) in Entries(dictionary))
+        {
+            if (key != "DescendantFonts") continue;
+            object? arrayData = GetProperty(value, "Data");
+            if (arrayData is not IEnumerable descendants) continue;
+
+            foreach (object? item in descendants)
+            {
+                if (item is null) continue;
+                object? descendant;
+                try { descendant = ResolveToken(document, item); }
+                catch { continue; }
+                object? descendantDictionary = GetProperty(descendant, "Data");
+                if (descendantDictionary is not null &&
+                    TryReadToUnicodeFromDictionary(document, descendantDictionary, out cmap))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryReadToUnicodeFromDictionary(
+        PdfDocument document, object dictionary, out CMapParseResult cmap)
+    {
+        cmap = null!;
+        foreach (var (key, value) in Entries(dictionary))
+        {
+            if (key != "ToUnicode") continue;
+
+            object? resolved;
+            try { resolved = ResolveToken(document, value); }
+            catch { return false; }
+            if (resolved is not StreamToken stream) return false;
+
+            try
+            {
+                Memory<byte> decoded = stream.Data;
+                var filters = document.Structure.FilterProvider.GetFilters(
+                    stream.StreamDictionary, document.Structure.TokenScanner);
+                int filterIndex = 0;
+                foreach (var filter in filters)
+                {
+                    if (!filter.IsSupported) return false;
+                    decoded = filter.Decode(
+                        decoded, stream.StreamDictionary,
+                        document.Structure.FilterProvider, filterIndex++);
+                }
+
+                CMapParseResult parsed = ToUnicodeCMapParser.Parse(
+                    Encoding.Latin1.GetString(decoded.Span));
+                if (parsed.CodeSpaces.Count == 0 || parsed.Mappings.Count == 0)
+                    return false;
+
+                cmap = parsed;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
     private static void InspectFontDictionary(object dictionary, PdfDocument document, string indent, int depth)
     {
         if (depth > 2) return;
