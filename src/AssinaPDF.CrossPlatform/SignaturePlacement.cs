@@ -20,8 +20,8 @@ public static class SignaturePlacementCoordinates
             placement.PageRotation is < 0 or > 3 ||
             placement.NormalizedX < 0 || placement.NormalizedY < 0 ||
             placement.NormalizedWidth <= 0 || placement.NormalizedHeight <= 0 ||
-            placement.NormalizedX + placement.NormalizedWidth > 1 ||
-            placement.NormalizedY + placement.NormalizedHeight > 1)
+            placement.NormalizedX + placement.NormalizedWidth > 1.000001 ||
+            placement.NormalizedY + placement.NormalizedHeight > 1.000001)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(placement), "A posição e as dimensões da assinatura precisam ser válidas.");
@@ -34,10 +34,16 @@ public static class SignaturePlacementCoordinates
             ? placement.PageWidthPoints
             : placement.PageHeightPoints;
 
-        double viewLeft = placement.NormalizedX * displayWidth;
-        double viewTop = placement.NormalizedY * displayHeight;
-        double viewRight = (placement.NormalizedX + placement.NormalizedWidth) * displayWidth;
-        double viewBottom = (placement.NormalizedY + placement.NormalizedHeight) * displayHeight;
+        double normalizedLeft = Math.Clamp(placement.NormalizedX, 0, 1);
+        double normalizedTop = Math.Clamp(placement.NormalizedY, 0, 1);
+        double normalizedRight = Math.Clamp(
+            placement.NormalizedX + placement.NormalizedWidth, 0, 1);
+        double normalizedBottom = Math.Clamp(
+            placement.NormalizedY + placement.NormalizedHeight, 0, 1);
+        double viewLeft = normalizedLeft * displayWidth;
+        double viewTop = normalizedTop * displayHeight;
+        double viewRight = normalizedRight * displayWidth;
+        double viewBottom = normalizedBottom * displayHeight;
 
         if (!AssinaPDF.MacPrototype.Services.PdfiumPageCoordinateMapper.TryViewToPdf(
                 viewLeft, viewTop, displayWidth, displayHeight,
