@@ -36,7 +36,20 @@ internal static class CidFontOperatorFormatter
         int pageNumber,
         TextFragment target,
         out string reason) =>
-        TryApplyBoldVariantCore(document, pageNumber, target, forceSyntheticBold: false, forceSyntheticItalic: false, foregroundOverride: null, out reason);
+        TryApplyBoldVariant(document, pageNumber, target, foregroundOverride: null, out reason);
+
+    internal static bool TryApplyBoldVariant(
+        Document document,
+        int pageNumber,
+        TextFragment target,
+        Aspose.Pdf.Color? foregroundOverride,
+        out string reason) =>
+        TryApplyBoldVariantCore(
+            document, pageNumber, target,
+            forceSyntheticBold: false,
+            forceSyntheticItalic: false,
+            foregroundOverride,
+            out reason);
 
     internal static bool TryApplySyntheticBoldFallback(
         Document document,
@@ -275,11 +288,15 @@ internal static class CidFontOperatorFormatter
         double strokeWidth = syntheticBold
             ? Math.Clamp(fontSize * 0.035, 0.20, 0.65)
             : 0;
+        // A cor de preenchimento faz parte do estado gráfico. Isole-a mesmo
+        // quando existe uma variante CID Bold real, para não colorir texto posterior.
+        bool isolateGraphicsState =
+            syntheticBold || syntheticItalic || foregroundOverride.HasValue;
 
         if (prefix.Length > 0)
             replacementOperators.Add(new SetGlyphsPositionShowText(prefix));
 
-        if (syntheticBold || syntheticItalic)
+        if (isolateGraphicsState)
             replacementOperators.Add(new GSave());
 
         if (syntheticItalic)
@@ -319,7 +336,7 @@ internal static class CidFontOperatorFormatter
 
         // Restore the graphics state and original face after the selected run;
         // adjacent glyphs retain their original appearance and positioning.
-        if (syntheticBold || syntheticItalic)
+        if (isolateGraphicsState)
             replacementOperators.Add(new GRestore());
         replacementOperators.Add(new SelectFont(sourceFont.ResourceName!, fontSize));
         if (suffix.Length > 0)
