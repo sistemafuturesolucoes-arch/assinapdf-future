@@ -49,7 +49,8 @@ public sealed class PdfVisualElementTests
                     Subject = "AssinaPDF Editor Ellipse",
                     Color = Color.FromRgb(0.42, 0.29, 0.75),
                     InteriorColor = Color.FromRgb(0.88, 0.84, 0.96),
-                    Opacity = 0.22
+                    Opacity = 0.22,
+                    Flags = AnnotationFlags.Print
                 };
                 page.Annotations.Add(ellipse);
                 ellipse.UpdateAppearances();
