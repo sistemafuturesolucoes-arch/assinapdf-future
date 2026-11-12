@@ -1794,8 +1794,14 @@ public partial class EditorWindow : Window
             double right = left + width;
             double top = bottom + height;
 
+            int previousImageCount = -1;
             ApplyPdfEdit(document =>
             {
+                var page = document.Pages[pageInfo.PageIndex + 1];
+                var beforeImages = new ImagePlacementAbsorber();
+                page.Accept(beforeImages);
+                previousImageCount = beforeImages.ImagePlacements.Count;
+
                 var stamp = new ImageStamp(imagePath)
                 {
                     X = left,
@@ -1807,12 +1813,13 @@ public partial class EditorWindow : Window
                     Background = false,
                     AlternativeText = Path.GetFileName(imagePath)
                 };
-                document.Pages[pageInfo.PageIndex + 1].AddStamp(stamp);
+                page.AddStamp(stamp);
             }, "Imagem inserida no PDF.", savedDocument =>
             {
                 var absorber = new ImagePlacementAbsorber();
                 savedDocument.Pages[pageInfo.PageIndex + 1].Accept(absorber);
-                return absorber.ImagePlacements.Any(placement =>
+                return absorber.ImagePlacements.Count > previousImageCount &&
+                    absorber.ImagePlacements.Any(placement =>
                     placement.Rectangle != null &&
                     placement.Rectangle.LLX <= right &&
                     placement.Rectangle.URX >= left &&
@@ -2174,6 +2181,7 @@ public partial class EditorWindow : Window
 
         try
         {
+            int originalImageCount = -1;
             ApplyPdfEdit(document =>
             {
                 var page = document.Pages[pageInfo.PageIndex + 1];
@@ -2196,6 +2204,7 @@ public partial class EditorWindow : Window
 
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
+                originalImageCount = absorber.ImagePlacements.Count;
                 if (imageIndex < 0 || imageIndex >= absorber.ImagePlacements.Count)
                     throw new InvalidOperationException("A imagem selecionada não foi encontrada no PDF.");
 
@@ -2258,7 +2267,8 @@ public partial class EditorWindow : Window
 
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
-                return absorber.ImagePlacements.Any(placement =>
+                return absorber.ImagePlacements.Count == originalImageCount &&
+                    absorber.ImagePlacements.Any(placement =>
                     placement.Rectangle is { } rectangle &&
                     Math.Pow((rectangle.LLX + rectangle.URX) / 2 - expectedCenterX, 2) +
                     Math.Pow((rectangle.LLY + rectangle.URY) / 2 - expectedCenterY, 2) < 900);
@@ -2287,6 +2297,7 @@ public partial class EditorWindow : Window
 
         try
         {
+            int originalImageCount = -1;
             ApplyPdfEdit(document =>
             {
                 var page = document.Pages[pageIndex + 1];
@@ -2304,6 +2315,7 @@ public partial class EditorWindow : Window
 
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
+                originalImageCount = absorber.ImagePlacements.Count;
                 if (imageIndex < 0 || imageIndex >= absorber.ImagePlacements.Count)
                     throw new InvalidOperationException("A imagem selecionada não existe mais.");
                 var placement = absorber.ImagePlacements[imageIndex];
@@ -2330,7 +2342,8 @@ public partial class EditorWindow : Window
 
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
-                return !absorber.ImagePlacements.Any(placement =>
+                return absorber.ImagePlacements.Count == originalImageCount - 1 &&
+                    !absorber.ImagePlacements.Any(placement =>
                     placement.Rectangle is { } rectangle &&
                     Math.Pow((rectangle.LLX + rectangle.URX) / 2 - centerX, 2) +
                     Math.Pow((rectangle.LLY + rectangle.URY) / 2 - centerY, 2) < 900);
