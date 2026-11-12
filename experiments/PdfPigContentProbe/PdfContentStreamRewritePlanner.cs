@@ -12,6 +12,7 @@ internal static class PdfContentStreamRewritePlanner
     public static bool TryPlanSingleTjReplacement(
         ReadOnlySpan<byte> decodedContentStream,
         int selectedTokenOffset,
+        int selectedByteOffset,
         ReadOnlySpan<byte> expectedOriginalBytes,
         ReadOnlySpan<byte> replacementBytes,
         out PdfContentStreamRewritePlan plan,
@@ -51,14 +52,17 @@ internal static class PdfContentStreamRewritePlanner
         byte[] rawToken = decodedContentStream[selected.TokenStart..selected.TokenEnd].ToArray();
         if (!PdfStringOperandCodec.TryDecodeToken(rawToken, out var token, out reason))
             return false;
-        if (!token.DecodedBytes.AsSpan().SequenceEqual(expectedOriginalBytes))
+        if (selectedByteOffset < 0 ||
+            selectedByteOffset + expectedOriginalBytes.Length > token.DecodedBytes.Length ||
+            !token.DecodedBytes.AsSpan(selectedByteOffset, expectedOriginalBytes.Length)
+                .SequenceEqual(expectedOriginalBytes))
         {
-            reason = "Decodificação independente do token não corresponde aos bytes esperados.";
+            reason = "Intervalo selecionado no operando não corresponde aos bytes originais esperados.";
             return false;
         }
 
         if (!PdfStringOperandCodec.TryReplaceBytesSameLength(
-            rawToken, token, 0, replacementBytes,
+            rawToken, token, selectedByteOffset, replacementBytes,
             out byte[] rewrittenToken, out reason))
             return false;
 
@@ -89,8 +93,10 @@ internal static class PdfContentStreamRewritePlanner
         var rewrittenMatch = after.TjOperands
             .Where(x => x.TokenStart == selected.TokenStart)
             .ToArray();
+        byte[] expectedWholeOperand = token.DecodedBytes.ToArray();
+        replacementBytes.CopyTo(expectedWholeOperand.AsSpan(selectedByteOffset));
         if (rewrittenMatch.Length != 1 ||
-            !rewrittenMatch[0].DecodedBytes.AsSpan().SequenceEqual(replacementBytes))
+            !rewrittenMatch[0].DecodedBytes.AsSpan().SequenceEqual(expectedWholeOperand))
         {
             reason = "O operando Tj reescrito não foi recuperado exatamente na validação de ida e volta.";
             return false;
