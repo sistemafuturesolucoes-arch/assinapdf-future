@@ -1920,51 +1920,102 @@ public partial class EditorWindow : Window
 
                     if (target == null || closest > 8.0)
                     {
-                        // Tenta a busca textual do Aspose, que consegue localizar
-                        // ocorrências por conteúdo mesmo quando a seleção veio de
-                        // caracteres PDFium separados em objetos de texto diferentes.
-                        // Só prossegue se o resultado representar exatamente o texto
-                        // selecionado; não substitui fragmentos vizinhos por aproximação.
-                        target = pageAbsorber.TextFragments
+                        // A seleção pode reunir vários TextFragments (por exemplo,
+                        // uma linha com estilos diferentes). Só reconstruímos o trecho
+                        // quando os fragmentos inteiramente contidos na seleção,
+                        // concatenados, reproduzem exatamente o texto selecionado.
+                        var exactCandidate = pageAbsorber.TextFragments
                             .Where(fragment => fragment.Rectangle != null &&
                                 string.Equals(
                                     NormalizePdfText(fragment.Text),
                                     NormalizePdfText(originalText),
                                     StringComparison.Ordinal))
-                            .OrderBy(fragment =>
+                            .Select(fragment => new
                             {
-                                var rectangle = fragment.Rectangle;
-                                if (rectangle == null || originalBounds == null)
-                                    return double.MaxValue;
-                                double dx = (rectangle.LLX + rectangle.URX - originalBounds.LLX - originalBounds.URX) / 2;
-                                double dy = (rectangle.LLY + rectangle.URY - originalBounds.LLY - originalBounds.URY) / 2;
-                                return dx * dx + dy * dy;
+                                Fragment = fragment,
+                                Bounds = fragment.Rectangle!,
+                                Distance = Math.Pow(
+                                    (fragment.Rectangle!.LLX + fragment.Rectangle.URX -
+                                     originalBounds.LLX - originalBounds.URX) / 2, 2) +
+                                    Math.Pow(
+                                    (fragment.Rectangle.LLY + fragment.Rectangle.URY -
+                                     originalBounds.LLY - originalBounds.URY) / 2, 2)
                             })
-                            .FirstOrDefault()!;
+                            .Where(item => item.Distance <= 64)
+                            .OrderBy(item => item.Distance)
+                            .ToArray();
 
-                        if (target == null)
+                        if (exactCandidate.Length > 0 &&
+                            (exactCandidate.Length == 1 ||
+                             Math.Abs(exactCandidate[1].Distance - exactCandidate[0].Distance) >= 1))
                         {
-                            // Quando a seleção cruza vários TextFragments, remova
-                            // somente a região selecionada e recrie o conteúdo nessa
-                            // posição. Assim a edição não depende de um fragmento único.
-                            // A região vem dos limites da seleção feita pelo PDFium.
-                            pageAbsorber.RemoveAllText(
-                                document.Pages[pageIndex + 1], originalBounds);
-
-                            if (replacementText.Length == 0)
-                            {
-                                deletionByBoundsFallback = true;
-                                return;
-                            }
-
-                            target = new TextFragment(replacementText)
-                            {
-                                Position = new Position(originalBounds.LLX, originalBounds.LLY)
-                            };
-                            replacementByBoundsFallback = true;
+                            target = exactCandidate[0].Fragment;
                         }
                     }
 
+                    if (target == null || closest > 8.0 &&
+                        !string.Equals(
+                            NormalizePdfText(target.Text),
+                            NormalizePdfText(originalText),
+                            StringComparison.Ordinal))
+                    {
+                        const double selectionTolerance = 2.0;
+                        var selectedFragments = pageAbsorber.TextFragments
+                            .Where(fragment => fragment.Rectangle != null &&
+                                !string.IsNullOrWhiteSpace(fragment.Text) &&
+                                fragment.Rectangle.LLX >= originalBounds.LLX - selectionTolerance &&
+                                fragment.Rectangle.LLY >= originalBounds.LLY - selectionTolerance &&
+                                fragment.Rectangle.URX <= originalBounds.URX + selectionTolerance &&
+                                fragment.Rectangle.URY <= originalBounds.URY + selectionTolerance)
+                            .ToArray();
+
+                        string selectedFragmentsText = string.Concat(
+                            selectedFragments.Select(fragment => fragment.Text));
+                        if (selectedFragments.Length == 0 ||
+                            !string.Equals(
+                                NormalizePdfText(selectedFragmentsText),
+                                NormalizePdfText(originalText),
+                                StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException(
+                                "A seleção não corresponde exatamente aos objetos de texto encontrados no PDF. " +
+                                "A edição foi cancelada para não alterar texto vizinho.");
+                        }
+
+                        bool hasPartiallyOverlappingText = pageAbsorber.TextFragments.Any(fragment =>
+                            fragment.Rectangle is { } rectangle &&
+                            !string.IsNullOrWhiteSpace(fragment.Text) &&
+                            rectangle.URX >= originalBounds.LLX &&
+                            rectangle.LLX <= originalBounds.URX &&
+                            rectangle.URY >= originalBounds.LLY &&
+                            rectangle.LLY <= originalBounds.URY &&
+                            !selectedFragments.Contains(fragment));
+
+                        if (hasPartiallyOverlappingText)
+                            throw new InvalidOperationException(
+                                "Há outro objeto de texto que cruza a área selecionada. " +
+                                "A edição foi cancelada para preservar o conteúdo vizinho.");
+
+                        if (cidBoldOnlyEdit || cidSyntheticItalicEdit)
+                            throw new InvalidOperationException(
+                                "A formatação especial de fonte CID não pode ser aplicada com segurança a uma seleção composta por vários objetos. " +
+                                "Edite um único bloco por vez.");
+
+                        foreach (TextFragment fragment in selectedFragments)
+                            fragment.Text = string.Empty;
+
+                        if (replacementText.Length == 0)
+                        {
+                            deletionByBoundsFallback = true;
+                            return;
+                        }
+
+                        target = new TextFragment(replacementText)
+                        {
+                            Position = new Position(originalBounds.LLX, originalBounds.LLY)
+                        };
+                        replacementByBoundsFallback = true;
+                    }
                     if (cidBoldOnlyEdit)
                     {
                         var boldRun = editedRuns[0];
