@@ -145,16 +145,19 @@
             <Border Height="1" Background="#343C49"/>
             <TextBlock Text="FORMATAÇÃO" FontSize="9" FontWeight="Bold"
                        Foreground="#A78BFA"/>
-            <TextBlock Text="As opções de fonte, tamanho, negrito, itálico e cor aparecem durante a edição do texto."
-                       FontSize="10" Foreground="#AAB2BF"
-                       TextWrapping="Wrap"/>
-            <ContentControl x:Name="EditorFormattingToolbarHost"/>
+            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+              <ContentControl x:Name="EditorFormattingToolbarHost"/>
+            </ScrollViewer>
+            <ContentControl x:Name="EditorInlineEditorHost" IsVisible="False"/>
             <Border Height="1" Background="#343C49"/>
-            <TextBlock Text="COMO EDITAR" FontSize="9" FontWeight="Bold"
-                       Foreground="#A78BFA"/>
-            <TextBlock Text="• Clique ou arraste sobre o texto para selecionar.&#10;&#10;• Use “Editar conteúdo” para alterar o texto e sua formatação.&#10;&#10;• Escolha T e clique na página para inserir um novo texto.&#10;&#10;• Use a roda do mouse para navegar e Ctrl + roda para ajustar o zoom."
-                       FontSize="10" Foreground="#AAB2BF"
-                       TextWrapping="Wrap"/>
+            <StackPanel x:Name="EditorInstructionsPanel" Spacing="8">
+              <TextBlock Text="COMO EDITAR" FontSize="9" FontWeight="Bold"
+                         Foreground="#A78BFA"/>
+              <TextBlock Text="• Clique ou arraste sobre o texto para selecionar.&#10;&#10;• Use “Editar conteúdo” para alterar o texto e sua formatação.&#10;&#10;• Escolha T e clique na página para inserir um novo texto.&#10;&#10;• Use a roda do mouse para navegar e Ctrl + roda para ajustar o zoom."
+                         FontSize="10" Foreground="#AAB2BF"
+                         TextWrapping="Wrap"/>
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
       </Border>
