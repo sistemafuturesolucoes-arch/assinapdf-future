@@ -427,6 +427,7 @@ static void PrintSummary(string report)
         "Fonte exata da seleção:", "Código(s) bruto(s) da seleção:",
         "Código 0x", "Width=", "CharProc decodificado:", "Início do programa:",
         "Métrica inicial Type3:", "FontMatrix:", "FontBBox:",
+        "/Differences:", "/CharProcs:", "Mapa completo dos CharProcs disponíveis", "    /",
         "Largura código C", "Largura código B", "Larguras C/B iguais:",
         "Nenhuma letra B foi encontrada",
         "NÃO EXECUTADA:", "SIMULAÇÃO DE SUBSTITUIÇÃO", "Texto original:",
