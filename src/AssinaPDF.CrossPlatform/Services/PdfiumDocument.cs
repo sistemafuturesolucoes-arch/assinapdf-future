@@ -480,10 +480,15 @@ public sealed class PdfiumDocument : IDisposable
                             ? string.Empty
                             : char.ConvertFromUtf32((int)unicode);
 
-                        PdfiumNative.TextGetCharBox(
+                        int charBoxResult = PdfiumNative.TextGetCharBox(
                             textPage, index,
                             out double left, out double right,
                             out double bottom, out double top);
+
+                        // FPDFText_GetCharBox retorna FPDF_BOOL. Não utilizar as
+                        // coordenadas quando o PDFium informar que a caixa é inválida.
+                        if (charBoxResult == 0)
+                            continue;
 
                         double fontSize = PdfiumNative.TextGetCharacterFontSize(textPage, index);
                         if (!double.IsFinite(left) || !double.IsFinite(right) ||
