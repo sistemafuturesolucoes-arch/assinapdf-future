@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using UglyToad.PdfPig;
 
@@ -67,8 +68,9 @@ try
                 {
                     string font = letters![0].FontName ?? "(fonte desconhecida)";
                     string code = Convert.ToHexString(operandBytes.Span);
-                    string unicode = $"U+{(int)letters[0].Value:X4}";
-                    string key = $"{font}|{code}|{unicode}|'{Escape(letters[0].Value.ToString())}'";
+                    string letterText = letters[0].Value;
+                    string unicode = string.Join("+", letterText.EnumerateRunes().Select(rune => $"U+{rune.Value:X4}"));
+                    string key = $"{font}|{code}|{unicode}|'{Escape(letterText)}'";
                     codeMap[key] = codeMap.TryGetValue(key, out int occurrences) ? occurrences + 1 : 1;
                     candidateMappings++;
                 }
