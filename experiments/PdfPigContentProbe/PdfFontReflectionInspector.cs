@@ -253,10 +253,19 @@ internal static class PdfFontReflectionInspector
                     for (long code = first; code <= last; code++)
                     {
                         long destination = destinationStart + (code - first);
-                        string destinationHex = destination.ToString(destinationStart.ToString("X").Length % 2 == 0
-                            ? $"X{destinationStart.ToString("X").Length}" : $"X{destinationStart.ToString("X").Length + 1}");
+                        // Preserve the destination code-unit width from the CMap.
+                        // Using the numeric value's minimal width would turn <0041>
+                        // into <41>, which is not valid UTF-16BE for this decoder.
+                        string destinationHex = destination.ToString($"X{hex[2].Length}");
+                        if (destinationHex.Length > hex[2].Length)
+                        {
+                            malformed++;
+                            continue;
+                        }
                         if (TryDecodeUnicodeHex(destinationHex, out string unicode))
                             mappings[NormalizeHex(code.ToString($"X{sourceWidth}"))] = unicode;
+                        else
+                            malformed++;
                     }
                 }
                 else malformed++;
