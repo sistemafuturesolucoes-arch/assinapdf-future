@@ -21,6 +21,10 @@ Expected result: `PDF glyph lab: 11/11 checks passed.`
 
 This is still a planning stage. The source mapper consumes explicit byte spans supplied by a future PDF content interpreter, and the byte planner identifies untouched operand ranges. It does **not** decode compressed PDF streams, parse indirect objects/resources, decode font character codes, discover the operator behind a PDFium glyph, emit rewritten `Tj/TJ` operators, preserve text advance/kerning, or save a modified PDF. A passing result is not proof of PDF editing correctness.
 
+## Native PDFium export probe
+
+A separate diagnostic project now checks whether the bundled native PDFium binary exports `FPDFText_GetTextObject` and the core text APIs. It is intentionally isolated and is not referenced by the application. Run it on each target OS using `dotnet run --project experiments/PdfiumExportProbe/PdfiumExportProbe.csproj`. See [the probe README](../PdfiumExportProbe/README.md). Export presence alone is not proof that the function can be safely invoked or that it maps characters to source bytes.
+
 ## Next acceptance gates
 
 1. Adapter from the existing PDFium character inspection to `GlyphBox`, preserving page and character indices.
