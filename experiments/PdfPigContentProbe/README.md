@@ -127,3 +127,6 @@ A inspeção Type3 agora também:
 - para cada amostra encontrada, mostra o código, o nome de glifo e a largura correspondente.
 
 Isso evita confundir fontes distintas que compartilham o mesmo nome exibido pelo PdfPig e evita assumir que o caractere Unicode `B` corresponde a um CharProc chamado `/B`. A inspeção continua somente leitura: não reescreve streams, não salva PDF e não autoriza substituição automática.
+
+
+A inspeção também lista candidatos Unicode `B` com sua referência de fonte e bytes de origem, explicitando se a referência coincide com a fonte selecionada. Para CharProcs decodificados, tenta extrair a métrica inicial Type3 (`wx wy d0/d1`), que representa o avanço declarado pelo programa. A ausência de candidato com referência idêntica permanece inconclusiva: não se deve inferir um código substituto a partir de outra fonte.
