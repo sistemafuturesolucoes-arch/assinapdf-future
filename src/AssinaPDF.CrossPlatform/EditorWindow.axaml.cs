@@ -591,6 +591,16 @@ public partial class EditorWindow : Window
         e.Handled = true;
     }
 
+    private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        SetEditorZoom(_zoomFactor / 1.10);
+    }
+
+    private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        SetEditorZoom(_zoomFactor * 1.10);
+    }
+
     private void SetEditorZoom(double requestedZoom)
     {
         double nextZoom = Math.Clamp(requestedZoom, 0.50, 3.00);
