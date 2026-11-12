@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
@@ -131,7 +132,7 @@ internal static class Type3EncodingGlyphInspector
         {
             Console.WriteLine($"  Código(s) bruto(s) da seleção: {Convert.ToHexString(selectedBytes)}");
             if (selectedBytes.Length == 1)
-                DescribeCode(selectedBytes[0], differences, charProcNames, widths, charProcEntries);
+                DescribeCode(document, selectedBytes[0], differences, charProcNames, widths, charProcEntries);
             else
                 Console.WriteLine("  Mapeamento Differences direto não aplicado: operando com mais de um byte.");
         }
@@ -168,7 +169,7 @@ internal static class Type3EncodingGlyphInspector
         Console.WriteLine();
     }
 
-    private static void DescribeCode(int code, List<GlyphEntry> differences, HashSet<string> charProcNames,
+    private static void DescribeCode(PdfDocument document, int code, List<GlyphEntry> differences, HashSet<string> charProcNames,
         List<WidthEntry>? widths, Dictionary<string, object>? charProcEntries)
     {
         var matches = differences.Where(x => x.Code == code).ToArray();
@@ -184,7 +185,7 @@ internal static class Type3EncodingGlyphInspector
             Console.WriteLine($"    Width={FindWidth(widths, code)}");
         if (hasProgram && charProcEntries is not null &&
             charProcEntries.TryGetValue(glyphName, out object? token))
-            Console.WriteLine($"    CharProc token={token.GetType().Name}; referência={Get(token, "Data") ?? token}");
+            DescribeCharProc(document, token);
     }
 
     private static void DumpObservedCodesForExactFont(PdfDocument document, Letter selected,
@@ -216,7 +217,7 @@ internal static class Type3EncodingGlyphInspector
                 if (raw is not ReadOnlyMemory<byte> memory || memory.Length == 0) continue;
                 Console.WriteLine($"  Amostra B na fonte exata: página={pageNumber}; seq={sequence}; bytes={Convert.ToHexString(memory.Span)}");
                 if (memory.Length == 1)
-                    DescribeCode(memory.Span[0], differences, charProcNames, widths, charProcEntries);
+                    DescribeCode(document, memory.Span[0], differences, charProcNames, widths, charProcEntries);
                 printed++;
                 if (printed >= 20) break;
             }
@@ -224,6 +225,45 @@ internal static class Type3EncodingGlyphInspector
         }
         if (printed == 0)
             Console.WriteLine("  Nenhuma letra B foi encontrada com a mesma referência exata de dicionário de fonte.");
+    }
+
+    private static void DescribeCharProc(PdfDocument document, object token)
+    {
+        try
+        {
+            object? resolved = Resolve(document, token);
+            if (resolved is not StreamToken stream)
+            {
+                Console.WriteLine($"    CharProc não resolvido como stream: {resolved?.GetType().Name ?? "null"}");
+                return;
+            }
+
+            Memory<byte> decoded = stream.Data;
+            var filters = document.Structure.FilterProvider.GetFilters(
+                stream.StreamDictionary, document.Structure.TokenScanner);
+            int filterIndex = 0;
+            foreach (var filter in filters)
+            {
+                if (!filter.IsSupported)
+                {
+                    Console.WriteLine($"    CharProc: filtro não suportado ({filter.GetType().Name}); inspeção do programa interrompida.");
+                    return;
+                }
+                decoded = filter.Decode(decoded, stream.StreamDictionary,
+                    document.Structure.FilterProvider, filterIndex++);
+            }
+
+            string source = Encoding.Latin1.GetString(decoded.Span);
+            string preview = source.Replace("\r", " ").Replace("\n", " ");
+            if (preview.Length > 220) preview = preview[..220] + "…";
+            string hash = Convert.ToHexString(SHA256.HashData(decoded.Span));
+            Console.WriteLine($"    CharProc decodificado: {decoded.Length} bytes; SHA256={hash}");
+            Console.WriteLine($"    Início do programa: {preview}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"    CharProc: inspeção interrompida ({ex.GetType().Name}).");
+        }
     }
 
     private static string FormatCodes(IEnumerable<GlyphEntry> entries, string name)
