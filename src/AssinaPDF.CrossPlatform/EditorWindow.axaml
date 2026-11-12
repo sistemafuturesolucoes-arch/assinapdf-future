@@ -147,7 +147,7 @@
                        Foreground="#A78BFA"/>
             <ScrollViewer HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Disabled">
-              <ContentControl x:Name="EditorFormattingToolbarHost"/>
+              <ContentControl x:Name="EditorFormattingToolbarHost" IsVisible="False"/>
             </ScrollViewer>
             <ContentControl x:Name="EditorInlineEditorHost" IsVisible="False"/>
             <Border Height="1" Background="#343C49"/>
