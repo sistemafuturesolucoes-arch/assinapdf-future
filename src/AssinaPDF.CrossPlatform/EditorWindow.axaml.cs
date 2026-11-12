@@ -912,9 +912,6 @@ public partial class EditorWindow : Window
             pageInfo.WidthPoints, pageInfo.HeightPoints, out double pdfX, out double pdfY, pageInfo.Rotation) || _document == null)
             return;
 
-        if (TrySelectVisualElementAtPoint(image, pageInfo, pdfX, pdfY))
-            return;
-
         try
         {
             // Primeiro tenta selecionar o objeto de texto inteiro do PDF (em vez
@@ -985,7 +982,15 @@ public partial class EditorWindow : Window
             }
             var character = PdfiumTextHitTest.FindCharacterAtPoint(characters, pageInfo.PageIndex, pdfX, pdfY, 3.0);
             if (character != null)
+            {
                 SetTextSelection(image, pageInfo, new[] { character }, character.Text);
+                return;
+            }
+
+            // Texto tem prioridade sobre imagens de fundo e formas que possam
+            // cobrir visualmente a mesma área. Elementos visuais são selecionados
+            // quando não há texto sob o ponto clicado.
+            TrySelectVisualElementAtPoint(image, pageInfo, pdfX, pdfY);
         }
         catch (Exception ex) { EditorStatusText.Text = $"Não foi possível localizar o texto: {ex.Message}"; }
     }
