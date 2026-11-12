@@ -114,3 +114,16 @@ This remains strictly diagnostic: it does not modify the PDF object, recompress 
 Uma inspeção adicional localiza o trecho de teste `CONFIRME` e examina o dicionário Type3 da primeira letra. Ela tenta ler `/Encoding`, `/BaseEncoding`, a sequência `/Differences`, os nomes presentes em `/CharProcs`, `/FirstChar`, `/Widths`, `/FontMatrix` e `/FontBBox`. O objetivo é verificar se os nomes de glifo `C` e `B` existem estruturalmente e se os códigos associados têm larguras declaradas iguais.
 
 A inspeção não depende de existir um mapeamento ToUnicode para todos os glifos: o ToUnicode é uma camada de extração textual, enquanto Encoding/Differences e CharProcs descrevem a codificação e os programas de desenho da fonte Type3. Ainda assim, encontrar um nome em Differences e CharProcs não comprova que o desenho seja visualmente equivalente, nem basta para editar o PDF. Codificações baseadas em nomes, aliases, ausência de Differences, métricas dos operadores d0/d1, estado de texto e posicionamento dos próximos operadores ainda exigem validação. Nenhum objeto é modificado e nenhum arquivo é salvo.
+
+
+### Diagnóstico Type3 por código real e referência exata da fonte
+
+A inspeção Type3 agora também:
+- lê os bytes do operando da letra selecionada;
+- relaciona o código numérico com o nome efetivo em `/Encoding /Differences`;
+- verifica se o nome resultante existe em `/CharProcs`;
+- mostra a largura declarada para o código quando disponível;
+- procura letras `B` usando a mesma referência de objeto do dicionário da fonte, não apenas o mesmo `FontName`;
+- para cada amostra encontrada, mostra o código, o nome de glifo e a largura correspondente.
+
+Isso evita confundir fontes distintas que compartilham o mesmo nome exibido pelo PdfPig e evita assumir que o caractere Unicode `B` corresponde a um CharProc chamado `/B`. A inspeção continua somente leitura: não reescreve streams, não salva PDF e não autoriza substituição automática.
