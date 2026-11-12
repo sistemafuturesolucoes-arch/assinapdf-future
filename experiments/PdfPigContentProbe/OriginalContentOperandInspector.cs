@@ -88,6 +88,37 @@ internal static class OriginalContentOperandInspector
             Console.WriteLine($"  Página {pageNumber}: PdfPig Tj={expected}; operandos localizados={found}; comparados={compared}; exatos={exact}; Bytes vazios={empty}; bytes diferentes={different}; Bytes indisponíveis={unavailable}; diferença de contagem={found - expected}");
             foreach (string detail in details)
                 Console.WriteLine($"    DIAGNÓSTICO {detail}");
+
+            // Correlaciona o operando original com a sequência de ShowText e as Letters produzidas.
+            int textSequence = 0, tjOperandIndex = 0, printedCorrelations = 0;
+            foreach (var operationInOrder in page.Operations)
+            {
+                if (operationInOrder.Operator is not ("Tj" or "TJ")) continue;
+                textSequence++;
+                if (operationInOrder.Operator != "Tj") continue;
+                if (tjOperandIndex >= locatedForPage.Count) break;
+
+                var token = locatedForPage[tjOperandIndex].Token;
+                var operationText = operationInOrder.GetType()
+                    .GetProperty("Text", BindingFlags.Public | BindingFlags.Instance)?
+                    .GetValue(operationInOrder)?.ToString() ?? "";
+                var associatedLetters = page.Letters
+                    .Where(letter => letter.TextSequence == textSequence)
+                    .ToArray();
+                bool isEmptyBytes = operationInOrder.GetType()
+                    .GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?
+                    .GetValue(operationInOrder) is ReadOnlyMemory<byte> opBytes && opBytes.Length == 0;
+
+                if (printedCorrelations < 20 || isEmptyBytes)
+                {
+                    string letterText = string.Concat(associatedLetters.Select(letter => letter.Value));
+                    string fonts = string.Join(",", associatedLetters.Select(letter => letter.FontName).Distinct());
+                    Console.WriteLine($"    GLIFO-MAP pág={pageNumber}; seq={textSequence}; op=Tj; obj={locatedForPage[tjOperandIndex].ObjectId}; offset={token.Start}; raw={token.RawHex}; opText='{EscapeForLog(operationText)}'; letters={associatedLetters.Length}; letterText='{EscapeForLog(letterText)}'; fontes={fonts}");
+                    printedCorrelations++;
+                }
+                tjOperandIndex++;
+            }
+            Console.WriteLine($"    GLIFO-MAP resumo: operandos Tj correlacionados={tjOperandIndex}; sequências de texto={textSequence}; linhas exibidas={printedCorrelations} (primeiras 20 + Bytes vazios).");
         }
 
         Console.WriteLine($"  TOTAL: streams analisados={totalParsed}; streams ignorados por filtro={totalUnsupported}; operandos Tj localizados={totalFound}");
@@ -179,6 +210,8 @@ internal static class OriginalContentOperandInspector
         }
         else if (resolved is StreamToken stream) output.Add((stream, id));
     }
+
+    private static string EscapeForLog(string value) => value.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("'", "\\'");
 
     private static string DescribeOperation(object operation)
     {
