@@ -690,7 +690,16 @@ public partial class EditorWindow : Window
     private ContextMenu CreateSelectionContextMenu()
     {
         var editItem = new MenuItem { Header = "Editar texto" };
-        editItem.Click += EditSelectedText_Click;
+        editItem.Click += (_, _) =>
+        {
+            if (_selectedVisualKind != VisualElementKind.None)
+            {
+                EditorStatusText.Text =
+                    "Imagens e formas podem ser movidas, redimensionadas ou excluídas. A edição de conteúdo é destinada a textos.";
+                return;
+            }
+            _ = EditSelectedText_ClickAsync();
+        };
         var copyItem = new MenuItem { Header = "Copiar" };
         copyItem.Click += async (_, _) =>
         {
@@ -839,7 +848,7 @@ public partial class EditorWindow : Window
             _isDrawingRectangle = false;
             e.Pointer.Capture(null);
             RemoveRectanglePreview(drawingPage.PageIndex);
-            _ = AddRectangleFromDragAsync(drawingPage, _selectionStart, _selectionEnd, drawingImage);
+            AddRectangleFromDrag(drawingPage, _selectionStart, _selectionEnd, drawingImage);
             _activeSelectionImage = null;
             _activeSelectionPage = null;
             e.Handled = true;
@@ -1588,7 +1597,7 @@ public partial class EditorWindow : Window
         _rectanglePreview = null;
     }
 
-    private async Task AddRectangleFromDragAsync(
+    private void AddRectangleFromDrag(
         PagePreviewInfo pageInfo,
         Avalonia.Point start,
         Avalonia.Point end,
@@ -1985,7 +1994,7 @@ public partial class EditorWindow : Window
             args.Pointer.Capture(null);
             if (changed)
             {
-                _ = ApplyVisualElementBoundsAsync(
+                ApplyVisualElementBounds(
                     pageInfo, image,
                     Canvas.GetLeft(border), Canvas.GetTop(border),
                     border.Width, border.Height);
@@ -2003,7 +2012,7 @@ public partial class EditorWindow : Window
             elementLabel + ". Arraste para mover; use o puxador roxo no canto para redimensionar.";
     }
 
-    private async Task ApplyVisualElementBoundsAsync(
+    private void ApplyVisualElementBounds(
         PagePreviewInfo pageInfo,
         AvaloniaImage image,
         double viewLeft,
@@ -2150,7 +2159,7 @@ public partial class EditorWindow : Window
         }
     }
 
-    private async Task DeleteSelectedVisualElementAsync()
+    private void DeleteSelectedVisualElement()
     {
         if (_selectedPageIndex is not int pageIndex ||
             _selectedVisualKind == VisualElementKind.None ||
@@ -2250,7 +2259,7 @@ public partial class EditorWindow : Window
     {
         if (_selectedVisualKind != VisualElementKind.None)
         {
-            _ = DeleteSelectedVisualElementAsync();
+            DeleteSelectedVisualElement();
             return;
         }
 
@@ -2360,7 +2369,13 @@ public partial class EditorWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_selectedPageIndex is not int pageIndex)
+        await EditSelectedText_ClickAsync();
+    }
+
+    private async Task EditSelectedText_ClickAsync()
+    {
+        if (_selectedVisualKind != VisualElementKind.None ||
+            _selectedPageIndex is not int pageIndex)
             return;
 
         await EditTextAtPointAsync(pageIndex, _selectedPdfX, _selectedPdfY,
