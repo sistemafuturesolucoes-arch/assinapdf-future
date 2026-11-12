@@ -1830,8 +1830,6 @@ public partial class EditorWindow : Window
                     placement.Rectangle.LLY <= top &&
                     placement.Rectangle.URY >= bottom);
             });
-
-            SelectMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
         }
         catch (Exception ex)
         {
