@@ -86,6 +86,7 @@ internal static class Type3EncodingGlyphInspector
         }
 
         object? encoding = ValueObject(fontDictionary, "Encoding");
+        Console.WriteLine("  /Encoding bruto: " + (encoding?.ToString() ?? "(não declarado)"));
         object? encodingDictionary = ResolveIfReference(document, encoding);
         string baseEncoding = "(não declarado)";
         var differences = new List<GlyphEntry>();
@@ -214,7 +215,7 @@ internal static class Type3EncodingGlyphInspector
     private static object? ResolveIfReference(PdfDocument document, object? token)
     {
         if (token is null) return null;
-        return token.GetType().Name == "IndirectReferenceToken" ? Resolve(document, token) : token;
+        return Resolve(document, token);
     }
 
     private static object? Resolve(PdfDocument document, object referenceOrToken)
