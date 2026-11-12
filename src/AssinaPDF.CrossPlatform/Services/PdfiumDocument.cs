@@ -190,9 +190,15 @@ public sealed class PdfiumDocument : IDisposable
                 if (pageRotation is < 0 or > 3)
                     throw new InvalidDataException("O PDF contém um valor /Rotate inválido.");
 
+                // PDFium já devolve GetPageWidth/Height com a rotação /Rotate
+                // aplicada. Essas dimensões são as dimensões visíveis da página.
+                // Para mapear conteúdo e coordenadas PDF, mantemos também as
+                // dimensões originais (sem rotação).
                 bool quarterTurn = pageRotation is 1 or 3;
-                double displayWidthPoints = quarterTurn ? pageHeight : pageWidth;
-                double displayHeightPoints = quarterTurn ? pageWidth : pageHeight;
+                float originalPageWidth = quarterTurn ? pageHeight : pageWidth;
+                float originalPageHeight = quarterTurn ? pageWidth : pageHeight;
+                double displayWidthPoints = pageWidth;
+                double displayHeightPoints = pageHeight;
                 double requestedWidth = displayWidthPoints * scale;
                 double requestedHeight = displayHeightPoints * scale;
 
@@ -246,7 +252,7 @@ public sealed class PdfiumDocument : IDisposable
                     0,
                     width,
                     height,
-                    pageRotation,
+                    0,
                     1);
 
                 // Widgets de formulários, incluindo campos de assinatura,
@@ -261,7 +267,7 @@ public sealed class PdfiumDocument : IDisposable
                         0,
                         width,
                         height,
-                        pageRotation,
+                        0,
                         1);
                 }
 
@@ -280,7 +286,9 @@ public sealed class PdfiumDocument : IDisposable
                     0,
                     pixels.Length);
 
-                return new RenderedPdfPage(width, height, stride, pixels, pageWidth, pageHeight, pageRotation);
+                return new RenderedPdfPage(
+                    width, height, stride, pixels,
+                    originalPageWidth, originalPageHeight, pageRotation);
             }
             finally
             {
@@ -313,7 +321,10 @@ public sealed class PdfiumDocument : IDisposable
 
             try
             {
-                return (PdfiumNative.GetPageWidth(page), PdfiumNative.GetPageHeight(page));
+                float width = PdfiumNative.GetPageWidth(page);
+                float height = PdfiumNative.GetPageHeight(page);
+                int rotation = PdfiumNative.GetPageRotation(page);
+                return rotation is 1 or 3 ? (height, width) : (width, height);
             }
             finally
             {
