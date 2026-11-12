@@ -123,6 +123,7 @@ internal static class Type3EncodingGlyphInspector
         var charProcEntries = Entries(charProcs).ToDictionary(x => x.Key.TrimStart('/'), x => x.Value, StringComparer.Ordinal);
         var charProcNames = charProcEntries.Keys.ToHashSet(StringComparer.Ordinal);
         Console.WriteLine($"  /CharProcs: {charProcNames.Count} programas; C={(charProcNames.Contains("C") ? "PRESENTE" : "AUSENTE")}; B={(charProcNames.Contains("B") ? "PRESENTE" : "AUSENTE")}");
+        var widths = ReadWidths(fontDictionary);
         var selectedBytes = Get(operation, "Bytes") is ReadOnlyMemory<byte> selectedMemory
             ? selectedMemory.ToArray()
             : Array.Empty<byte>();
@@ -130,13 +131,12 @@ internal static class Type3EncodingGlyphInspector
         {
             Console.WriteLine($"  Código(s) bruto(s) da seleção: {Convert.ToHexString(selectedBytes)}");
             if (selectedBytes.Length == 1)
-                DescribeCode(selectedBytes[0], differences, charProcNames, null, charProcEntries);
+                DescribeCode(selectedBytes[0], differences, charProcNames, widths, charProcEntries);
             else
                 Console.WriteLine("  Mapeamento Differences direto não aplicado: operando com mais de um byte.");
         }
-        DumpObservedCodesForExactFont(document, selected, differences, charProcNames, charProcEntries);
+        DumpObservedCodesForExactFont(document, selected, differences, charProcNames, charProcEntries, widths);
 
-        var widths = ReadWidths(fontDictionary);
         var cCodes = differences.Where(x => x.Name == "C").Select(x => x.Code).Distinct().ToArray();
         var bCodes = differences.Where(x => x.Name == "B").Select(x => x.Code).Distinct().ToArray();
         foreach (int code in cCodes)
@@ -188,7 +188,8 @@ internal static class Type3EncodingGlyphInspector
     }
 
     private static void DumpObservedCodesForExactFont(PdfDocument document, Letter selected,
-        List<GlyphEntry> differences, HashSet<string> charProcNames, Dictionary<string, object> charProcEntries)
+        List<GlyphEntry> differences, HashSet<string> charProcNames, Dictionary<string, object> charProcEntries,
+        List<WidthEntry> widths)
     {
         object? selectedDetails = Get(selected, "FontDetails");
         object? selectedReference = Get(selectedDetails, "FontDictionaryReference");
@@ -215,7 +216,7 @@ internal static class Type3EncodingGlyphInspector
                 if (raw is not ReadOnlyMemory<byte> memory || memory.Length == 0) continue;
                 Console.WriteLine($"  Amostra B na fonte exata: página={pageNumber}; seq={sequence}; bytes={Convert.ToHexString(memory.Span)}");
                 if (memory.Length == 1)
-                    DescribeCode(memory.Span[0], differences, charProcNames, null, charProcEntries);
+                    DescribeCode(memory.Span[0], differences, charProcNames, widths, charProcEntries);
                 printed++;
                 if (printed >= 20) break;
             }
