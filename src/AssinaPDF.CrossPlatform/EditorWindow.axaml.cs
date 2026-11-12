@@ -457,9 +457,33 @@ public partial class EditorWindow : Window
         ClearTextSelection();
 
         _document = new PdfiumDocument(_workingCopyPath);
+
+        // Limita a memória total usada pelas páginas e miniaturas. Em PDFs
+        // extensos, a escala é distribuída entre as páginas em vez de carregar
+        // centenas de imagens em resolução máxima ao mesmo tempo.
+        const long maximumTotalPreviewPixels = 40_000_000;
+        const long minimumPixelsPerPage = 20_000;
+        long renderedPixels = 0;
+        bool previewReduced = false;
+
         for (int i = 0; i < _document.PageCount; i++)
         {
-            var rendered = _document.RenderPage(i, 1.25f);
+            var dimensions = _document.GetPageDimensionsPoints(i);
+            double pageArea = Math.Max(1, dimensions.Width * (double)dimensions.Height);
+            int pagesRemaining = _document.PageCount - i;
+            long remainingBudget = Math.Max(
+                minimumPixelsPerPage,
+                maximumTotalPreviewPixels - renderedPixels);
+            double pageBudget = Math.Max(
+                minimumPixelsPerPage,
+                remainingBudget / (double)pagesRemaining);
+            double renderScale = Math.Min(1.25, Math.Sqrt(pageBudget / pageArea));
+            renderScale = Math.Max(0.12, renderScale);
+            if (renderScale < 0.50)
+                previewReduced = true;
+
+            var rendered = _document.RenderPage(i, (float)renderScale);
+            renderedPixels += (long)rendered.Width * rendered.Height;
             var bitmap = CreateBitmap(rendered);
             _bitmaps.Add(bitmap);
 
@@ -568,6 +592,10 @@ public partial class EditorWindow : Window
             thumbnailButton.Click += Thumbnail_Click;
             EditorThumbnailsPanel.Children.Add(thumbnailButton);
         }
+
+        if (previewReduced)
+            EditorStatusText.Text =
+                $"Documento com {_document.PageCount} páginas: a resolução das prévias foi reduzida automaticamente para controlar o uso de memória. O PDF original não foi alterado.";
     }
 
     private void Thumbnail_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
