@@ -291,7 +291,7 @@ internal static class CidFontOperatorFormatter
         // A cor de preenchimento faz parte do estado gráfico. Isole-a mesmo
         // quando existe uma variante CID Bold real, para não colorir texto posterior.
         bool isolateGraphicsState =
-            syntheticBold || syntheticItalic || foregroundOverride.HasValue;
+            syntheticBold || syntheticItalic || foregroundOverride != null;
 
         if (prefix.Length > 0)
             replacementOperators.Add(new SetGlyphsPositionShowText(prefix));
