@@ -18,6 +18,8 @@ internal static class ToUnicodeCMapParser
 {
     private const int MaxRangeExpansion = 4096;
     private const int MaxSourceBytes = 4;
+    private const int MaxMappings = 65536;
+    private const int MaxCodeSpaceRanges = 256;
 
     private static readonly Regex TokenPattern = new(
         @"<[^>]*>|\[|\]|[A-Za-z][A-Za-z0-9]*|[0-9]+",
@@ -29,6 +31,7 @@ internal static class ToUnicodeCMapParser
 
         string withoutComments = Regex.Replace(source, @"%[^\r\n]*", "");
         var tokens = TokenPattern.Matches(withoutComments)
+            .Cast<Match>()
             .Select(match => match.Value)
             .ToArray();
 
@@ -124,6 +127,13 @@ internal static class ToUnicodeCMapParser
                 continue;
             }
 
+            if (codeSpaces.Count >= MaxCodeSpaceRanges)
+            {
+                malformed++;
+                index += 2;
+                continue;
+            }
+
             codeSpaces.Add(new CMapCodeSpaceRange(normalizedFirst, normalizedLast));
             parsed++;
             index += 2;
@@ -152,7 +162,8 @@ internal static class ToUnicodeCMapParser
                 continue;
             }
 
-            if (TryNormalizeSource(source, out string normalized) &&
+            if (mappings.Count < MaxMappings &&
+                TryNormalizeSource(source, out string normalized) &&
                 TryDecodeUnicode(destination, out string unicode) &&
                 !mappings.ContainsKey(normalized))
             {
@@ -250,7 +261,8 @@ internal static class ToUnicodeCMapParser
         SortedDictionary<string, string> mappings, BigInteger source,
         int sourceWidthHex, string destination)
     {
-        if (!TryDecodeUnicode(destination, out string unicode)) return false;
+        if (mappings.Count >= MaxMappings ||
+            !TryDecodeUnicode(destination, out string unicode)) return false;
         string key = Convert.ToHexString(source.ToByteArray(isUnsigned: true, isBigEndian: true));
         if (key.Length > sourceWidthHex) return false;
         key = key.PadLeft(sourceWidthHex, '0');
