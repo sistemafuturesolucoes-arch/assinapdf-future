@@ -51,11 +51,17 @@ internal static class ToUnicodeCMapParser
     {
         while (index < tokens.Length && tokens[index] != "endbfchar")
         {
-            if (index + 1 >= tokens.Length || !TryHexToken(tokens[index], out string source) ||
+            if (index + 1 >= tokens.Length)
+            {
+                malformed++;
+                break;
+            }
+
+            if (!TryHexToken(tokens[index], out string source) ||
                 !TryHexToken(tokens[index + 1], out string destination))
             {
                 malformed++;
-                index++;
+                index += 2;
                 continue;
             }
 
@@ -80,20 +86,19 @@ internal static class ToUnicodeCMapParser
     {
         while (index < tokens.Length && tokens[index] != "endbfrange")
         {
-            if (index + 2 >= tokens.Length ||
-                !TryHexToken(tokens[index], out string firstHex) ||
+            if (index + 2 >= tokens.Length)
+            {
+                malformed++;
+                break;
+            }
+
+            if (!TryHexToken(tokens[index], out string firstHex) ||
                 !TryHexToken(tokens[index + 1], out string lastHex) ||
                 !TryNormalizeSource(firstHex, out _) ||
                 firstHex.Length != lastHex.Length ||
-                !TryParseSource(lastHex, out BigInteger last))
-            {
-                malformed++;
-                index++;
-                continue;
-            }
-
-            if (!TryParseSource(firstHex, out BigInteger first) || last < first ||
-                last - first > MaxRangeExpansion)
+                !TryParseSource(firstHex, out BigInteger first) ||
+                !TryParseSource(lastHex, out BigInteger last) ||
+                last < first || last - first > MaxRangeExpansion)
             {
                 malformed++;
                 index += 3;
@@ -107,7 +112,7 @@ internal static class ToUnicodeCMapParser
             {
                 index += 3;
                 int added = 0;
-                while (index < tokens.Length && tokens[index] != "]")
+                while (index < tokens.Length && tokens[index] != "]" && tokens[index] != "endbfrange")
                 {
                     if (!TryHexToken(tokens[index], out string destination) ||
                         added >= count ||
