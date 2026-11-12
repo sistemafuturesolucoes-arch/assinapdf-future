@@ -44,13 +44,13 @@ internal static class PdfStringOperandCodec
             return false;
         }
 
+        bool hasChange = false;
         for (int i = 0; i < replacement.Length; i++)
+            hasChange |= decoded.DecodedBytes[byteOffset + i] != replacement[i];
+        if (!hasChange)
         {
-            if (decoded.DecodedBytes[byteOffset + i] == replacement[i])
-            {
-                reason = "Substituição não altera nenhum byte.";
-                return false;
-            }
+            reason = "Substituição não altera nenhum byte.";
+            return false;
         }
 
         int rawStart = decoded.Origins[byteOffset].RawStart;
