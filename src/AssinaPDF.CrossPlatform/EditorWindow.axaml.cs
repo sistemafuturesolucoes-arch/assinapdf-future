@@ -1096,12 +1096,83 @@ public partial class EditorWindow : Window
                 IsHitTestVisible = true
             };
 
+            bool draggingBox = false;
+            bool boxWasMoved = false;
+            Avalonia.Point dragStart = default;
+            double initialLeft = rect.X;
+            double initialTop = rect.Y;
+
             box.PointerPressed += (_, args) =>
             {
                 if (!args.GetCurrentPoint(box).Properties.IsLeftButtonPressed)
                     return;
 
                 SetTextSelection(surface.Image, pageInfo, line.Characters, line.Text);
+                dragStart = args.GetPosition(surface.Overlay);
+                draggingBox = true;
+                boxWasMoved = false;
+                initialLeft = Canvas.GetLeft(box);
+                initialTop = Canvas.GetTop(box);
+                box.Cursor = new Cursor(StandardCursorType.SizeAll);
+                args.Pointer.Capture(box);
+                args.Handled = true;
+            };
+
+            box.PointerMoved += (_, args) =>
+            {
+                if (!draggingBox ||
+                    !args.GetCurrentPoint(box).Properties.IsLeftButtonPressed)
+                    return;
+
+                var current = args.GetPosition(surface.Overlay);
+                double dx = current.X - dragStart.X;
+                double dy = current.Y - dragStart.Y;
+                if (Math.Abs(dx) < 3 && Math.Abs(dy) < 3)
+                    return;
+
+                boxWasMoved = true;
+                Canvas.SetLeft(box, initialLeft + dx);
+                Canvas.SetTop(box, initialTop + dy);
+                args.Handled = true;
+            };
+
+            box.PointerReleased += (_, args) =>
+            {
+                if (!draggingBox)
+                    return;
+
+                var current = args.GetPosition(surface.Overlay);
+                double dx = current.X - dragStart.X;
+                double dy = current.Y - dragStart.Y;
+                draggingBox = false;
+                args.Pointer.Capture(null);
+                box.Cursor = new Cursor(StandardCursorType.SizeAll);
+
+                if (boxWasMoved)
+                {
+                    surface.Overlay.IsHitTestVisible = false;
+                    _ = MoveSelectedTextAsync(pageInfo, surface.Image, dx, dy);
+                }
+
+                args.Handled = true;
+            };
+
+            box.DoubleTapped += async (_, args) =>
+            {
+                draggingBox = false;
+                SetTextSelection(surface.Image, pageInfo, line.Characters, line.Text);
+
+                var pdfBounds = (
+                    Left: line.Left,
+                    Bottom: line.Bottom,
+                    Right: line.Right,
+                    Top: line.Top);
+                double centerX = (line.Left + line.Right) / 2;
+                double centerY = (line.Bottom + line.Top) / 2;
+
+                await EditTextAtPointAsync(
+                    pageIndex, centerX, centerY, line.Text, pdfBounds);
+                ClearTextSelection();
                 args.Handled = true;
             };
 
