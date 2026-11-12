@@ -4209,6 +4209,7 @@ public partial class EditorWindow : Window
             _sessionDirectory, $"undo-{Guid.NewGuid():N}.pdf");
         bool snapshotCreated = false;
         bool snapshotStored = false;
+        int originalPageCount;
 
         try
         {
@@ -4219,6 +4220,7 @@ public partial class EditorWindow : Window
 
             using (var document = Document.Open(_workingCopyPath))
             {
+                originalPageCount = document.Pages.Count;
                 edit(document);
                 document.Save(outputPath);
             }
@@ -4230,6 +4232,9 @@ public partial class EditorWindow : Window
             {
                 if (savedDocument.Pages.Count == 0)
                     throw new IOException("O PDF gerado não contém páginas.");
+                if (savedDocument.Pages.Count != originalPageCount)
+                    throw new IOException(
+                        "A edição alterou inesperadamente a quantidade de páginas. A cópia anterior foi preservada.");
 
                 if (verifySavedDocument != null && !verifySavedDocument(savedDocument))
                     throw new IOException(
@@ -4238,7 +4243,7 @@ public partial class EditorWindow : Window
 
             // O arquivo precisa abrir e renderizar em todas as páginas no PDFium
             // antes de substituir a cópia de trabalho.
-            ValidatePdfWithPdfium(outputPath);
+            ValidatePdfWithPdfium(outputPath, originalPageCount);
 
             _document?.Dispose();
             _document = null;
@@ -4272,11 +4277,13 @@ public partial class EditorWindow : Window
         }
     }
 
-    private static void ValidatePdfWithPdfium(string pdfPath)
+    private static void ValidatePdfWithPdfium(string pdfPath, int? expectedPageCount = null)
     {
         using var preview = new PdfiumDocument(pdfPath);
         if (preview.PageCount <= 0)
             throw new InvalidDataException("O PDF não contém páginas válidas para visualização.");
+        if (expectedPageCount.HasValue && preview.PageCount != expectedPageCount.Value)
+            throw new InvalidDataException("O PDFium identificou uma quantidade de páginas diferente da original.");
 
         for (int pageIndex = 0; pageIndex < preview.PageCount; pageIndex++)
         {
