@@ -74,6 +74,22 @@ internal static class PdfStringOperandCodecSelfTests
                 raw, decoded, 0, new byte[] { 0x41 }, out _, out _);
         });
 
+        Check("normalizes literal CR and CRLF to LF", () =>
+        {
+            byte[] raw = new byte[] { 40, 65, 13, 66, 13, 10, 67, 41 };
+            return PdfStringOperandCodec.TryDecodeToken(raw, out var decoded, out _) &&
+                   Convert.ToHexString(decoded.DecodedBytes) == "410A420A43" &&
+                   decoded.Origins[1].RawEnd - decoded.Origins[1].RawStart == 1 &&
+                   decoded.Origins[3].RawEnd - decoded.Origins[3].RawStart == 2;
+        });
+
+        Check("ignores escaped line continuation in literal strings", () =>
+        {
+            byte[] raw = new byte[] { 40, 65, 92, 13, 10, 66, 41 };
+            return PdfStringOperandCodec.TryDecodeToken(raw, out var decoded, out _) &&
+                   Convert.ToHexString(decoded.DecodedBytes) == "4142";
+        });
+
         Console.WriteLine($"PDF raw-string codec self-tests: {passed}/{passed + failed} passed.");
         return failed;
 
