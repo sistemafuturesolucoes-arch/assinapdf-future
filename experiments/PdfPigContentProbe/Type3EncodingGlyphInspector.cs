@@ -134,9 +134,15 @@ internal static class Type3EncodingGlyphInspector
                 string.Join(", ", codes.Select(code => $"0x{code:X2}/W={FindWidth(widths, code)}"));
             Console.WriteLine($"    /{procName}: {codeInfo}");
         }
-        var selectedBytes = Get(operation, "Bytes") is ReadOnlyMemory<byte> selectedMemory
-            ? selectedMemory.ToArray()
-            : Array.Empty<byte>();
+        object? bytesProperty = Get(operation, "Bytes");
+        Console.WriteLine($"  Operação de texto: tipo={operation.GetType().FullName}; Bytes tipo={bytesProperty?.GetType().FullName ?? "(null)"}; Bytes valor={bytesProperty ?? "(null)"}");
+        byte[] selectedBytes = bytesProperty switch
+        {
+            ReadOnlyMemory<byte> memory => memory.ToArray(),
+            Memory<byte> memory => memory.ToArray(),
+            byte[] array => array,
+            _ => Array.Empty<byte>()
+        };
         if (selectedBytes.Length > 0)
         {
             Console.WriteLine($"  Código(s) bruto(s) da seleção: {Convert.ToHexString(selectedBytes)}");
@@ -145,6 +151,8 @@ internal static class Type3EncodingGlyphInspector
             else
                 Console.WriteLine("  Mapeamento Differences direto não aplicado: operando com mais de um byte.");
         }
+        else
+            Console.WriteLine("  CÓDIGO BRUTO NÃO EXTRAÍDO: a propriedade Bytes não foi reconhecida como memória/array de bytes.");
         DumpObservedCodesForExactFont(document, selected, differences, charProcNames, charProcEntries, widths);
 
         var cCodes = differences.Where(x => x.Name == "C").Select(x => x.Code).Distinct().ToArray();
@@ -298,11 +306,16 @@ internal static class Type3EncodingGlyphInspector
         var result = new List<WidthEntry>();
         if (data is not IEnumerable items) return result;
         int code = first;
+        int slots = 0;
         foreach (var item in items)
         {
             if (item is not null && TryNumber(item, out double width))
-                result.Add(new WidthEntry(code++, width));
+                result.Add(new WidthEntry(code, width));
+            code++;
+            slots++;
         }
+        Console.WriteLine($"  /Widths diagnóstico: FirstChar={first}; LastChar={Value(dictionary, "LastChar")}; slots={slots}; valores válidos={result.Count}; token={token}");
+        Console.WriteLine("  /Widths primeiros slots: " + string.Join(", ", result.Take(16).Select(x => $"{x.Code}= {x.Width.ToString("0.######", CultureInfo.InvariantCulture)}")));
         return result;
     }
 
