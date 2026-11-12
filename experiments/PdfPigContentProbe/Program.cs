@@ -28,6 +28,8 @@ try
     Console.WriteLine();
 
     int totalLetters = 0, totalTextOps = 0, totalMappedLetters = 0, totalUnmappedLetters = 0;
+    int candidateMappings = 0, ambiguousByteOperations = 0;
+    var codeMap = new Dictionary<string, int>(StringComparer.Ordinal);
     for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
     {
         var page = document.GetPage(pageNumber);
@@ -58,6 +60,24 @@ try
                 ? "(nenhuma letra associada)"
                 : MakePreview(string.Concat(letters.Select(x => x.Value)), 72);
 
+            var bytesValue = operation.GetType().GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?.GetValue(operation);
+            if (bytesValue is ReadOnlyMemory<byte> operandBytes && operandBytes.Length > 0 && count > 0)
+            {
+                if (operandBytes.Length == 2 && count == 1)
+                {
+                    string font = letters![0].FontName ?? "(fonte desconhecida)";
+                    string code = Convert.ToHexString(operandBytes.Span);
+                    string unicode = $"U+{(int)letters[0].Value:X4}";
+                    string key = $"{font}|{code}|{unicode}|'{Escape(letters[0].Value.ToString())}'";
+                    codeMap[key] = codeMap.TryGetValue(key, out int occurrences) ? occurrences + 1 : 1;
+                    candidateMappings++;
+                }
+                else
+                {
+                    ambiguousByteOperations++;
+                }
+            }
+
             Console.WriteLine($"  seq={sequence,4} op={operation.Operator} tipo={operation.GetType().Name,-28} letras={count,4} texto=\"{Escape(preview)}\"");
             if (HasInterestingOperands(operation))
             {
@@ -85,6 +105,18 @@ try
         Console.WriteLine();
     }
 
+    Console.WriteLine("MAPEAMENTO CANDIDATO: operando de 2 bytes associado a exatamente 1 Letter");
+    Console.WriteLine("Fonte | Código hexadecimal | Unicode | Caractere | Ocorrências");
+    foreach (var entry in codeMap.OrderBy(x => x.Key, StringComparer.Ordinal).Take(100))
+    {
+        var parts = entry.Key.Split('|');
+        Console.WriteLine($"  {parts[0]} | {parts[1]} | {parts[2]} | {parts[3]} | {entry.Value}");
+    }
+    if (codeMap.Count > 100)
+        Console.WriteLine($"  (mostrados 100 de {codeMap.Count} combinações)");
+    Console.WriteLine($"  Associações candidatas: {candidateMappings}; operações com bytes que exigem análise adicional: {ambiguousByteOperations}");
+    Console.WriteLine();
+
     Console.WriteLine("RESUMO GERAL");
     Console.WriteLine($"  Letras: {totalLetters}");
     Console.WriteLine($"  Operações Tj/TJ visíveis: {totalTextOps}");
@@ -95,7 +127,8 @@ try
     Console.WriteLine("- TextSequence identifica a chamada de exibição de texto que produziu cada Letter no PdfPig.");
     Console.WriteLine("- A associação só é considerada direta quando a sequência encontra uma operação Tj/TJ na lista pública da página.");
     Console.WriteLine("- Letras sem operação visível podem vir de Form XObjects/conteúdo aninhado ou de diferenças do parser; não são atribuídas por aproximação.");
-    Console.WriteLine("- Este teste ainda não fornece offset de bytes no stream original, nem reescreve ou salva PDFs.");
+    Console.WriteLine("- O mapeamento candidato é apenas uma correlação operando/fonte/Unicode quando há exatamente 2 bytes e 1 Letter; não prova a codificação completa nem o offset no stream original.");
+    Console.WriteLine("- Este teste não reescreve nem salva PDFs.");
     return 0;
 }
 catch (Exception ex)
