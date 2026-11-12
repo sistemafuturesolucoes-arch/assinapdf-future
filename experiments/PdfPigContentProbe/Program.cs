@@ -15,7 +15,8 @@ if (args.Contains("--self-test", StringComparer.Ordinal))
     int cmapFailures = ToUnicodeCMapParserSelfTests.Run();
     int mapperFailures = PdfGlyphByteMapperSelfTests.Run();
     int tokenFailures = PdfStringOperandCodecSelfTests.Run();
-    return cmapFailures + mapperFailures + tokenFailures;
+    int rewriteFailures = PdfGlyphTokenRewritePlannerSelfTests.Run();
+    return cmapFailures + mapperFailures + tokenFailures + rewriteFailures;
 }
 
 string? pdfPath = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
