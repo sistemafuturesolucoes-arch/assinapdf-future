@@ -713,10 +713,22 @@ public partial class MainWindow : Window
                 if (child is not Button marker || marker.Tag is not SignatureWidgetInfo widget)
                     continue;
 
-                Canvas.SetLeft(marker, widget.NormalizedX * _signatureOverlays[i].Width);
-                Canvas.SetTop(marker, widget.NormalizedY * _signatureOverlays[i].Height);
-                marker.Width = Math.Max(54, widget.NormalizedWidth * _signatureOverlays[i].Width);
-                marker.Height = Math.Max(26, widget.NormalizedHeight * _signatureOverlays[i].Height);
+                var pageDimensions = _pageDimensions[i];
+                double widgetLeft = widget.NormalizedX * pageDimensions.Width;
+                double widgetBottom =
+                    (1.0 - widget.NormalizedY - widget.NormalizedHeight) * pageDimensions.Height;
+                double widgetRight =
+                    (widget.NormalizedX + widget.NormalizedWidth) * pageDimensions.Width;
+                double widgetTop = (1.0 - widget.NormalizedY) * pageDimensions.Height;
+                var widgetViewRect = PdfiumPageCoordinateMapper.PdfToViewRect(
+                    widgetLeft, widgetBottom, widgetRight, widgetTop,
+                    _signatureOverlays[i].Width, _signatureOverlays[i].Height,
+                    pageDimensions.Width, pageDimensions.Height, pageDimensions.Rotation);
+
+                Canvas.SetLeft(marker, widgetViewRect.X);
+                Canvas.SetTop(marker, widgetViewRect.Y);
+                marker.Width = Math.Max(54, widgetViewRect.Width);
+                marker.Height = Math.Max(26, widgetViewRect.Height);
             }
             _pageCards[i].Width = size.Width * scale + 30;
         }
