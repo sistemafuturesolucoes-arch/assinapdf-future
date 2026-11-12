@@ -1660,6 +1660,7 @@ public partial class EditorWindow : Window
             EditorInlineEditorHost.Content = inlineEditor;
             EditorInlineEditorHost.IsVisible = true;
             EditorInstructionsPanel.IsVisible = false;
+            EditorFormattingToolbarHost.IsVisible = true;
             EditSelectedTextButton.IsVisible = false;
             DeleteSelectedTextButton.IsVisible = false;
             EditorStatusText.Text = originalText == null
@@ -1677,6 +1678,7 @@ public partial class EditorWindow : Window
             EditorInlineEditorHost.Content = null;
             EditorInlineEditorHost.IsVisible = false;
             EditorInstructionsPanel.IsVisible = true;
+            EditorFormattingToolbarHost.IsVisible = false;
             if (_formattingToolbar != null && _defaultToolbarEditor != null)
                 _formattingToolbar.Target = _defaultToolbarEditor;
 
