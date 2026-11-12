@@ -75,6 +75,20 @@
                   ToolTip.Tip="Mostrar caixas de texto detectadas"/>
           <TextBlock Text="Blocos" FontSize="9" Foreground="#C5CBD5"
                      HorizontalAlignment="Center"/>
+          <Button x:Name="AddImageModeButton" Content="▧"
+                  Click="AddImageMode_Click" Height="48" FontSize="21"
+                  Background="#252D39" Foreground="#E7EAF0"
+                  BorderBrush="#3B4554"
+                  ToolTip.Tip="Inserir imagem no PDF"/>
+          <TextBlock Text="Imagem" FontSize="9" Foreground="#C5CBD5"
+                     HorizontalAlignment="Center"/>
+          <Button x:Name="RectangleModeButton" Content="□"
+                  Click="RectangleMode_Click" Height="48" FontSize="23"
+                  Background="#252D39" Foreground="#E7EAF0"
+                  BorderBrush="#3B4554"
+                  ToolTip.Tip="Desenhar retângulo no PDF"/>
+          <TextBlock Text="Forma" FontSize="9" Foreground="#C5CBD5"
+                     HorizontalAlignment="Center"/>
           <Border Height="1" Background="#343C49" Margin="4,8"/>
           <TextBlock Text="ATALHOS" FontSize="8" FontWeight="Bold"
                      Foreground="#7F8998" HorizontalAlignment="Center"/>
