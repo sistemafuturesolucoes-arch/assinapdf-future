@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 
 Console.WriteLine("AssinaPDF - PDFium character/object probe");
 Console.WriteLine($"OS: {RuntimeInformation.OSDescription}");
@@ -64,10 +65,15 @@ try
     string? pdfPath = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
     if (pdfPath is null)
     {
-        Console.WriteLine();
-        Console.WriteLine("Export check concluído. Para testar o mapeamento, informe o caminho de um PDF:");
-        Console.WriteLine("dotnet run --project experiments/PdfiumExportProbe/PdfiumExportProbe.csproj -- <caminho-do-pdf>");
-        return 0;
+        pdfPath = FindLatestEditorPdf();
+        if (pdfPath is null)
+        {
+            Console.WriteLine("Nenhum PDF existente foi encontrado no histórico do editor AssinaPDF.");
+            Console.WriteLine("Abra um PDF no editor e execute novamente, ou informe um caminho explicitamente.");
+            return 12;
+        }
+
+        Console.WriteLine($"PDF selecionado automaticamente do histórico do editor: {pdfPath}");
     }
 
     if (!File.Exists(pdfPath))
@@ -279,5 +285,68 @@ sealed class PdfiumApi
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+}
+
+static string? FindLatestEditorPdf()
+{
+    string appData = OperatingSystem.IsMacOS()
+        ? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Library", "Application Support")
+        : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+    if (string.IsNullOrWhiteSpace(appData))
+        appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+    string root = Path.Combine(appData, "FutureSolucoes", "AssinaPDF", "DocumentosEditados");
+    string historyPath = Path.Combine(root, "historico-edicao.json");
+    if (!File.Exists(historyPath))
+        return null;
+
+    try
+    {
+        using JsonDocument history = JsonDocument.Parse(File.ReadAllText(historyPath));
+        if (history.RootElement.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var candidates = new List<(DateTime LastModified, string Path)>();
+        foreach (JsonElement entry in history.RootElement.EnumerateArray())
+        {
+            if (!TryGetString(entry, "WorkingCopyPath", out string? workingCopy) ||
+                string.IsNullOrWhiteSpace(workingCopy) ||
+                !File.Exists(workingCopy))
+                continue;
+
+            DateTime modified = File.GetLastWriteTimeUtc(workingCopy);
+            if (TryGetString(entry, "LastModifiedAtUtc", out string? timestamp) &&
+                DateTime.TryParse(timestamp, null,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime parsed))
+                modified = parsed;
+
+            candidates.Add((modified, workingCopy));
+        }
+
+        return candidates
+            .OrderByDescending(candidate => candidate.LastModified)
+            .Select(candidate => candidate.Path)
+            .FirstOrDefault();
+    }
+    catch
+    {
+        return null;
+    }
+
+    static bool TryGetString(JsonElement element, string name, out string? value)
+    {
+        if (element.TryGetProperty(name, out JsonElement property) &&
+            property.ValueKind == JsonValueKind.String)
+        {
+            value = property.GetString();
+            return true;
+        }
+
+        value = null;
+        return false;
     }
 }
