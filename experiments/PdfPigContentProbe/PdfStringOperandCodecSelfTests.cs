@@ -23,7 +23,7 @@ internal static class PdfStringOperandCodecSelfTests
         {
             byte[] raw = System.Text.Encoding.ASCII.GetBytes("<41 4\n2 F>");
             return PdfStringOperandCodec.TryDecodeToken(raw, out var decoded, out _) &&
-                   Convert.ToHexString(decoded.DecodedBytes) == "41420F";
+                   Convert.ToHexString(decoded.DecodedBytes) == "4142F0";
         });
 
         Check("replaces only selected literal bytes and preserves neighbors", () =>
