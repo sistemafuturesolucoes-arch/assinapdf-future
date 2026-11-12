@@ -1643,8 +1643,8 @@ public partial class EditorWindow : Window
                     InteriorColor = Aspose.Pdf.Color.FromRgb(0.88, 0.84, 0.96),
                     Opacity = 0.22
                 };
-                annotation.UpdateAppearances();
                 page.Annotations.Add(annotation);
+                annotation.UpdateAppearances();
             }, "Retângulo inserido no PDF.", savedDocument =>
             {
                 return savedDocument.Pages[pageInfo.PageIndex + 1].Annotations
@@ -1682,7 +1682,7 @@ public partial class EditorWindow : Window
                 {
                     new FilePickerFileType("Imagens")
                     {
-                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff" }
+                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp" }
                     }
                 }
             });
@@ -1845,6 +1845,13 @@ public partial class EditorWindow : Window
                     throw new InvalidDataException("Não foi possível extrair os dados da imagem selecionada.");
 
                 int rotation = ((int)Math.Round(placement.Rotation) % 360 + 360) % 360;
+                if (rotation != 0 && rotation != 90 && rotation != 180 && rotation != 270)
+                {
+                    EditorStatusText.Text =
+                        "Esta imagem possui rotação arbitrária e não pode ser movida com segurança por esta ferramenta.";
+                    return false;
+                }
+
                 SetVisualElementSelection(
                     image, pageInfo, VisualElementKind.Image,
                     null, index, imageBytes, rotation,
