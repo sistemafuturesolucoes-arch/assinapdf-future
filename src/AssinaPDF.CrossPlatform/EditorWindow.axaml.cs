@@ -876,7 +876,11 @@ public partial class EditorWindow : Window
             _isDrawingRectangle = false;
             e.Pointer.Capture(null);
             RemoveRectanglePreview(drawingPage.PageIndex);
-            AddRectangleFromDrag(drawingPage, _selectionStart, _selectionEnd, drawingImage);
+            AddShapeFromDrag(
+                drawingPage, _selectionStart, _selectionEnd, drawingImage,
+                _toolMode == EditorToolMode.DrawEllipse
+                    ? VisualElementKind.Ellipse
+                    : VisualElementKind.Rectangle);
             _activeSelectionImage = null;
             _activeSelectionPage = null;
             e.Handled = true;
@@ -1679,7 +1683,7 @@ public partial class EditorWindow : Window
                 pageInfo.WidthPoints, pageInfo.HeightPoints,
                 out double endX, out double endY, pageInfo.Rotation))
         {
-            EditorStatusText.Text = "Não foi possível calcular a área do retângulo.";
+            EditorStatusText.Text = "Não foi possível calcular a área da forma.";
             return;
         }
 
@@ -1689,7 +1693,7 @@ public partial class EditorWindow : Window
         double top = Math.Max(startY, endY);
         if (right - left < 4 || top - bottom < 4)
         {
-            EditorStatusText.Text = "O retângulo precisa ter pelo menos 4 pontos de largura e altura.";
+            EditorStatusText.Text = "A forma precisa ter pelo menos 4 pontos de largura e altura.";
             return;
         }
 
@@ -1731,7 +1735,7 @@ public partial class EditorWindow : Window
         catch (Exception ex)
         {
             EditorStatusText.Text =
-                $"Não foi possível inserir o retângulo. A versão anterior foi preservada. {ex.Message}";
+                $"Não foi possível inserir a forma. A versão anterior foi preservada. {ex.Message}";
         }
     }
 
