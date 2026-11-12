@@ -91,6 +91,8 @@ internal static class OriginalContentOperandInspector
 
             // Correlaciona o operando original com a sequência de ShowText e as Letters produzidas.
             int textSequence = 0, tjOperandIndex = 0, printedCorrelations = 0;
+            var mappingStats = new Dictionary<string, (int Equal, int Different, int NoLetters, int OneByteOneLetter)>();
+            var mappingSamples = new List<string>();
             foreach (var operationInOrder in page.Operations)
             {
                 if (operationInOrder.Operator is not ("Tj" or "TJ")) continue;
@@ -108,6 +110,13 @@ internal static class OriginalContentOperandInspector
                 bool isEmptyBytes = operationInOrder.GetType()
                     .GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?
                     .GetValue(operationInOrder) is ReadOnlyMemory<byte> opBytes && opBytes.Length == 0;
+                string fontKey = associatedLetters.Length == 0 ? "(sem letra)" : string.Join(",", associatedLetters.Select(letter => letter.FontName).Distinct());
+                var previous = mappingStats.TryGetValue(fontKey, out var stat) ? stat : (0, 0, 0, 0);
+                bool equalCount = token.Bytes.Length == associatedLetters.Length;
+                bool oneByteOneLetter = token.Bytes.Length == 1 && associatedLetters.Length == 1 && associatedLetters[0].Value.EnumerateRunes().Count() == 1;
+                mappingStats[fontKey] = (previous.Item1 + (equalCount ? 1 : 0), previous.Item2 + (equalCount ? 0 : 1), previous.Item3 + (associatedLetters.Length == 0 ? 1 : 0), previous.Item4 + (oneByteOneLetter ? 1 : 0));
+                if (oneByteOneLetter && mappingSamples.Count < 40)
+                    mappingSamples.Add($"fonte={fontKey}; código={Convert.ToHexString(token.Bytes)}; letra={associatedLetters[0].Value}; offset={token.Start}");
 
                 if (printedCorrelations < 20 || isEmptyBytes)
                 {
@@ -118,6 +127,11 @@ internal static class OriginalContentOperandInspector
                 }
                 tjOperandIndex++;
             }
+            Console.WriteLine("    ANÁLISE CANDIDATA POR FONTE (igualdade de contagem não prova codificação):");
+            foreach (var entry in mappingStats.OrderBy(x => x.Key, StringComparer.Ordinal))
+                Console.WriteLine($"      fonte={entry.Key}; bytes=letras:{entry.Value.Equal}; contagens diferentes:{entry.Value.Different}; sem letras:{entry.Value.NoLetters}; 1 byte/1 letra Unicode:{entry.Value.OneByteOneLetter}");
+            foreach (string sample in mappingSamples)
+                Console.WriteLine($"      CÓDIGO-1BYTE {sample}");
             Console.WriteLine($"    GLIFO-MAP resumo: operandos Tj correlacionados={tjOperandIndex}; sequências de texto={textSequence}; linhas exibidas={printedCorrelations} (primeiras 20 + Bytes vazios).");
         }
 
