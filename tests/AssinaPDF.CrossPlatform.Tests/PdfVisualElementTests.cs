@@ -17,6 +17,10 @@ public sealed class PdfVisualElementTests
             Path.GetTempPath(), $"assinapdf-image-{Guid.NewGuid():N}.png");
         string pdfPath = Path.Combine(
             Path.GetTempPath(), $"assinapdf-elements-{Guid.NewGuid():N}.pdf");
+        string editedPath = Path.Combine(
+            Path.GetTempPath(), $"assinapdf-elements-edited-{Guid.NewGuid():N}.pdf");
+        string finalPath = Path.Combine(
+            Path.GetTempPath(), $"assinapdf-elements-final-{Guid.NewGuid():N}.pdf");
 
         try
         {
@@ -104,8 +108,9 @@ public sealed class PdfVisualElementTests
                     Background = false
                 });
 
-                editable.Save(pdfPath);
+                editable.Save(editedPath);
             }
+            File.Move(editedPath, pdfPath, overwrite: true);
 
             using (var reopened = Document.Open(pdfPath))
             {
@@ -136,8 +141,9 @@ public sealed class PdfVisualElementTests
 
                 page.Annotations.Delete(rectangle);
                 page.Annotations.Delete(ellipse);
-                reopened.Save(pdfPath);
+                reopened.Save(finalPath);
             }
+            File.Move(finalPath, pdfPath, overwrite: true);
 
             using var finalDocument = Document.Open(pdfPath);
             Assert.Empty(finalDocument.Pages[1].Annotations
@@ -153,6 +159,10 @@ public sealed class PdfVisualElementTests
                 File.Delete(imagePath);
             if (File.Exists(pdfPath))
                 File.Delete(pdfPath);
+            if (File.Exists(editedPath))
+                File.Delete(editedPath);
+            if (File.Exists(finalPath))
+                File.Delete(finalPath);
         }
     }
 }
