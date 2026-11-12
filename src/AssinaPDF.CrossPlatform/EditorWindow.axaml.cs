@@ -860,7 +860,7 @@ public partial class EditorWindow : Window
     }
 
     private void SetTextSelection(AvaloniaImage image, PagePreviewInfo pageInfo,
-        IReadOnlyList<PdfiumCharacterInfo> characters, string text)
+        IReadOnlyList<PdfiumCharacterInfo> characters, string text, bool drawHighlight = true)
     {
         if (characters.Count == 0 || !_pageSurfaces.TryGetValue(pageInfo.PageIndex, out var surface))
             return;
@@ -874,6 +874,8 @@ public partial class EditorWindow : Window
         _selectedTextBounds = (left, bottom, right, top);
         var rect = PdfiumPageCoordinateMapper.PdfToViewRect(left, bottom, right, top,
             image.Bounds.Width, image.Bounds.Height, pageInfo.WidthPoints, pageInfo.HeightPoints);
+        if (drawHighlight)
+        {
         var highlight = new Border
         {
             BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(35, 116, 220)),
@@ -919,6 +921,7 @@ public partial class EditorWindow : Window
         Canvas.SetTop(highlight, rect.Y);
         surface.Overlay.Children.Add(highlight);
         surface.Overlay.IsHitTestVisible = true;
+        }
         SelectedTextLabel.Text = text.Length > 70 ? text[..67] + "..." : text;
         SelectedTextLabel.IsVisible = true;
         EditSelectedTextButton.IsVisible = true;
@@ -1107,7 +1110,9 @@ public partial class EditorWindow : Window
                 if (!args.GetCurrentPoint(box).Properties.IsLeftButtonPressed)
                     return;
 
-                SetTextSelection(surface.Image, pageInfo, line.Characters, line.Text);
+                // Não criar uma segunda camada de seleção sobre a caixa: ela interceptaria
+                // o segundo clique e impediria o reconhecimento de DoubleTapped.
+                SetTextSelection(surface.Image, pageInfo, line.Characters, line.Text, drawHighlight: false);
                 dragStart = args.GetPosition(surface.Overlay);
                 draggingBox = true;
                 boxWasMoved = false;
@@ -1115,7 +1120,7 @@ public partial class EditorWindow : Window
                 initialTop = Canvas.GetTop(box);
                 box.Cursor = new Cursor(StandardCursorType.SizeAll);
                 args.Pointer.Capture(box);
-                args.Handled = true;
+                // Deixe o roteamento de gestos do Avalonia reconhecer o duplo clique.
             };
 
             box.PointerMoved += (_, args) =>
@@ -1154,13 +1159,14 @@ public partial class EditorWindow : Window
                     _ = MoveSelectedTextAsync(pageInfo, surface.Image, dx, dy);
                 }
 
-                args.Handled = true;
+                // Não marcar o PointerReleased como tratado: DoubleTapped é disparado
+                // pelo reconhecedor de gestos após a sequência de dois toques.
             };
 
             box.DoubleTapped += async (_, args) =>
             {
                 draggingBox = false;
-                SetTextSelection(surface.Image, pageInfo, line.Characters, line.Text);
+                SetTextSelection(surface.Image, pageInfo, line.Characters, line.Text, drawHighlight: false);
 
                 var pdfBounds = (
                     Left: line.Left,
