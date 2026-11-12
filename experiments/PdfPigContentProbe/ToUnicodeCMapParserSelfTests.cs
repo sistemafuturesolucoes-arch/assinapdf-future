@@ -35,6 +35,13 @@ internal static class ToUnicodeCMapParserSelfTests
                    result.Mappings["03"] == "C";
         });
 
+        Check("high-bit source codes remain unsigned and fixed-width", () =>
+        {
+            var result = ToUnicodeCMapParser.Parse("1 beginbfrange <80> <81> <0041> endbfrange");
+            return result.Mappings.Count == 2 &&
+                   result.Mappings["80"] == "A" && result.Mappings["81"] == "B";
+        });
+
         Check("source leading zeros are preserved", () =>
         {
             var result = ToUnicodeCMapParser.Parse("1 beginbfchar <000A> <0058> endbfchar");
