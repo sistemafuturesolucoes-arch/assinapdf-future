@@ -172,6 +172,21 @@ internal static class PdfStringOperandCodec
                 continue;
             }
 
+            if (value == 13)
+            {
+                if (i < token.Length - 1 && token[i] == 10) i++;
+                bytes.Add(10);
+                origins.Add(new PdfDecodedByteOrigin(start, i));
+                continue;
+            }
+
+            if (value == 10)
+            {
+                bytes.Add(10);
+                origins.Add(new PdfDecodedByteOrigin(start, i));
+                continue;
+            }
+
             if (value == (byte)'(') depth++;
             else if (value == (byte)')')
             {
