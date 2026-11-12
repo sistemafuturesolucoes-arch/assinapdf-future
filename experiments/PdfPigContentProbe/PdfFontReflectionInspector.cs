@@ -289,7 +289,10 @@ internal static class PdfFontReflectionInspector
         try
         {
             var bytes = Convert.FromHexString(hex);
-            value = Encoding.BigEndianUnicode.GetString(bytes);
+            // Reject invalid UTF-16 (including unpaired surrogates) instead of
+            // silently replacing malformed destination data with U+FFFD.
+            value = new UnicodeEncoding(bigEndian: true, byteOrderMark: false, throwOnInvalidBytes: true)
+                .GetString(bytes);
             return true;
         }
         catch { return false; }
