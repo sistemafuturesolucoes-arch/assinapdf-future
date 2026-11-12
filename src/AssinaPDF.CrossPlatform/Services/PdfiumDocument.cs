@@ -12,8 +12,12 @@ public sealed class RenderedPdfPage
     public int Height { get; }
     public int Stride { get; }
     public byte[] Pixels { get; }
+    // PageWidth/HeightPoints mantêm as dimensões visíveis (já rotacionadas),
+    // para compatibilidade com as telas de assinatura e impressão existentes.
     public float PageWidthPoints { get; }
     public float PageHeightPoints { get; }
+    public float OriginalPageWidthPoints { get; }
+    public float OriginalPageHeightPoints { get; }
     public int PageRotation { get; }
 
     internal RenderedPdfPage(
@@ -23,6 +27,8 @@ public sealed class RenderedPdfPage
         byte[] pixels,
         float pageWidthPoints,
         float pageHeightPoints,
+        float originalPageWidthPoints,
+        float originalPageHeightPoints,
         int pageRotation)
     {
         Width = width;
@@ -31,6 +37,8 @@ public sealed class RenderedPdfPage
         Pixels = pixels;
         PageWidthPoints = pageWidthPoints;
         PageHeightPoints = pageHeightPoints;
+        OriginalPageWidthPoints = originalPageWidthPoints;
+        OriginalPageHeightPoints = originalPageHeightPoints;
         PageRotation = pageRotation;
     }
 }
@@ -288,7 +296,9 @@ public sealed class PdfiumDocument : IDisposable
 
                 return new RenderedPdfPage(
                     width, height, stride, pixels,
-                    originalPageWidth, originalPageHeight, pageRotation);
+                    pageWidth, pageHeight,
+                    originalPageWidth, originalPageHeight,
+                    pageRotation);
             }
             finally
             {
@@ -321,10 +331,7 @@ public sealed class PdfiumDocument : IDisposable
 
             try
             {
-                float width = PdfiumNative.GetPageWidth(page);
-                float height = PdfiumNative.GetPageHeight(page);
-                int rotation = PdfiumNative.GetPageRotation(page);
-                return rotation is 1 or 3 ? (height, width) : (width, height);
+                return (PdfiumNative.GetPageWidth(page), PdfiumNative.GetPageHeight(page));
             }
             finally
             {
