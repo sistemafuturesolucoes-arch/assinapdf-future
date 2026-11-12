@@ -64,3 +64,13 @@ O probe percorre as letras extraídas e inspeciona, por reflection e sem invocar
 A etapa de fontes foi ampliada para resolver, em memória, os streams `/ToUnicode`, decodificar os filtros PDF suportados e imprimir o CMap textual com contagem de estruturas `codespacerange`, `bfchar`, `bfrange`, `cidchar` e `cidrange`. Também inspeciona `/Encoding` nomeado ou em dicionário (incluindo `/BaseEncoding` e `/Differences`), além de metadados essenciais das fontes descendentes CID e estruturas Type3.
 
 A saída é limitada por quantidade de fontes, tamanho do CMap e itens de arrays para evitar relatórios excessivos. O conteúdo decodificado é apenas diagnóstico: a implementação ainda não transforma CMaps em um codificador/decodificador completo, não correlaciona automaticamente cada code space a bytes de glifos e não altera nem salva PDFs. Fontes compostas, CMaps Identity, mapeamentos de vários bytes, ligaturas e diferenças de codificação exigem validação específica antes de qualquer reescrita.
+
+## Deterministic ToUnicode parser self-tests
+
+Run the parser tests without opening a PDF:
+
+```powershell
+dotnet run --project experiments/PdfPigContentProbe/PdfPigContentProbe.csproj -c Release -- --self-test
+```
+
+The bounded diagnostic parser scans `bfchar` and `bfrange` blocks across arbitrary whitespace and line breaks, including multiple entries on one line and destination arrays spanning lines. It strips PostScript comments, preserves source-code width, validates UTF-16BE (including surrogate pairs), rejects duplicate/invalid mappings, and caps range expansion at 4096 entries. Source codes are limited to the PDF four-byte maximum. This is not a complete PostScript CMap interpreter: it does not resolve inherited/usecmap maps, codespace semantics, CID mapping blocks, or every malformed-token recovery rule. A passing self-test validates this parser only, not a PDF editor or stream rewrite.
