@@ -1723,6 +1723,440 @@ public partial class EditorWindow : Window
         catch (Exception ex) { EditorStatusText.Text = $"Não foi possível abrir o PDF: {ex.Message}"; }
     }
 
+    private bool TrySelectVisualElementAtPoint(
+        AvaloniaImage image,
+        PagePreviewInfo pageInfo,
+        double pdfX,
+        double pdfY)
+    {
+        try
+        {
+            using var document = Document.Open(_workingCopyPath);
+            var page = document.Pages[pageInfo.PageIndex + 1];
+
+            var rectangle = page.Annotations
+                .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
+                .Where(annotation => string.Equals(
+                    annotation.Subject, "AssinaPDF Editor Rectangle",
+                    StringComparison.Ordinal))
+                .FirstOrDefault(annotation =>
+                {
+                    var bounds = annotation.Rect;
+                    return bounds != null &&
+                        pdfX >= bounds.LLX && pdfX <= bounds.URX &&
+                        pdfY >= bounds.LLY && pdfY <= bounds.URY;
+                });
+
+            if (rectangle?.Rect is { } rectangleBounds &&
+                !string.IsNullOrWhiteSpace(rectangle.Name))
+            {
+                SetVisualElementSelection(
+                    image, pageInfo, VisualElementKind.Rectangle,
+                    rectangle.Name, -1, null, 0,
+                    (rectangleBounds.LLX, rectangleBounds.LLY,
+                     rectangleBounds.URX, rectangleBounds.URY));
+                return true;
+            }
+
+            var absorber = new ImagePlacementAbsorber();
+            page.Accept(absorber);
+            for (int index = absorber.ImagePlacements.Count - 1; index >= 0; index--)
+            {
+                var placement = absorber.ImagePlacements[index];
+                var bounds = placement.Rectangle;
+                if (bounds == null ||
+                    pdfX < bounds.LLX || pdfX > bounds.URX ||
+                    pdfY < bounds.LLY || pdfY > bounds.URY)
+                    continue;
+
+                using var imageStream = new MemoryStream();
+                placement.Save(imageStream);
+                byte[] imageBytes = imageStream.ToArray();
+                if (imageBytes.Length == 0)
+                    throw new InvalidDataException("Não foi possível extrair os dados da imagem selecionada.");
+
+                int rotation = ((int)Math.Round(placement.Rotation) % 360 + 360) % 360;
+                SetVisualElementSelection(
+                    image, pageInfo, VisualElementKind.Image,
+                    null, index, imageBytes, rotation,
+                    (bounds.LLX, bounds.LLY, bounds.URX, bounds.URY));
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                "Não foi possível selecionar o elemento visual: " + ex.Message;
+        }
+
+        return false;
+    }
+
+    private void SetVisualElementSelection(
+        AvaloniaImage image,
+        PagePreviewInfo pageInfo,
+        VisualElementKind kind,
+        string? name,
+        int imagePlacementIndex,
+        byte[]? imageBytes,
+        int imageRotation,
+        (double Left, double Bottom, double Right, double Top) bounds)
+    {
+        ClearTextSelection();
+        _selectedPageIndex = pageInfo.PageIndex;
+        _selectedVisualKind = kind;
+        _selectedVisualName = name;
+        _selectedImagePlacementIndex = imagePlacementIndex;
+        _selectedImageBytes = imageBytes;
+        _selectedImageRotation = imageRotation;
+        _selectedVisualBounds = bounds;
+
+        string elementLabel = kind == VisualElementKind.Image ? "Imagem selecionada" : "Retângulo selecionado";
+        SelectedTextLabel.Text = elementLabel;
+        SelectedTextLabel.IsVisible = true;
+        EditSelectedTextButton.IsVisible = false;
+        DeleteSelectedTextButton.Content = "Excluir elemento";
+        DeleteSelectedTextButton.IsVisible = true;
+
+        if (!_pageSurfaces.TryGetValue(pageInfo.PageIndex, out var surface))
+            return;
+
+        var viewRect = PdfiumPageCoordinateMapper.PdfToViewRect(
+            bounds.Left, bounds.Bottom, bounds.Right, bounds.Top,
+            image.Bounds.Width, image.Bounds.Height,
+            pageInfo.WidthPoints, pageInfo.HeightPoints, pageInfo.Rotation);
+
+        var border = new Border
+        {
+            Width = Math.Max(10, viewRect.Width),
+            Height = Math.Max(10, viewRect.Height),
+            BorderBrush = new Avalonia.Media.SolidColorBrush(
+                Avalonia.Media.Color.FromRgb(35, 116, 220)),
+            BorderThickness = new Thickness(2),
+            Background = new Avalonia.Media.SolidColorBrush(
+                Avalonia.Media.Color.FromArgb(12, 35, 116, 220)),
+            Cursor = new Cursor(StandardCursorType.SizeAll),
+            IsHitTestVisible = true
+        };
+        _visualSelectionBorder = border;
+
+        var resizeHandle = new Border
+        {
+            Width = 11,
+            Height = 11,
+            Background = new Avalonia.Media.SolidColorBrush(
+                Avalonia.Media.Color.FromRgb(109, 75, 195)),
+            BorderBrush = Avalonia.Media.Brushes.White,
+            BorderThickness = new Thickness(1),
+            IsHitTestVisible = false
+        };
+
+        double initialLeft = viewRect.X;
+        double initialTop = viewRect.Y;
+        double initialWidth = Math.Max(10, viewRect.Width);
+        double initialHeight = Math.Max(10, viewRect.Height);
+        double dragStartX = 0;
+        double dragStartY = 0;
+        bool dragging = false;
+        bool resizing = false;
+        bool changed = false;
+
+        void PositionHandle()
+        {
+            Canvas.SetLeft(resizeHandle,
+                Canvas.GetLeft(border) + border.Width - resizeHandle.Width / 2);
+            Canvas.SetTop(resizeHandle,
+                Canvas.GetTop(border) + border.Height - resizeHandle.Height / 2);
+        }
+
+        border.PointerPressed += (_, args) =>
+        {
+            if (!args.GetCurrentPoint(border).Properties.IsLeftButtonPressed)
+                return;
+
+            var local = args.GetPosition(border);
+            resizing = local.X >= border.Width - 17 &&
+                       local.Y >= border.Height - 17;
+            dragging = true;
+            changed = false;
+            dragStartX = args.GetPosition(surface.Overlay).X;
+            dragStartY = args.GetPosition(surface.Overlay).Y;
+            initialLeft = Canvas.GetLeft(border);
+            initialTop = Canvas.GetTop(border);
+            initialWidth = border.Width;
+            initialHeight = border.Height;
+            args.Pointer.Capture(border);
+            args.Handled = true;
+        };
+
+        border.PointerMoved += (_, args) =>
+        {
+            if (!dragging)
+                return;
+
+            var current = args.GetPosition(surface.Overlay);
+            double dx = current.X - dragStartX;
+            double dy = current.Y - dragStartY;
+            if (Math.Abs(dx) < 1 && Math.Abs(dy) < 1)
+                return;
+
+            changed = true;
+            if (resizing)
+            {
+                border.Width = Math.Max(10, initialWidth + dx);
+                border.Height = Math.Max(10, initialHeight + dy);
+            }
+            else
+            {
+                Canvas.SetLeft(border, initialLeft + dx);
+                Canvas.SetTop(border, initialTop + dy);
+            }
+
+            PositionHandle();
+            args.Handled = true;
+        };
+
+        border.PointerReleased += (_, args) =>
+        {
+            if (!dragging)
+                return;
+
+            dragging = false;
+            args.Pointer.Capture(null);
+            if (changed)
+            {
+                _ = ApplyVisualElementBoundsAsync(
+                    pageInfo, image,
+                    Canvas.GetLeft(border), Canvas.GetTop(border),
+                    border.Width, border.Height);
+            }
+            args.Handled = true;
+        };
+
+        Canvas.SetLeft(border, viewRect.X);
+        Canvas.SetTop(border, viewRect.Y);
+        surface.Overlay.Children.Add(border);
+        surface.Overlay.Children.Add(resizeHandle);
+        surface.Overlay.IsHitTestVisible = true;
+        PositionHandle();
+        EditorStatusText.Text =
+            elementLabel + ". Arraste para mover; use o puxador roxo no canto para redimensionar.";
+    }
+
+    private async Task ApplyVisualElementBoundsAsync(
+        PagePreviewInfo pageInfo,
+        AvaloniaImage image,
+        double viewLeft,
+        double viewTop,
+        double viewWidth,
+        double viewHeight)
+    {
+        if (_selectedVisualBounds is not { } originalBounds ||
+            _selectedVisualKind == VisualElementKind.None ||
+            viewWidth < 8 || viewHeight < 8)
+            return;
+
+        if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+                viewLeft, viewTop, image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints,
+                out double x1, out double y1, pageInfo.Rotation) ||
+            !PdfiumPageCoordinateMapper.TryViewToPdf(
+                viewLeft + viewWidth, viewTop + viewHeight,
+                image.Bounds.Width, image.Bounds.Height,
+                pageInfo.WidthPoints, pageInfo.HeightPoints,
+                out double x2, out double y2, pageInfo.Rotation))
+        {
+            EditorStatusText.Text = "O novo tamanho/posição ultrapassa a página.";
+            LoadDocumentPreview();
+            return;
+        }
+
+        double left = Math.Min(x1, x2);
+        double right = Math.Max(x1, x2);
+        double bottom = Math.Min(y1, y2);
+        double top = Math.Max(y1, y2);
+        if (right - left < 4 || top - bottom < 4 ||
+            left < 0 || bottom < 0 ||
+            right > pageInfo.WidthPoints || top > pageInfo.HeightPoints)
+        {
+            EditorStatusText.Text = "O elemento precisa permanecer dentro dos limites da página.";
+            LoadDocumentPreview();
+            return;
+        }
+
+        VisualElementKind kind = _selectedVisualKind;
+        string? selectedName = _selectedVisualName;
+        int imageIndex = _selectedImagePlacementIndex;
+        byte[]? imageBytes = _selectedImageBytes;
+        int imageRotation = _selectedImageRotation;
+        double expectedCenterX = (left + right) / 2;
+        double expectedCenterY = (bottom + top) / 2;
+
+        try
+        {
+            ApplyPdfEdit(document =>
+            {
+                var page = document.Pages[pageInfo.PageIndex + 1];
+                if (kind == VisualElementKind.Rectangle)
+                {
+                    var annotation = page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
+                        .FirstOrDefault(item => string.Equals(
+                            item.Name, selectedName, StringComparison.Ordinal));
+                    if (annotation == null)
+                        throw new InvalidOperationException("O retângulo selecionado não existe mais no PDF.");
+
+                    annotation.Rect = new Aspose.Pdf.Rectangle(left, bottom, right, top);
+                    annotation.UpdateAppearances();
+                    return;
+                }
+
+                if (imageBytes == null || imageBytes.Length == 0)
+                    throw new InvalidOperationException("Os dados da imagem selecionada não estão disponíveis.");
+
+                var absorber = new ImagePlacementAbsorber();
+                page.Accept(absorber);
+                if (imageIndex < 0 || imageIndex >= absorber.ImagePlacements.Count)
+                    throw new InvalidOperationException("A imagem selecionada não foi encontrada no PDF.");
+
+                var placement = absorber.ImagePlacements[imageIndex];
+                var currentBounds = placement.Rectangle;
+                if (currentBounds == null ||
+                    Math.Pow((currentBounds.LLX + currentBounds.URX) / 2 -
+                             (originalBounds.Left + originalBounds.Right) / 2, 2) +
+                    Math.Pow((currentBounds.LLY + currentBounds.URY) / 2 -
+                             (originalBounds.Bottom + originalBounds.Top) / 2, 2) > 900)
+                    throw new InvalidOperationException("A imagem mudou desde a seleção. Selecione-a novamente.");
+
+                placement.Hide();
+
+                int normalizedRotation = ((imageRotation % 360) + 360) % 360;
+                bool quarterTurn = normalizedRotation is 90 or 270;
+                double stampWidth = quarterTurn ? top - bottom : right - left;
+                double stampHeight = quarterTurn ? right - left : top - bottom;
+                double centerX = (left + right) / 2;
+                double centerY = (bottom + top) / 2;
+
+                using var imageStream = new MemoryStream(imageBytes, writable: false);
+                var stamp = new ImageStamp(imageStream)
+                {
+                    X = centerX - stampWidth / 2,
+                    Y = centerY - stampHeight / 2,
+                    DisplayWidth = stampWidth,
+                    DisplayHeight = stampHeight,
+                    Quality = 95,
+                    Opacity = 1.0,
+                    Background = false,
+                    Rotate = normalizedRotation switch
+                    {
+                        90 => Aspose.Pdf.Rotation.on90,
+                        180 => Aspose.Pdf.Rotation.on180,
+                        270 => Aspose.Pdf.Rotation.on270,
+                        _ => Aspose.Pdf.Rotation.on0
+                    }
+                };
+                page.AddStamp(stamp);
+            }, kind == VisualElementKind.Image
+                ? "Imagem movida/redimensionada no PDF."
+                : "Retângulo movido/redimensionado no PDF.", savedDocument =>
+            {
+                var page = savedDocument.Pages[pageInfo.PageIndex + 1];
+                if (kind == VisualElementKind.Rectangle)
+                {
+                    var annotation = page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
+                        .FirstOrDefault(item => string.Equals(
+                            item.Name, selectedName, StringComparison.Ordinal));
+                    return annotation?.Rect is { } rectangle &&
+                        Math.Abs(rectangle.LLX - left) < 2 &&
+                        Math.Abs(rectangle.LLY - bottom) < 2 &&
+                        Math.Abs(rectangle.URX - right) < 2 &&
+                        Math.Abs(rectangle.URY - top) < 2;
+                }
+
+                var absorber = new ImagePlacementAbsorber();
+                page.Accept(absorber);
+                return absorber.ImagePlacements.Any(placement =>
+                    placement.Rectangle is { } rectangle &&
+                    Math.Pow((rectangle.LLX + rectangle.URX) / 2 - expectedCenterX, 2) +
+                    Math.Pow((rectangle.LLY + rectangle.URY) / 2 - expectedCenterY, 2) < 900);
+            });
+        }
+        catch (Exception ex)
+        {
+            LoadDocumentPreview();
+            EditorStatusText.Text =
+                "Não foi possível mover/redimensionar o elemento; a versão anterior foi preservada. " + ex.Message;
+        }
+    }
+
+    private async Task DeleteSelectedVisualElementAsync()
+    {
+        if (_selectedPageIndex is not int pageIndex ||
+            _selectedVisualKind == VisualElementKind.None ||
+            _selectedVisualBounds is not { } bounds)
+            return;
+
+        VisualElementKind kind = _selectedVisualKind;
+        string? selectedName = _selectedVisualName;
+        int imageIndex = _selectedImagePlacementIndex;
+        double centerX = (bounds.Left + bounds.Right) / 2;
+        double centerY = (bounds.Bottom + bounds.Top) / 2;
+
+        try
+        {
+            ApplyPdfEdit(document =>
+            {
+                var page = document.Pages[pageIndex + 1];
+                if (kind == VisualElementKind.Rectangle)
+                {
+                    var annotation = page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
+                        .FirstOrDefault(item => string.Equals(
+                            item.Name, selectedName, StringComparison.Ordinal));
+                    if (annotation == null)
+                        throw new InvalidOperationException("O retângulo selecionado não existe mais.");
+                    page.Annotations.Delete(annotation);
+                    return;
+                }
+
+                var absorber = new ImagePlacementAbsorber();
+                page.Accept(absorber);
+                if (imageIndex < 0 || imageIndex >= absorber.ImagePlacements.Count)
+                    throw new InvalidOperationException("A imagem selecionada não existe mais.");
+                var placement = absorber.ImagePlacements[imageIndex];
+                var rectangle = placement.Rectangle;
+                if (rectangle == null ||
+                    Math.Pow((rectangle.LLX + rectangle.URX) / 2 - centerX, 2) +
+                    Math.Pow((rectangle.LLY + rectangle.URY) / 2 - centerY, 2) > 900)
+                    throw new InvalidOperationException("A imagem mudou desde a seleção.");
+                placement.Hide();
+            }, kind == VisualElementKind.Image
+                ? "Imagem excluída do PDF."
+                : "Retângulo excluído do PDF.", savedDocument =>
+            {
+                var page = savedDocument.Pages[pageIndex + 1];
+                if (kind == VisualElementKind.Rectangle)
+                    return !page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
+                        .Any(item => string.Equals(
+                            item.Name, selectedName, StringComparison.Ordinal));
+
+                var absorber = new ImagePlacementAbsorber();
+                page.Accept(absorber);
+                return !absorber.ImagePlacements.Any(placement =>
+                    placement.Rectangle is { } rectangle &&
+                    Math.Pow((rectangle.LLX + rectangle.URX) / 2 - centerX, 2) +
+                    Math.Pow((rectangle.LLY + rectangle.URY) / 2 - centerY, 2) < 900);
+            });
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                "Não foi possível excluir o elemento; a versão anterior foi preservada. " + ex.Message;
+        }
+    }
+
     private void ClearTextSelection()
     {
         foreach (var surface in _pageSurfaces.Values)
