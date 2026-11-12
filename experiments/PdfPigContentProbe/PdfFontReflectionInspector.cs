@@ -74,7 +74,7 @@ internal static class PdfFontReflectionInspector
                 if (stream is not null && stream.GetType().Name == "StreamToken")
                     DumpDecodedCMap(stream, document, indent);
                 else
-                    Console.WriteLine($"{indent}/ToUnicode: não resolvido como stream ({stream?.GetType().Name ?? "null"})");
+                    Console.WriteLine($"{indent}/ToUnicode: não resolvido como stream ({stream?.GetType().Name ?? "null"}); cadeia={DescribeTokenChain(document, value)}");
             }
             else if (key == "Encoding")
             {
@@ -154,6 +154,8 @@ internal static class PdfFontReflectionInspector
                     object? cmap = ResolveToken(document, value);
                     if (cmap is not null && cmap.GetType().Name == "StreamToken")
                         DumpDecodedCMap(cmap, document, indent + "  ");
+                    else
+                        Console.WriteLine($"{indent}  /DescendantFonts/ToUnicode não resolvido; cadeia={DescribeTokenChain(document, value)}");
                 }
             }
         }
@@ -269,6 +271,70 @@ internal static class PdfFontReflectionInspector
 
         // A cyclic or unexpectedly deep token chain is not safe to inspect.
         return null;
+    }
+
+    private static string DescribeTokenChain(PdfDocument document, object token)
+    {
+        var parts = new List<string>();
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+
+        for (int depth = 0; depth < 16; depth++)
+        {
+            if (!visited.Add(token))
+            {
+                parts.Add("ciclo");
+                break;
+            }
+
+            string typeName = token.GetType().Name;
+            parts.Add(typeName);
+
+            if (typeName == "IndirectReferenceToken")
+            {
+                object? reference = GetProperty(token, "Data");
+                if (reference is null)
+                {
+                    parts.Add("Data ausente");
+                    break;
+                }
+
+                try
+                {
+                    object? resolved = ResolveReference(document, reference);
+                    if (resolved is null)
+                    {
+                        parts.Add("referência sem objeto");
+                        break;
+                    }
+                    token = resolved;
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    parts.Add($"resolução falhou:{ex.GetType().Name}");
+                    break;
+                }
+            }
+
+            if (typeName == "ObjectToken")
+            {
+                object? inner = GetProperty(token, "Data");
+                if (inner is null || ReferenceEquals(inner, token))
+                {
+                    parts.Add("Data ausente/inválido");
+                    break;
+                }
+                token = inner;
+                continue;
+            }
+
+            object? data = GetProperty(token, "Data");
+            if (data is not null && !ReferenceEquals(data, token))
+                parts.Add($"Data={data.GetType().Name}");
+            break;
+        }
+
+        return string.Join(" -> ", parts);
     }
 
     private static object? ResolveReference(PdfDocument document, object reference)
