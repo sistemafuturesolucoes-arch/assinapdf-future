@@ -162,44 +162,25 @@ internal static class PdfFontReflectionInspector
     {
         try
         {
-            object? streamDictionary = GetProperty(streamToken, "StreamDictionary");
-            object? streamData = GetProperty(streamToken, "Data");
-            if (streamData is not Memory<byte> raw)
+            if (streamToken is not StreamToken stream)
             {
-                Console.WriteLine($"{indent}/ToUnicode: bytes não expostos ({streamData?.GetType().Name ?? "null"})");
+                Console.WriteLine($"{indent}/ToUnicode: token não é StreamToken.");
                 return;
             }
 
-            Memory<byte> decoded = raw;
-            var filterProvider = GetProperty(document.Structure, "FilterProvider");
-            var tokenScanner = GetProperty(document.Structure, "TokenScanner");
-            if (filterProvider is not null && tokenScanner is not null && streamDictionary is not null)
+            Memory<byte> decoded = stream.Data;
+            var filters = document.Structure.FilterProvider.GetFilters(
+                stream.StreamDictionary, document.Structure.TokenScanner);
+            int filterIndex = 0;
+            foreach (var filter in filters)
             {
-                var getFilters = filterProvider.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .First(m => m.Name == "GetFilters" && m.GetParameters().Length == 2);
-                if (getFilters.Invoke(filterProvider, new[] { streamDictionary, tokenScanner }) is IEnumerable filters)
+                if (!filter.IsSupported)
                 {
-                    int filterIndex = 0;
-                    foreach (var filter in filters)
-                    {
-                        if (filter is null) continue;
-                        bool supported = GetProperty(filter, "IsSupported") as bool? ?? false;
-                        if (!supported)
-                        {
-                            Console.WriteLine($"{indent}/ToUnicode: filtro não suportado ({filter.GetType().Name})");
-                            return;
-                        }
-                        var decode = filter.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                            .First(m => m.Name == "Decode" && m.GetParameters().Length == 4);
-                        object? result = decode.Invoke(filter, new object?[] { decoded, streamDictionary, filterProvider, filterIndex++ });
-                        if (result is Memory<byte> memory) decoded = memory;
-                        else
-                        {
-                            Console.WriteLine($"{indent}/ToUnicode: retorno inesperado do decoder.");
-                            return;
-                        }
-                    }
+                    Console.WriteLine($"{indent}/ToUnicode: filtro não suportado ({filter.GetType().Name})");
+                    return;
                 }
+                decoded = filter.Decode(
+                    decoded, stream.StreamDictionary, document.Structure.FilterProvider, filterIndex++);
             }
 
             string cmapText = Encoding.Latin1.GetString(decoded.Span);
