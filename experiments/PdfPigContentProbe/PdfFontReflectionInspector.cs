@@ -201,8 +201,12 @@ internal static class PdfFontReflectionInspector
     private static void PrintCMapMappings(string text, string indent)
     {
         CMapParseResult result = ToUnicodeCMapParser.Parse(text);
-        Console.WriteLine($"{indent}Mapeamentos Unicode interpretados: {result.Mappings.Count}; entradas inválidas/rejeitadas: {result.MalformedEntries}");
+        Console.WriteLine($"{indent}Code spaces: {result.CodeSpaces.Count}; mapeamentos Unicode: {result.Mappings.Count}; entradas inválidas/rejeitadas: {result.MalformedEntries}");
         Console.WriteLine($"{indent}  bfchar: {result.ParsedBfCharEntries}; bfrange: {result.ParsedBfRangeEntries}");
+        foreach (var range in result.CodeSpaces.Take(12))
+            Console.WriteLine(indent + "  code space <" + range.FirstHex + ">..<" + range.LastHex + ">");
+        if (result.CodeSpaces.Count > 12)
+            Console.WriteLine($"{indent}  ... exibidos 12 de {result.CodeSpaces.Count} code spaces");
         foreach (var pair in result.Mappings.Take(24))
         {
             string scalars = string.Join(" ", pair.Value.EnumerateRunes().Select(r => $"U+{r.Value:X4}"));
