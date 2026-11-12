@@ -13,6 +13,7 @@ internal static class OriginalContentOperandInspector
     {
         Console.WriteLine("LOCALIZAÇÃO DE OFFSETS DOS OPERANDOS Tj (somente leitura)");
         int totalFound = 0, totalParsed = 0, totalUnsupported = 0;
+        int totalExact = 0, totalEmpty = 0, totalDifferent = 0, totalUnavailable = 0;
         var samples = new List<LocatedOperand>();
 
         for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
@@ -51,28 +52,46 @@ internal static class OriginalContentOperandInspector
 
             var pdfPigOperations = page.Operations.Where(x => x.Operator == "Tj").ToArray();
             int compared = Math.Min(pdfPigOperations.Length, locatedForPage.Count);
-            int exact = 0;
-            var mismatches = new List<string>();
+            int exact = 0, empty = 0, different = 0, unavailable = 0;
+            var details = new List<string>();
             for (int index = 0; index < compared; index++)
             {
-                var value = pdfPigOperations[index].GetType()
-                    .GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?.GetValue(pdfPigOperations[index]);
-                if (value is ReadOnlyMemory<byte> memory && memory.Span.SequenceEqual(locatedForPage[index].Token.Bytes))
-                    exact++;
-                else if (mismatches.Count < 8)
+                var operation = pdfPigOperations[index];
+                var property = operation.GetType().GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance);
+                var value = property?.GetValue(operation);
+                if (value is ReadOnlyMemory<byte> memory)
                 {
-                    string parsedHex = value is ReadOnlyMemory<byte> parsed ? Convert.ToHexString(parsed.Span) : "(Bytes indisponível)";
-                    string streamHex = Convert.ToHexString(locatedForPage[index].Token.Bytes);
-                    mismatches.Add($"#{index + 1}: PdfPig={parsedHex}; stream={streamHex}; obj={locatedForPage[index].ObjectId}; offset={locatedForPage[index].Token.Start}");
+                    if (memory.Length == 0)
+                    {
+                        empty++;
+                        if (details.Count < 8)
+                            details.Add($"#{index + 1}: PdfPig Bytes VAZIO; stream={Convert.ToHexString(locatedForPage[index].Token.Bytes)}; obj={locatedForPage[index].ObjectId}; offset={locatedForPage[index].Token.Start}; tipo={operation.GetType().Name}");
+                    }
+                    else if (memory.Span.SequenceEqual(locatedForPage[index].Token.Bytes))
+                        exact++;
+                    else
+                    {
+                        different++;
+                        if (details.Count < 8)
+                            details.Add($"#{index + 1}: PdfPig={Convert.ToHexString(memory.Span)}; stream={Convert.ToHexString(locatedForPage[index].Token.Bytes)}; obj={locatedForPage[index].ObjectId}; offset={locatedForPage[index].Token.Start}; tipo={operation.GetType().Name}");
+                    }
+                }
+                else
+                {
+                    unavailable++;
+                    if (details.Count < 8)
+                        details.Add($"#{index + 1}: propriedade Bytes indisponível/tipo inesperado ({value?.GetType().FullName ?? "null"}); stream={Convert.ToHexString(locatedForPage[index].Token.Bytes)}; obj={locatedForPage[index].ObjectId}; offset={locatedForPage[index].Token.Start}; tipo={operation.GetType().Name}");
                 }
             }
 
-            Console.WriteLine($"  Página {pageNumber}: PdfPig Tj={expected}; operandos localizados={found}; bytes comparados={compared}; correspondências exatas={exact}; divergências={compared - exact}; diferença de contagem={found - expected}");
-            foreach (string mismatch in mismatches)
-                Console.WriteLine($"    DIVERGÊNCIA {mismatch}");
+            totalExact += exact; totalEmpty += empty; totalDifferent += different; totalUnavailable += unavailable;
+            Console.WriteLine($"  Página {pageNumber}: PdfPig Tj={expected}; operandos localizados={found}; comparados={compared}; exatos={exact}; Bytes vazios={empty}; bytes diferentes={different}; Bytes indisponíveis={unavailable}; diferença de contagem={found - expected}");
+            foreach (string detail in details)
+                Console.WriteLine($"    DIAGNÓSTICO {detail}");
         }
 
         Console.WriteLine($"  TOTAL: streams analisados={totalParsed}; streams ignorados por filtro={totalUnsupported}; operandos Tj localizados={totalFound}");
+        Console.WriteLine($"  CORRELAÇÃO TOTAL: exatos={totalExact}; Bytes vazios no PdfPig={totalEmpty}; bytes diferentes={totalDifferent}; Bytes indisponíveis={totalUnavailable}");
         Console.WriteLine("  AMOSTRAS (offsets em bytes do stream DECODIFICADO, não do arquivo PDF bruto):");
         foreach (var item in samples)
             Console.WriteLine($"    pág={item.Page}; obj={item.ObjectId}; offset={item.Offset}; bytes={item.Length}; tipo={item.Kind}; hex={item.Hex}");
