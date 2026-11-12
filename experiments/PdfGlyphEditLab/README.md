@@ -33,3 +33,27 @@ This is still a planning stage. The source mapper consumes explicit byte spans s
 ## Licensing
 
 No third-party engine is included in this experiment. The reDACT project remains a behavior/reference candidate only; its GPL-3.0 terms are not being introduced into the AssinaPDF product by this lab.
+
+
+## Finding from the current AssinaPDF integration
+
+The current CrossPlatform project already extracts PDFium characters using
+`FPDFText_GetUnicode`, `FPDFText_GetCharBox`, and font metadata. It also enumerates
+page objects with `FPDFPage_GetObject` and reads text-object text.
+
+PDFium exposes an additional experimental API, `FPDFText_GetTextObject`, which
+returns the text page object associated with a character index. This can establish
+a useful intermediate mapping:
+
+`PDFium character index -> PDF text object`
+
+It does **not** expose the original content-stream operator index, string operand
+index, or encoded byte offset. It therefore cannot, by itself, authorize a glyph-level
+rewrite. Multiple characters may belong to the same text object, and the object API
+does not reveal the exact source byte sequence for an individual glyph.
+
+Next proof should validate the exported API in the bundled Windows and macOS PDFium
+runtimes, map every extracted character to a stable page-object identity, and compare
+the text-object output with PDFium's page character sequence. Only after that should
+a real content-stream parser be connected to recover operator/operand/byte provenance.
+The production editor remains unchanged until this is proven on real PDFs.
