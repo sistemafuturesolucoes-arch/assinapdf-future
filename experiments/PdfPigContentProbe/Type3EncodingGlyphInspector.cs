@@ -210,10 +210,14 @@ internal static class Type3EncodingGlyphInspector
                 if (!lettersBySequence.TryGetValue(sequence, out var letters) || letters.Length != 1)
                     continue;
                 var letter = letters[0];
-                if (letter.Value != "B" ||
-                    !Equals(Get(Get(letter, "FontDetails"), "FontDictionaryReference"), selectedReference))
-                    continue;
+                if (letter.Value != "B") continue;
+                object? letterReference = Get(Get(letter, "FontDetails"), "FontDictionaryReference");
                 object? raw = Get(op, "Bytes");
+                string bytes = raw is ReadOnlyMemory<byte> memoryValue ? Convert.ToHexString(memoryValue.Span) : "(bytes indisponíveis)";
+                bool exactReference = Equals(letterReference, selectedReference) ||
+                    string.Equals(letterReference?.ToString(), selectedReference?.ToString(), StringComparison.Ordinal);
+                Console.WriteLine($"  Candidato B: página={pageNumber}; seq={sequence}; fonte={letter.FontName}; ref={letterReference}; mesma referência={exactReference}; bytes={bytes}");
+                if (!exactReference) continue;
                 if (raw is not ReadOnlyMemory<byte> memory || memory.Length == 0) continue;
                 Console.WriteLine($"  Amostra B na fonte exata: página={pageNumber}; seq={sequence}; bytes={Convert.ToHexString(memory.Span)}");
                 if (memory.Length == 1)
@@ -259,6 +263,11 @@ internal static class Type3EncodingGlyphInspector
             string hash = Convert.ToHexString(SHA256.HashData(decoded.Span));
             Console.WriteLine($"    CharProc decodificado: {decoded.Length} bytes; SHA256={hash}");
             Console.WriteLine($"    Início do programa: {preview}");
+            var metrics = Regex.Match(source, @"(?m)^\\s*(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)\\s+d([01])\\b");
+            if (metrics.Success)
+                Console.WriteLine($"    Métrica inicial Type3: wx={metrics.Groups[1].Value}; wy={metrics.Groups[2].Value}; operador=d{metrics.Groups[3].Value}");
+            else
+                Console.WriteLine("    Métrica inicial Type3 d0/d1: não identificada no início do stream.");
         }
         catch (Exception ex)
         {
