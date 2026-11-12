@@ -36,7 +36,7 @@ try
             .ToDictionary(group => group.Key, group => group.ToArray());
 
         int sequence = 0;
-        int pageTextOps = 0, pageMapped = 0, pageUnmapped = 0;
+        int pageTextOps = 0, pageMapped = 0, pageUnmapped = 0, pageInterestingOperands = 0;
         var seenSequences = new HashSet<int>();
 
         Console.WriteLine($"PÁGINA {pageNumber}: {page.Letters.Count} glifos/letras; {page.Operations.Count} operações totais");
@@ -57,8 +57,11 @@ try
                 : MakePreview(string.Concat(letters.Select(x => x.Value)), 72);
 
             Console.WriteLine($"  seq={sequence,4} op={operation.Operator} tipo={operation.GetType().Name,-28} letras={count,4} texto=\"{Escape(preview)}\"");
-            if (pageTextOps <= 24)
-                Console.WriteLine($"       operandos: {DescribeOperands(operation)}");
+            if (HasInterestingOperands(operation))
+            {
+                pageInterestingOperands++;
+                Console.WriteLine($"       OPERANDO INTERESSANTE: {DescribeOperands(operation)}");
+            }
         }
 
         foreach (var group in lettersBySequence)
@@ -70,9 +73,7 @@ try
         totalMappedLetters += pageMapped;
         totalUnmappedLetters += pageUnmapped;
 
-        Console.WriteLine($"  RESUMO página {pageNumber}: operações Tj/TJ={pageTextOps}; letras associadas={pageMapped}; letras sem operação Tj/TJ visível nesta página={pageUnmapped}");
-        if (pageTextOps > 24)
-            Console.WriteLine("  (operandos detalhados somente para as primeiras 24 operações de texto)");
+        Console.WriteLine($"  RESUMO página {pageNumber}: operações Tj/TJ={pageTextOps}; letras associadas={pageMapped}; letras sem operação Tj/TJ visível nesta página={pageUnmapped}; operandos com múltiplos bytes/arrays TJ={pageInterestingOperands}");
         Console.WriteLine();
     }
 
@@ -93,6 +94,17 @@ catch (Exception ex)
 {
     Console.Error.WriteLine($"Falha ao analisar PDF: {ex.GetType().Name}: {ex.Message}");
     return 10;
+}
+
+static bool HasInterestingOperands(object operation)
+{
+    var type = operation.GetType();
+    var bytesValue = type.GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?.GetValue(operation);
+    if (bytesValue is ReadOnlyMemory<byte> bytes && bytes.Length > 1)
+        return true;
+
+    var arrayValue = type.GetProperty("Array", BindingFlags.Public | BindingFlags.Instance)?.GetValue(operation);
+    return arrayValue is System.Collections.IEnumerable;
 }
 
 static string DescribeOperands(object operation)
