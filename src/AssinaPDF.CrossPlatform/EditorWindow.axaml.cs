@@ -2112,7 +2112,7 @@ public partial class EditorWindow : Window
                         90 => Aspose.Pdf.Rotation.on90,
                         180 => Aspose.Pdf.Rotation.on180,
                         270 => Aspose.Pdf.Rotation.on270,
-                        _ => Aspose.Pdf.Rotation.on0
+                        _ => Aspose.Pdf.Rotation.None
                     }
                 };
                 page.AddStamp(stamp);
