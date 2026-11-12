@@ -226,9 +226,9 @@ internal static class Type3EncodingGlyphInspector
         {
             if (!visited.Add(current)) return null;
             string type = current.GetType().Name;
-            if (type == "IndirectReferenceToken")
+            if (type == "IndirectReferenceToken" || type == "IndirectReference")
             {
-                object? reference = Get(current, "Data");
+                object? reference = type == "IndirectReferenceToken" ? Get(current, "Data") : current;
                 if (reference is null) return null;
                 var method = document.Structure.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .First(m => m.Name == "GetObject" && m.GetParameters().Length == 1 &&
