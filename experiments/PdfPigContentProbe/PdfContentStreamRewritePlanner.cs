@@ -43,12 +43,6 @@ internal static class PdfContentStreamRewritePlanner
         }
 
         PdfContentStringOperand selected = matches[0];
-        if (!selected.DecodedBytes.AsSpan().SequenceEqual(expectedOriginalBytes))
-        {
-            reason = "Bytes decodificados no offset não correspondem ao código original selecionado.";
-            return false;
-        }
-
         byte[] rawToken = decodedContentStream[selected.TokenStart..selected.TokenEnd].ToArray();
         if (!PdfStringOperandCodec.TryDecodeToken(rawToken, out var token, out reason))
             return false;
