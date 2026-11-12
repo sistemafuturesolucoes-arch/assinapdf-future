@@ -1093,8 +1093,7 @@ public partial class EditorWindow : Window
                 Background = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.FromArgb(18, 105, 76, 165)),
                 Cursor = new Cursor(StandardCursorType.Hand),
-                IsHitTestVisible = true,
-                ToolTip = line.Text.Length > 120 ? line.Text[..117] + "..." : line.Text
+                IsHitTestVisible = true
             };
 
             box.PointerPressed += (_, args) =>
