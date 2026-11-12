@@ -14,16 +14,17 @@ internal static class PdfFontReflectionInspector
             foreach (var letter in page.Letters)
             {
                 var reference = letter.Font.FontDictionaryReference;
-                if (reference is null) continue;
-                string id = reference.ObjectNumber.ToString();
+                if (!reference.HasValue) continue;
+                var fontReference = reference.Value;
+                string id = fontReference.ObjectNumber.ToString();
                 if (!seen.Add(id)) continue;
                 Console.WriteLine($"  FONTE: {letter.FontName}; objeto={id} 0");
                 try
                 {
                     var getObject = document.Structure.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                         .First(m => m.Name == "GetObject" && m.GetParameters().Length == 1 &&
-                                    m.GetParameters()[0].ParameterType.IsInstanceOfType(reference));
-                    object? objectToken = getObject.Invoke(document.Structure, new object[] { reference });
+                                    m.GetParameters()[0].ParameterType.IsInstanceOfType(fontReference));
+                    object? objectToken = getObject.Invoke(document.Structure, new object[] { fontReference });
                     if (objectToken is null) { Console.WriteLine("    objeto não resolvido"); continue; }
                     object? dictionary = objectToken.GetType().GetProperty("Data")?.GetValue(objectToken);
                     if (dictionary is null) { Console.WriteLine($"    token sem Data: {objectToken.GetType().Name}"); continue; }
