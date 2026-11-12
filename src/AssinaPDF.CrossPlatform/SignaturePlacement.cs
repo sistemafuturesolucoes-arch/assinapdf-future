@@ -7,4 +7,5 @@ public sealed record SignaturePlacement(
     double NormalizedWidth,
     double NormalizedHeight,
     float PageWidthPoints,
-    float PageHeightPoints);
+    float PageHeightPoints,
+    int PageRotation = 0);
