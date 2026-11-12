@@ -57,3 +57,10 @@ A saída também agrupa por fonte a quantidade de operandos em que o número de 
 ## Inspeção das estruturas internas de fonte
 
 O probe percorre as letras extraídas e inspeciona, por reflection e sem invocar métodos de conversão, as propriedades, campos e assinaturas de API do objeto de detalhes da fonte exposto por cada `Letter`. O objetivo é identificar quais estruturas de codificação, CMaps, mapas Unicode ou dicionários estão disponíveis nesta versão do PdfPig para investigar fontes incorporadas/subconjuntos. A inspeção é limitada a metadados e referências de objetos; não tenta adivinhar a codificação nem altera o documento.
+
+
+## Inspeção dos mapas de fonte e CMaps
+
+A etapa de fontes foi ampliada para resolver, em memória, os streams `/ToUnicode`, decodificar os filtros PDF suportados e imprimir o CMap textual com contagem de estruturas `codespacerange`, `bfchar`, `bfrange`, `cidchar` e `cidrange`. Também inspeciona `/Encoding` nomeado ou em dicionário (incluindo `/BaseEncoding` e `/Differences`), além de metadados essenciais das fontes descendentes CID e estruturas Type3.
+
+A saída é limitada por quantidade de fontes, tamanho do CMap e itens de arrays para evitar relatórios excessivos. O conteúdo decodificado é apenas diagnóstico: a implementação ainda não transforma CMaps em um codificador/decodificador completo, não correlaciona automaticamente cada code space a bytes de glifos e não altera nem salva PDFs. Fontes compostas, CMaps Identity, mapeamentos de vários bytes, ligaturas e diferenças de codificação exigem validação específica antes de qualquer reescrita.
