@@ -36,6 +36,15 @@ internal static class PdfStringOperandCodec
     {
         rewrittenToken = Array.Empty<byte>();
         reason = "Substituição recusada.";
+        if (!TryDecodeToken(rawToken, out var verifiedSource, out _) ||
+            !string.Equals(verifiedSource.Kind, decoded.Kind, StringComparison.Ordinal) ||
+            !verifiedSource.DecodedBytes.SequenceEqual(decoded.DecodedBytes) ||
+            !verifiedSource.Origins.SequenceEqual(decoded.Origins))
+        {
+            reason = "O mapa de origem fornecido não corresponde exatamente ao token bruto.";
+            return false;
+        }
+
         if (byteOffset < 0 || replacement.Length == 0 ||
             byteOffset + replacement.Length > decoded.DecodedBytes.Length ||
             decoded.Origins.Count != decoded.DecodedBytes.Length)
