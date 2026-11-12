@@ -49,8 +49,8 @@ public partial class EditorWindow : Window
     private int? _selectedPageIndex;
     private double _selectedPdfX;
     private double _selectedPdfY;
-    private enum EditorToolMode { Select, AddText, AddImage, DrawRectangle }
-    private enum VisualElementKind { None, Image, Rectangle }
+    private enum EditorToolMode { Select, AddText, AddImage, DrawRectangle, DrawEllipse }
+    private enum VisualElementKind { None, Image, Rectangle, Ellipse }
     private EditorToolMode _toolMode = EditorToolMode.Select;
     private bool _isDraggingSelection;
     private bool _isDrawingRectangle;
@@ -744,7 +744,7 @@ public partial class EditorWindow : Window
             _ = AddImageAtPointAsync(pageInfo, point, image);
             return;
         }
-        if (_toolMode == EditorToolMode.DrawRectangle)
+        if (_toolMode is EditorToolMode.DrawRectangle or EditorToolMode.DrawEllipse)
         {
             e.Handled = true;
             _isDrawingRectangle = true;
@@ -820,7 +820,7 @@ public partial class EditorWindow : Window
                 image.Cursor = new Cursor(_toolMode switch
                 {
                     EditorToolMode.AddImage => StandardCursorType.Hand,
-                    EditorToolMode.DrawRectangle => StandardCursorType.Cross,
+                    EditorToolMode.DrawRectangle or EditorToolMode.DrawEllipse => StandardCursorType.Cross,
                     _ => StandardCursorType.Arrow
                 });
                 foreach (var marker in surface.Overlay.Children.OfType<TextBlock>()
@@ -1552,6 +1552,36 @@ public partial class EditorWindow : Window
         EditorStatusText.Text = "Arraste sobre a página para desenhar um retângulo.";
     }
 
+    private void EllipseMode_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _toolMode = EditorToolMode.DrawEllipse;
+        ClearTextSelection();
+        foreach (var surface in _pageSurfaces.Values)
+            surface.Image.Cursor = new Cursor(StandardCursorType.Cross);
+
+        EllipseModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(233, 227, 245));
+        EllipseModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(76, 52, 130));
+        SelectModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        SelectModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(52, 56, 62));
+        AddTextModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        AddTextModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(52, 56, 62));
+        AddImageModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        AddImageModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(52, 56, 62));
+        RectangleModeButton.Background = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(240, 241, 244));
+        RectangleModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
+            Avalonia.Media.Color.FromRgb(52, 56, 62));
+        EditorStatusText.Text = "Arraste sobre a página para desenhar uma elipse.";
+    }
+
     private void UpdateRectanglePreview(
         AvaloniaImage image,
         PagePreviewInfo pageInfo,
@@ -1597,11 +1627,12 @@ public partial class EditorWindow : Window
         _rectanglePreview = null;
     }
 
-    private void AddRectangleFromDrag(
+    private void AddShapeFromDrag(
         PagePreviewInfo pageInfo,
         Avalonia.Point start,
         Avalonia.Point end,
-        AvaloniaImage image)
+        AvaloniaImage image,
+        VisualElementKind shapeKind)
     {
         if (!PdfiumPageCoordinateMapper.TryViewToPdf(
                 start.X, start.Y, image.Bounds.Width, image.Bounds.Height,
@@ -1626,29 +1657,34 @@ public partial class EditorWindow : Window
             return;
         }
 
-        string annotationName = "FutureEditorRectangle-" + Guid.NewGuid().ToString("N");
+        string annotationName = "FutureEditorShape-" + Guid.NewGuid().ToString("N");
+        bool isEllipse = shapeKind == VisualElementKind.Ellipse;
+        string annotationSubject = isEllipse
+            ? "AssinaPDF Editor Ellipse"
+            : "AssinaPDF Editor Rectangle";
         try
         {
             ApplyPdfEdit(document =>
             {
                 var page = document.Pages[pageInfo.PageIndex + 1];
-                var annotation = new Aspose.Pdf.Annotations.SquareAnnotation(
-                    page, new Aspose.Pdf.Rectangle(left, bottom, right, top))
-                {
-                    Name = annotationName,
-                    Title = "AssinaPDF",
-                    Subject = "AssinaPDF Editor Rectangle",
-                    Contents = "Forma inserida pelo AssinaPDF",
-                    Color = Aspose.Pdf.Color.FromRgb(0.42, 0.29, 0.75),
-                    InteriorColor = Aspose.Pdf.Color.FromRgb(0.88, 0.84, 0.96),
-                    Opacity = 0.22
-                };
+                Aspose.Pdf.Annotations.Annotation annotation = isEllipse
+                    ? new Aspose.Pdf.Annotations.CircleAnnotation(
+                        page, new Aspose.Pdf.Rectangle(left, bottom, right, top))
+                    : new Aspose.Pdf.Annotations.SquareAnnotation(
+                        page, new Aspose.Pdf.Rectangle(left, bottom, right, top));
+
+                annotation.Name = annotationName;
+                annotation.Title = "AssinaPDF";
+                annotation.Subject = annotationSubject;
+                annotation.Contents = "Forma inserida pelo AssinaPDF";
+                annotation.Color = Aspose.Pdf.Color.FromRgb(0.42, 0.29, 0.75);
+                annotation.InteriorColor = Aspose.Pdf.Color.FromRgb(0.88, 0.84, 0.96);
+                annotation.Opacity = 0.22;
                 page.Annotations.Add(annotation);
                 annotation.UpdateAppearances();
-            }, "Retângulo inserido no PDF.", savedDocument =>
+            }, isEllipse ? "Elipse inserida no PDF." : "Retângulo inserido no PDF.", savedDocument =>
             {
                 return savedDocument.Pages[pageInfo.PageIndex + 1].Annotations
-                    .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
                     .Any(annotation => string.Equals(
                         annotation.Name, annotationName, StringComparison.Ordinal));
             });
@@ -1803,11 +1839,10 @@ public partial class EditorWindow : Window
             using var document = Document.Open(_workingCopyPath);
             var page = document.Pages[pageInfo.PageIndex + 1];
 
-            var rectangle = page.Annotations
-                .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
-                .Where(annotation => string.Equals(
-                    annotation.Subject, "AssinaPDF Editor Rectangle",
-                    StringComparison.Ordinal))
+            var shape = page.Annotations
+                .Where(annotation =>
+                    string.Equals(annotation.Subject, "AssinaPDF Editor Rectangle", StringComparison.Ordinal) ||
+                    string.Equals(annotation.Subject, "AssinaPDF Editor Ellipse", StringComparison.Ordinal))
                 .FirstOrDefault(annotation =>
                 {
                     var bounds = annotation.Rect;
@@ -1816,14 +1851,18 @@ public partial class EditorWindow : Window
                         pdfY >= bounds.LLY && pdfY <= bounds.URY;
                 });
 
-            if (rectangle?.Rect is { } rectangleBounds &&
-                !string.IsNullOrWhiteSpace(rectangle.Name))
+            if (shape?.Rect is { } shapeBounds &&
+                !string.IsNullOrWhiteSpace(shape.Name))
             {
+                VisualElementKind shapeKind =
+                    shape is Aspose.Pdf.Annotations.CircleAnnotation
+                        ? VisualElementKind.Ellipse
+                        : VisualElementKind.Rectangle;
                 SetVisualElementSelection(
-                    image, pageInfo, VisualElementKind.Rectangle,
-                    rectangle.Name, -1, null, 0,
-                    (rectangleBounds.LLX, rectangleBounds.LLY,
-                     rectangleBounds.URX, rectangleBounds.URY));
+                    image, pageInfo, shapeKind,
+                    shape.Name, -1, null, 0,
+                    (shapeBounds.LLX, shapeBounds.LLY,
+                     shapeBounds.URX, shapeBounds.URY));
                 return true;
             }
 
@@ -1899,7 +1938,12 @@ public partial class EditorWindow : Window
         _selectedImageRotation = imageRotation;
         _selectedVisualBounds = bounds;
 
-        string elementLabel = kind == VisualElementKind.Image ? "Imagem selecionada" : "Retângulo selecionado";
+        string elementLabel = kind switch
+        {
+            VisualElementKind.Image => "Imagem selecionada",
+            VisualElementKind.Ellipse => "Elipse selecionada",
+            _ => "Retângulo selecionado"
+        };
         SelectedTextLabel.Text = elementLabel;
         SelectedTextLabel.IsVisible = true;
         EditSelectedTextButton.IsVisible = false;
@@ -2085,14 +2129,12 @@ public partial class EditorWindow : Window
             ApplyPdfEdit(document =>
             {
                 var page = document.Pages[pageInfo.PageIndex + 1];
-                if (kind == VisualElementKind.Rectangle)
+                if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
                 {
-                    var annotation = page.Annotations
-                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
-                        .FirstOrDefault(item => string.Equals(
-                            item.Name, selectedName, StringComparison.Ordinal));
+                    var annotation = page.Annotations.FirstOrDefault(item =>
+                        string.Equals(item.Name, selectedName, StringComparison.Ordinal));
                     if (annotation == null)
-                        throw new InvalidOperationException("O retângulo selecionado não existe mais no PDF.");
+                        throw new InvalidOperationException("A forma selecionada não existe mais no PDF.");
 
                     annotation.Rect = new Aspose.Pdf.Rectangle(left, bottom, right, top);
                     annotation.UpdateAppearances();
@@ -2146,15 +2188,15 @@ public partial class EditorWindow : Window
                 page.AddStamp(stamp);
             }, kind == VisualElementKind.Image
                 ? "Imagem movida/redimensionada no PDF."
-                : "Retângulo movido/redimensionado no PDF.", savedDocument =>
+                : kind == VisualElementKind.Ellipse
+                    ? "Elipse movida/redimensionada no PDF."
+                    : "Retângulo movido/redimensionado no PDF.", savedDocument =>
             {
                 var page = savedDocument.Pages[pageInfo.PageIndex + 1];
-                if (kind == VisualElementKind.Rectangle)
+                if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
                 {
-                    var annotation = page.Annotations
-                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
-                        .FirstOrDefault(item => string.Equals(
-                            item.Name, selectedName, StringComparison.Ordinal));
+                    var annotation = page.Annotations.FirstOrDefault(item =>
+                        string.Equals(item.Name, selectedName, StringComparison.Ordinal));
                     return annotation?.Rect is { } rectangle &&
                         Math.Abs(rectangle.LLX - left) < 2 &&
                         Math.Abs(rectangle.LLY - bottom) < 2 &&
@@ -2196,14 +2238,12 @@ public partial class EditorWindow : Window
             ApplyPdfEdit(document =>
             {
                 var page = document.Pages[pageIndex + 1];
-                if (kind == VisualElementKind.Rectangle)
+                if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
                 {
-                    var annotation = page.Annotations
-                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
-                        .FirstOrDefault(item => string.Equals(
-                            item.Name, selectedName, StringComparison.Ordinal));
+                    var annotation = page.Annotations.FirstOrDefault(item =>
+                        string.Equals(item.Name, selectedName, StringComparison.Ordinal));
                     if (annotation == null)
-                        throw new InvalidOperationException("O retângulo selecionado não existe mais.");
+                        throw new InvalidOperationException("A forma selecionada não existe mais.");
                     page.Annotations.Delete(annotation);
                     return;
                 }
@@ -2221,14 +2261,14 @@ public partial class EditorWindow : Window
                 placement.Hide();
             }, kind == VisualElementKind.Image
                 ? "Imagem excluída do PDF."
-                : "Retângulo excluído do PDF.", savedDocument =>
+                : kind == VisualElementKind.Ellipse
+                    ? "Elipse excluída do PDF."
+                    : "Retângulo excluído do PDF.", savedDocument =>
             {
                 var page = savedDocument.Pages[pageIndex + 1];
-                if (kind == VisualElementKind.Rectangle)
-                    return !page.Annotations
-                        .OfType<Aspose.Pdf.Annotations.SquareAnnotation>()
-                        .Any(item => string.Equals(
-                            item.Name, selectedName, StringComparison.Ordinal));
+                if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
+                    return !page.Annotations.Any(item => string.Equals(
+                        item.Name, selectedName, StringComparison.Ordinal));
 
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
