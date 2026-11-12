@@ -33,6 +33,8 @@ try
     var codeMap = new Dictionary<string, int>(StringComparer.Ordinal);
     var operandStats = new Dictionary<string, int>(StringComparer.Ordinal);
     var complexSamples = new List<string>();
+    var glyphOperations = new List<(int Page, int Sequence, string Font, string Text, byte[] Bytes)>();
+    var observedCodes = new Dictionary<(string Font, string Text), HashSet<string>>();
     for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
     {
         var page = document.GetPage(pageNumber);
@@ -71,6 +73,24 @@ try
                     : string.Join(",", letters.Select(x => x.FontName).Distinct());
                 string bucket = $"{font}|bytes={operandBytes.Length}|letras={count}";
                 operandStats[bucket] = operandStats.TryGetValue(bucket, out int bucketCount) ? bucketCount + 1 : 1;
+
+                if (operation.Operator == "Tj" && letters is { Length: 1 })
+                {
+                    string letterTextForSimulation = letters[0].Value;
+                    string fontForSimulation = letters[0].FontName ?? "(fonte desconhecida)";
+                    if (letterTextForSimulation.EnumerateRunes().Count() == 1)
+                    {
+                        byte[] rawBytes = operandBytes.ToArray();
+                        glyphOperations.Add((pageNumber, sequence, fontForSimulation, letterTextForSimulation, rawBytes));
+                        var mapKey = (fontForSimulation, letterTextForSimulation);
+                        if (!observedCodes.TryGetValue(mapKey, out var codes))
+                        {
+                            codes = new HashSet<string>(StringComparer.Ordinal);
+                            observedCodes.Add(mapKey, codes);
+                        }
+                        codes.Add(Convert.ToHexString(rawBytes));
+                    }
+                }
 
                 if (count > 0 && operandBytes.Length == 2 && count == 1)
                 {
@@ -142,6 +162,54 @@ try
         Console.WriteLine($"  {sample}");
     if (complexSamples.Count == 0)
         Console.WriteLine("  Nenhuma encontrada nas operações com Bytes expostos.");
+    Console.WriteLine();
+
+    Console.WriteLine("SIMULAÇÃO DE SUBSTITUIÇÃO EM MEMÓRIA (sem alterar/salvar PDF)");
+    const targetText = "CONFIRME";
+    const replacementText = "BONFIRME";
+    bool simulationCompleted = false;
+    foreach (var pageGroup in glyphOperations.GroupBy(x => x.Page).OrderBy(x => x.Key))
+    {
+        var ops = pageGroup.OrderBy(x => x.Sequence).ToArray();
+        for (int start = 0; start <= ops.Length - targetText.Length; start++)
+        {
+            var window = ops.Skip(start).Take(targetText.Length).ToArray();
+            if (window.Length != targetText.Length ||
+                window.Select((item, index) => item.Sequence == window[0].Sequence + index).Any(ok => !ok) ||
+                window.Any(item => item.Font != window[0].Font || item.Text.EnumerateRunes().Count() != 1) ||
+                string.Concat(window.Select(item => item.Text)) != targetText)
+                continue;
+
+            string font = window[0].Font;
+            string replacementGlyph = replacementText[..1];
+            if (!observedCodes.TryGetValue((font, replacementGlyph), out var replacementCodes) ||
+                replacementCodes.Count != 1)
+            {
+                Console.WriteLine($"  NÃO EXECUTADA: fonte '{font}' não possui código único observado para '{replacementGlyph}'.");
+                simulationCompleted = true;
+                break;
+            }
+
+            byte[][] original = window.Select(item => item.Bytes.ToArray()).ToArray();
+            byte[][] simulated = original.Select(bytes => bytes.ToArray()).ToArray();
+            simulated[0] = Convert.FromHexString(replacementCodes.Single());
+
+            bool neighborsUnchanged = Enumerable.Range(1, targetText.Length - 1)
+                .All(index => original[index].SequenceEqual(simulated[index]));
+            bool replacementChanged = !original[0].SequenceEqual(simulated[0]);
+            Console.WriteLine($"  Página: {pageGroup.Key}; sequência inicial: {window[0].Sequence}; fonte: {font}");
+            Console.WriteLine($"  Texto original: {targetText}; texto simulado: {replacementText}");
+            Console.WriteLine($"  Glifo alterado: '{window[0].Text}' [{Convert.ToHexString(original[0])}] -> '{replacementGlyph}' [{Convert.ToHexString(simulated[0])}]");
+            Console.WriteLine($"  Bytes dos outros {targetText.Length - 1} glifos preservados: {(neighborsUnchanged ? "SIM" : "NÃO")}");
+            Console.WriteLine($"  Bytes do glifo selecionado alterados: {(replacementChanged ? "SIM" : "NÃO")}");
+            Console.WriteLine("  Limite: simulação de operandos em memória; não reescreve content stream, não recalcula avanço tipográfico e não salva PDF.");
+            simulationCompleted = true;
+            break;
+        }
+        if (simulationCompleted) break;
+    }
+    if (!simulationCompleted)
+        Console.WriteLine($"  NÃO EXECUTADA: não foi encontrada uma sequência contínua e unívoca para '{targetText}' na mesma fonte.");
     Console.WriteLine();
 
     Console.WriteLine("RESUMO GERAL");
