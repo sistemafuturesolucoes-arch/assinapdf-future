@@ -39,7 +39,10 @@ per page:
 
 It prints totals at the end. The object total is the sum of per-page distinct
 object counts; an object appearing on more than one page can therefore contribute
-once per page.
+once per page. For each page, NULL mappings are further classified using
+`FPDFText_GetUnicode` and the experimental `FPDFText_IsGenerated` API: generated
+versus non-generated, Unicode U+0000, total generated characters, and up to 12
+sample character indices/code points.
 
 Exit codes:
 
@@ -53,7 +56,10 @@ Exit codes:
 - A non-null pointer matching an object enumerated by `FPDFPage_GetObject` is
   evidence of a character-to-text-object association for that page.
 - NULL and unmatched counts are diagnostic signals, not proof by themselves
-  that a PDF is corrupt.
+  that a PDF is corrupt. A NULL with a nonzero Unicode value is different from a
+  NULL with U+0000; the generated-character flag is another diagnostic clue.
+- `FPDFText_IsGenerated` is experimental. If the bundled PDFium does not export
+  it, the probe reports the generated flag as unavailable (`n/d`) and continues.
 - This probe does **not** map a character to its encoded byte offset, content
   stream, `Tj`/`TJ` operator, or string operand.
 - It does not rewrite operators, move glyphs, delete text, or save a modified PDF.
