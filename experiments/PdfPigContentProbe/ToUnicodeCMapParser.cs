@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -164,7 +163,7 @@ internal static class ToUnicodeCMapParser
         int sourceWidthHex, string destination)
     {
         if (!TryDecodeUnicode(destination, out string unicode)) return false;
-        string key = source.ToString("X", CultureInfo.InvariantCulture);
+        string key = Convert.ToHexString(source.ToByteArray(isUnsigned: true, isBigEndian: true));
         if (key.Length > sourceWidthHex) return false;
         key = key.PadLeft(sourceWidthHex, '0');
         if (mappings.ContainsKey(key)) return false;
