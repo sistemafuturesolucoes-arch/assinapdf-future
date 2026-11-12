@@ -1480,6 +1480,8 @@ public partial class EditorWindow : Window
         AddImageModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
         RectangleModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
         RectangleModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
+        EllipseModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
+        EllipseModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
         EditorStatusText.Text = "Modo Selecionar: arraste sobre o texto no PDF; clique com o botão direito para ver as ações.";
     }
 
@@ -1497,6 +1499,8 @@ public partial class EditorWindow : Window
         AddImageModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
         RectangleModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
         RectangleModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
+        EllipseModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
+        EllipseModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
         EditorStatusText.Text = "Modo Adicionar texto: clique na página do PDF no ponto em que deseja inserir o texto.";
     }
 
@@ -1523,6 +1527,8 @@ public partial class EditorWindow : Window
             Avalonia.Media.Color.FromRgb(240, 241, 244));
         RectangleModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
             Avalonia.Media.Color.FromRgb(52, 56, 62));
+        EllipseModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
+        EllipseModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
         EditorStatusText.Text = "Clique na página para escolher uma imagem e inseri-la no PDF.";
     }
 
@@ -1549,6 +1555,8 @@ public partial class EditorWindow : Window
             Avalonia.Media.Color.FromRgb(52, 56, 62));
         SelectModeButton.Foreground = new Avalonia.Media.SolidColorBrush(
             Avalonia.Media.Color.FromRgb(52, 56, 62));
+        EllipseModeButton.Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(240, 241, 244));
+        EllipseModeButton.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(52, 56, 62));
         EditorStatusText.Text = "Arraste sobre a página para desenhar um retângulo.";
     }
 
