@@ -31,6 +31,8 @@ try
     int totalLetters = 0, totalTextOps = 0, totalMappedLetters = 0, totalUnmappedLetters = 0;
     int candidateMappings = 0, ambiguousByteOperations = 0;
     var codeMap = new Dictionary<string, int>(StringComparer.Ordinal);
+    var operandStats = new Dictionary<string, int>(StringComparer.Ordinal);
+    var complexSamples = new List<string>();
     for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
     {
         var page = document.GetPage(pageNumber);
@@ -62,21 +64,32 @@ try
                 : MakePreview(string.Concat(letters.Select(x => x.Value)), 72);
 
             var bytesValue = operation.GetType().GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?.GetValue(operation);
-            if (bytesValue is ReadOnlyMemory<byte> operandBytes && operandBytes.Length > 0 && count > 0)
+            if (bytesValue is ReadOnlyMemory<byte> operandBytes && operandBytes.Length > 0)
             {
-                if (operandBytes.Length == 2 && count == 1)
+                string font = letters is null || letters.Length == 0
+                    ? "(sem letra associada)"
+                    : string.Join(",", letters.Select(x => x.FontName).Distinct());
+                string bucket = $"{font}|bytes={operandBytes.Length}|letras={count}";
+                operandStats[bucket] = operandStats.TryGetValue(bucket, out int bucketCount) ? bucketCount + 1 : 1;
+
+                if (count > 0 && operandBytes.Length == 2 && count == 1)
                 {
-                    string font = letters![0].FontName ?? "(fonte desconhecida)";
+                    string letterText = letters![0].Value;
                     string code = Convert.ToHexString(operandBytes.Span);
-                    string letterText = letters[0].Value;
                     string unicode = string.Join("+", letterText.EnumerateRunes().Select(rune => $"U+{rune.Value:X4}"));
                     string key = $"{font}|{code}|{unicode}|'{Escape(letterText)}'";
                     codeMap[key] = codeMap.TryGetValue(key, out int occurrences) ? occurrences + 1 : 1;
                     candidateMappings++;
                 }
-                else
+                else if (count > 0)
                 {
                     ambiguousByteOperations++;
+                    if (complexSamples.Count < 40 && (count > 1 || operandBytes.Length > 2))
+                    {
+                        string hex = Convert.ToHexString(operandBytes.Span[..Math.Min(operandBytes.Length, 32)]);
+                        string textValue = string.Concat(letters!.Select(x => x.Value));
+                        complexSamples.Add($"pág={pageNumber}; seq={sequence}; fonte={font}; bytes={operandBytes.Length}; letras={count}; hex={hex}; texto='{Escape(MakePreview(textValue, 32))}'");
+                    }
                 }
             }
 
@@ -116,7 +129,19 @@ try
     }
     if (codeMap.Count > 100)
         Console.WriteLine($"  (mostrados 100 de {codeMap.Count} combinações)");
-    Console.WriteLine($"  Associações candidatas: {candidateMappings}; operações com bytes que exigem análise adicional: {ambiguousByteOperations}");
+    Console.WriteLine($"  Associações candidatas observadas: {candidateMappings}; operações com bytes fora da regra 2 bytes/1 letra: {ambiguousByteOperations}");
+    Console.WriteLine();
+
+    Console.WriteLine("DISTRIBUIÇÃO DE OPERANDOS POR FONTE / TAMANHO / LETRAS");
+    foreach (var entry in operandStats.OrderBy(x => x.Key, StringComparer.Ordinal))
+        Console.WriteLine($"  {entry.Key}: {entry.Value}");
+    Console.WriteLine();
+
+    Console.WriteLine("AMOSTRAS DE OPERAÇÕES COM MÚLTIPLAS LETRAS OU MAIS DE 2 BYTES");
+    foreach (string sample in complexSamples)
+        Console.WriteLine($"  {sample}");
+    if (complexSamples.Count == 0)
+        Console.WriteLine("  Nenhuma encontrada nas operações com Bytes expostos.");
     Console.WriteLine();
 
     Console.WriteLine("RESUMO GERAL");
@@ -130,6 +155,7 @@ try
     Console.WriteLine("- A associação só é considerada direta quando a sequência encontra uma operação Tj/TJ na lista pública da página.");
     Console.WriteLine("- Letras sem operação visível podem vir de Form XObjects/conteúdo aninhado ou de diferenças do parser; não são atribuídas por aproximação.");
     Console.WriteLine("- O mapeamento candidato é apenas uma correlação operando/fonte/Unicode quando há exatamente 2 bytes e 1 Letter; não prova a codificação completa nem o offset no stream original.");
+    Console.WriteLine("- A distribuição separa operandos de 1 byte, 2 bytes e tamanhos maiores, além da quantidade de Letters associadas.");
     Console.WriteLine("- Este teste não reescreve nem salva PDFs.");
     return 0;
 }
