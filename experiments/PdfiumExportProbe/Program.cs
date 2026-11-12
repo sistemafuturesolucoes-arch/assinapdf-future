@@ -82,23 +82,12 @@ try
         return 4;
     }
 
-    int pageIndex = 0;
-    int pageArg = Array.FindIndex(args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
-    if (pageArg >= 0 && (pageArg + 1 >= args.Length ||
-        !int.TryParse(args[pageArg + 1], out pageIndex) || pageIndex < 0))
-    {
-        Console.WriteLine("Valor inválido para --page. Use índice começando em zero.");
-        return 5;
-    }
-
     var api = new PdfiumApi(library);
     api.InitLibrary();
 
     byte[] pdfBytes = File.ReadAllBytes(pdfPath);
     GCHandle pinned = GCHandle.Alloc(pdfBytes, GCHandleType.Pinned);
     IntPtr document = IntPtr.Zero;
-    IntPtr page = IntPtr.Zero;
-    IntPtr textPage = IntPtr.Zero;
     try
     {
         document = api.LoadMemDocument64(pinned.AddrOfPinnedObject(), (nuint)pdfBytes.Length, IntPtr.Zero);
@@ -109,101 +98,55 @@ try
         }
 
         int pageCount = api.GetPageCount(document);
-        if (pageIndex >= pageCount)
+        if (pageCount <= 0 || pageCount > 100_000)
         {
-            Console.WriteLine($"Página solicitada {pageIndex} fora do intervalo. O PDF tem {pageCount} página(s); use índice 0 a {pageCount - 1}.");
+            Console.WriteLine($"Contagem de páginas inválida/fora do limite: {pageCount}.");
             return 7;
         }
 
-        page = api.LoadPage(document, pageIndex);
-        if (page == IntPtr.Zero)
-        {
-            Console.WriteLine($"PDFium não conseguiu carregar a página de índice {pageIndex}.");
-            return 8;
-        }
-
-        textPage = api.TextLoadPage(page);
-        if (textPage == IntPtr.Zero)
-        {
-            Console.WriteLine("PDFium não conseguiu criar a página de texto.");
-            return 9;
-        }
-
-        int charCount = api.TextCountChars(textPage);
-        int objectCount = api.PageCountObjects(page);
-        if (charCount < 0 || objectCount < 0 || charCount > 1_000_000 || objectCount > 1_000_000)
-        {
-            Console.WriteLine($"Contagens inválidas/fora do limite: chars={charCount}, objects={objectCount}.");
-            return 10;
-        }
-
-        var objectIndices = new Dictionary<IntPtr, int>();
-        for (int i = 0; i < objectCount; i++)
-        {
-            IntPtr obj = api.PageGetObject(page, i);
-            if (obj != IntPtr.Zero)
-                objectIndices[obj] = i;
-        }
-
-        var characterGroups = new Dictionary<IntPtr, StringBuilder>();
-        int nullMappings = 0;
-        int unmatchedObjects = 0;
         Console.WriteLine();
-        Console.WriteLine($"PDF: {Path.GetFileName(pdfPath)} | Página: {pageIndex + 1}/{pageCount}");
-        Console.WriteLine($"Caracteres PDFium: {charCount} | Objetos da página: {objectCount}");
-        Console.WriteLine("Índice | Caractere | Objeto da página | Endereço do objeto");
+        Console.WriteLine($"PDF: {Path.GetFileName(pdfPath)}");
+        Console.WriteLine($"Total de páginas: {pageCount}");
+        Console.WriteLine();
+        Console.WriteLine($"{"Página",6} | {"Caracteres",10} | {"Objetos associados",18} | {"NULL",8} | {"Não localizados",15} | Status");
+        Console.WriteLine(new string('-', 83));
 
-        for (int i = 0; i < charCount; i++)
+        long totalCharacters = 0;
+        long totalAssociatedObjects = 0;
+        long totalNullMappings = 0;
+        long totalUnmatched = 0;
+        int failedPages = 0;
+
+        for (int pageIndex = 0; pageIndex < pageCount; pageIndex++)
         {
-            uint unicode = api.GetUnicode(textPage, i);
-            string character = unicode == 0 || !Rune.IsValid((int)unicode)
-                ? "�"
-                : char.ConvertFromUtf32((int)unicode);
-
-            IntPtr textObject = api.GetTextObject(textPage, i);
-            if (textObject == IntPtr.Zero)
+            var result = AnalyzePage(api, document, pageIndex);
+            if (result.Error)
             {
-                nullMappings++;
-                Console.WriteLine($"{i,6} | {Escape(character),-10} | NULL");
+                failedPages++;
+                Console.WriteLine($"{pageIndex + 1,6} | {"-",10} | {"-",18} | {"-",8} | {"-",15} | ERRO");
                 continue;
             }
 
-            if (!characterGroups.TryGetValue(textObject, out StringBuilder? group))
-                characterGroups[textObject] = group = new StringBuilder();
-            group.Append(character);
+            totalCharacters += result.Characters;
+            totalAssociatedObjects += result.Objects;
+            totalNullMappings += result.NullMappings;
+            totalUnmatched += result.Unmatched;
 
-            if (objectIndices.TryGetValue(textObject, out int objectIndex))
-                Console.WriteLine($"{i,6} | {Escape(character),-10} | {objectIndex,16} | 0x{textObject.ToInt64():X}");
-            else
-            {
-                unmatchedObjects++;
-                Console.WriteLine($"{i,6} | {Escape(character),-10} | NÃO LOCALIZADO | 0x{textObject.ToInt64():X}");
-            }
+            string status = result.NullMappings == 0 && result.Unmatched == 0 ? "OK" : "REVISAR";
+            Console.WriteLine($"{pageIndex + 1,6} | {result.Characters,10} | {result.Objects,18} | {result.NullMappings,8} | {result.Unmatched,15} | {status}");
         }
 
+        Console.WriteLine(new string('-', 83));
+        string finalStatus = failedPages > 0 ? $"{failedPages} ERRO(S)" : "CONCLUÍDO";
+        Console.WriteLine($"{ "TOTAL",6} | {totalCharacters,10} | {totalAssociatedObjects,18} | {totalNullMappings,8} | {totalUnmatched,15} | {finalStatus}");
         Console.WriteLine();
-        Console.WriteLine("Resumo por objeto (texto agrupado pela identidade do ponteiro):");
-        foreach (var pair in characterGroups.OrderBy(p =>
-                     objectIndices.TryGetValue(p.Key, out int idx) ? idx : int.MaxValue))
-        {
-            string objectLabel = objectIndices.TryGetValue(pair.Key, out int index)
-                ? index.ToString()
-                : "não localizado";
-            string? objectText = api.GetTextObjectText(pair.Key, textPage);
-            Console.WriteLine($"Objeto {objectLabel}: caracteres='{Escape(pair.Value.ToString())}' | texto-do-objeto='{Escape(objectText ?? "(indisponível)")}'");
-        }
-
-        Console.WriteLine();
-        Console.WriteLine($"Objetos de texto distintos associados a caracteres: {characterGroups.Count}");
-        Console.WriteLine($"Caracteres sem objeto (NULL): {nullMappings}");
-        Console.WriteLine($"Ponteiros não encontrados na enumeração da página: {unmatchedObjects}");
-        Console.WriteLine("Este resultado comprova associação caractere→objeto somente para este PDF/página; não revela bytes nem operadores Tj/TJ.");
-        return nullMappings == 0 && unmatchedObjects == 0 ? 0 : 11;
+        Console.WriteLine("Objetos associados são contados por página; o total soma essas contagens.");
+        Console.WriteLine("NULL e ponteiros não localizados são métricas de diagnóstico, não prova isolada de corrupção.");
+        Console.WriteLine("O teste não revela bytes nem operadores Tj/TJ e não modifica o PDF.");
+        return failedPages > 0 ? 13 : totalNullMappings == 0 && totalUnmatched == 0 ? 0 : 11;
     }
     finally
     {
-        if (textPage != IntPtr.Zero) api.TextClosePage(textPage);
-        if (page != IntPtr.Zero) api.ClosePage(page);
         if (document != IntPtr.Zero) api.CloseDocument(document);
         pinned.Free();
     }
@@ -211,6 +154,69 @@ try
 finally
 {
     NativeLibrary.Free(library);
+}
+
+static (int Characters, int Objects, int NullMappings, int Unmatched, bool Error)
+    AnalyzePage(PdfiumApi api, IntPtr document, int pageIndex)
+{
+    IntPtr page = IntPtr.Zero;
+    IntPtr textPage = IntPtr.Zero;
+
+    try
+    {
+        page = api.LoadPage(document, pageIndex);
+        if (page == IntPtr.Zero)
+            return (0, 0, 0, 0, true);
+
+        textPage = api.TextLoadPage(page);
+        if (textPage == IntPtr.Zero)
+            return (0, 0, 0, 0, true);
+
+        int charCount = api.TextCountChars(textPage);
+        int objectCount = api.PageCountObjects(page);
+        if (charCount < 0 || objectCount < 0 ||
+            charCount > 1_000_000 || objectCount > 1_000_000)
+            return (0, 0, 0, 0, true);
+
+        var pageObjects = new HashSet<IntPtr>();
+        for (int i = 0; i < objectCount; i++)
+        {
+            IntPtr obj = api.PageGetObject(page, i);
+            if (obj != IntPtr.Zero)
+                pageObjects.Add(obj);
+        }
+
+        var associatedObjects = new HashSet<IntPtr>();
+        int nullMappings = 0;
+        int unmatched = 0;
+
+        for (int i = 0; i < charCount; i++)
+        {
+            IntPtr textObject = api.GetTextObject(textPage, i);
+            if (textObject == IntPtr.Zero)
+            {
+                nullMappings++;
+                continue;
+            }
+
+            associatedObjects.Add(textObject);
+            if (!pageObjects.Contains(textObject))
+                unmatched++;
+        }
+
+        return (charCount, associatedObjects.Count, nullMappings, unmatched, false);
+    }
+    catch
+    {
+        return (0, 0, 0, 0, true);
+    }
+    finally
+    {
+        if (textPage != IntPtr.Zero)
+            api.TextClosePage(textPage);
+        if (page != IntPtr.Zero)
+            api.ClosePage(page);
+    }
 }
 
 static string Escape(string value) =>
