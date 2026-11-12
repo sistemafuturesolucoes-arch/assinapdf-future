@@ -276,7 +276,7 @@ internal static class Type3EncodingGlyphInspector
 
             string source = Encoding.Latin1.GetString(decoded.Span);
             string preview = source.Replace("\r", " ").Replace("\n", " ");
-            if (preview.Length > 220) preview = preview[..220] + "…";
+            if (preview.Length > 2400) preview = preview[..2400] + "… (truncado)";
             string hash = Convert.ToHexString(SHA256.HashData(decoded.Span));
             Console.WriteLine($"    CharProc decodificado: {decoded.Length} bytes; SHA256={hash}");
             Console.WriteLine($"    Início do programa: {preview}");
