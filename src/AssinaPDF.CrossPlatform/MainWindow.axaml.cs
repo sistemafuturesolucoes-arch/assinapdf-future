@@ -42,7 +42,7 @@ public partial class MainWindow : Window
     private readonly List<Border> _textSelectionMarkers = new();
     private readonly List<PdfiumTextWordInfo?> _selectedTextWords = new();
     private readonly List<IReadOnlyList<PdfiumTextLineInfo>> _pageTextLines = new();
-    private readonly List<(double Width, double Height)> _pageDimensions = new();
+    private readonly List<(double Width, double Height, int Rotation)> _pageDimensions = new();
     private IReadOnlyList<SignatureWidgetInfo> _signatureWidgets = Array.Empty<SignatureWidgetInfo>();
     private string? _currentPdfPath;
 
@@ -156,7 +156,7 @@ public partial class MainWindow : Window
 
             var newDocument = new PdfiumDocument(path);
             var newBitmaps = new List<WriteableBitmap>();
-            var newPageDimensions = new List<(double Width, double Height)>();
+            var newPageDimensions = new List<(double Width, double Height, int Rotation)>();
             var newPageTextLines = new List<IReadOnlyList<PdfiumTextLineInfo>>();
 
             try
@@ -165,7 +165,7 @@ public partial class MainWindow : Window
                 {
                     var renderedPage = newDocument.RenderPage(i, 1.5f);
                     newBitmaps.Add(CreateBitmap(renderedPage));
-                    newPageDimensions.Add((renderedPage.PageWidthPoints, renderedPage.PageHeightPoints));
+                    newPageDimensions.Add((renderedPage.OriginalPageWidthPoints, renderedPage.OriginalPageHeightPoints, renderedPage.PageRotation));
 
                     try
                     {
@@ -594,7 +594,8 @@ public partial class MainWindow : Window
             dimensions.Width,
             dimensions.Height,
             out double pdfX,
-            out double pdfY))
+            out double pdfY,
+            dimensions.Rotation))
             return;
 
         var selected = PdfiumTextHitTest.FindWordAtPoint(
@@ -674,7 +675,8 @@ public partial class MainWindow : Window
             overlay.Width,
             overlay.Height,
             dimensions.Width,
-            dimensions.Height);
+            dimensions.Height,
+            dimensions.Rotation);
 
         Canvas.SetLeft(marker, rect.X);
         Canvas.SetTop(marker, rect.Y);
