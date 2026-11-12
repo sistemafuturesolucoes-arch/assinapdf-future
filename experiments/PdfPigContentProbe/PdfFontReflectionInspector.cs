@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Tokens;
 
@@ -187,12 +188,110 @@ internal static class PdfFontReflectionInspector
             Console.WriteLine($"{indent}/ToUnicode: stream decodificado; {decoded.Length} bytes");
             Console.WriteLine($"{indent}  CMap: {Preview(cmapText, MaxCMapChars).Replace("\r", "").Replace("\n", "\n" + indent + "  ")}");
             PrintCMapStatistics(cmapText, indent + "  ");
+            PrintCMapMappings(cmapText, indent + "  ");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"{indent}/ToUnicode: falha controlada ao decodificar: {ex.GetType().Name}: {ex.Message}");
         }
     }
+
+    private static void PrintCMapMappings(string text, string indent)
+    {
+        // Diagnostic parser for the common ToUnicode bfchar/bfrange forms.
+        // It deliberately does not claim to support every PostScript CMap construct.
+        var mappings = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        int malformed = 0;
+        var lines = text.Replace("\r", "").Split('\n');
+        bool inBfChar = false;
+        bool inBfRange = false;
+
+        foreach (string rawLine in lines)
+        {
+            string line = rawLine.Trim();
+            if (line.Contains("beginbfchar", StringComparison.Ordinal)) { inBfChar = true; continue; }
+            if (line.Contains("endbfchar", StringComparison.Ordinal)) { inBfChar = false; continue; }
+            if (line.Contains("beginbfrange", StringComparison.Ordinal)) { inBfRange = true; continue; }
+            if (line.Contains("endbfrange", StringComparison.Ordinal)) { inBfRange = false; continue; }
+            if (!inBfChar && !inBfRange) continue;
+
+            var hex = Regex.Matches(line, "<([0-9A-Fa-f]+)>").Select(m => m.Groups[1].Value).ToArray();
+            if (inBfChar)
+            {
+                if (hex.Length >= 2 && TryDecodeUnicodeHex(hex[1], out string unicode))
+                    mappings[NormalizeHex(hex[0])] = unicode;
+                else if (line.Length > 0) malformed++;
+            }
+            else if (inBfRange)
+            {
+                if (hex.Length < 3 || !TryParseHex(hex[0], out long first) ||
+                    !TryParseHex(hex[1], out long last) || last < first || last - first > 4096)
+                {
+                    if (line.Length > 0) malformed++;
+                    continue;
+                }
+
+                int sourceWidth = hex[0].Length;
+                if (line.Contains('[', StringComparison.Ordinal))
+                {
+                    int cursor = 0;
+                    foreach (Match destination in Regex.Matches(line, "<([0-9A-Fa-f]+)>"))
+                    {
+                        string value = destination.Groups[1].Value;
+                        if (cursor > last - first) break;
+                        if (TryDecodeUnicodeHex(value, out string unicode))
+                            mappings[NormalizeHex((first + cursor).ToString($"X{sourceWidth}"))] = unicode;
+                        cursor++;
+                    }
+                }
+                else if (TryParseHex(hex[2], out long destinationStart))
+                {
+                    for (long code = first; code <= last; code++)
+                    {
+                        long destination = destinationStart + (code - first);
+                        string destinationHex = destination.ToString(destinationStart.ToString("X").Length % 2 == 0
+                            ? $"X{destinationStart.ToString("X").Length}" : $"X{destinationStart.ToString("X").Length + 1}");
+                        if (TryDecodeUnicodeHex(destinationHex, out string unicode))
+                            mappings[NormalizeHex(code.ToString($"X{sourceWidth}"))] = unicode;
+                    }
+                }
+                else malformed++;
+            }
+        }
+
+        Console.WriteLine($"{indent}Mapeamentos Unicode interpretados: {mappings.Count}; linhas não interpretadas: {malformed}");
+        foreach (var pair in mappings.Take(24))
+        {
+            string scalars = string.Join(" ", pair.Value.EnumerateRunes().Select(r => $"U+{r.Value:X4}"));
+            Console.WriteLine($"{indent}  código PDF <{pair.Key}> -> \"{EscapeForCMap(pair.Value)}\" ({scalars})");
+        }
+        if (mappings.Count > 24)
+            Console.WriteLine($"{indent}  ... exibidos 24 de {mappings.Count} mapeamentos");
+    }
+
+    private static bool TryDecodeUnicodeHex(string hex, out string value)
+    {
+        value = "";
+        if (hex.Length == 0 || hex.Length % 4 != 0) return false;
+        try
+        {
+            var bytes = Convert.FromHexString(hex);
+            value = Encoding.BigEndianUnicode.GetString(bytes);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static bool TryParseHex(string hex, out long value) =>
+        long.TryParse(hex, System.Globalization.NumberStyles.HexNumber,
+            System.Globalization.CultureInfo.InvariantCulture, out value);
+
+    private static string NormalizeHex(string hex) =>
+        hex.Length % 2 == 0 ? hex.ToUpperInvariant() : ("0" + hex).ToUpperInvariant();
+
+    private static string EscapeForCMap(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"")
+             .Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
 
     private static void PrintCMapStatistics(string text, string indent)
     {
