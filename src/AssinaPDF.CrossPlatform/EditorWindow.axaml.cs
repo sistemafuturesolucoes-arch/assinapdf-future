@@ -676,6 +676,28 @@ public partial class EditorWindow : Window
             return;
         }
 
+        // O segundo clique abre a edição do texto sob o ponteiro. O clique simples
+        // continua reservado à seleção por arraste, sem abrir janelas acidentalmente.
+        if (e.ClickCount >= 2)
+        {
+            e.Handled = true;
+            ClearTextSelection();
+            SelectTextAtPoint(image, pageInfo, point);
+            if (_selectedPageIndex == pageInfo.PageIndex &&
+                !string.IsNullOrWhiteSpace(_selectedText) &&
+                _selectedTextBounds is { } selectedBounds)
+            {
+                _ = EditTextAtPointAsync(
+                    pageInfo.PageIndex, _selectedPdfX, _selectedPdfY,
+                    _selectedText, selectedBounds);
+            }
+            else
+            {
+                EditorStatusText.Text = "Não encontrei texto editável nesse ponto.";
+            }
+            return;
+        }
+
         ClearTextSelection();
         _isDraggingSelection = true;
         _selectionStart = point;
@@ -889,6 +911,18 @@ public partial class EditorWindow : Window
         Avalonia.Point dragStart = default;
         highlight.PointerPressed += (_, args) =>
         {
+            if (args.ClickCount >= 2)
+            {
+                args.Handled = true;
+                if (_selectedTextBounds is { } selectedBounds &&
+                    !string.IsNullOrWhiteSpace(_selectedText))
+                {
+                    _ = EditTextAtPointAsync(
+                        pageInfo.PageIndex, _selectedPdfX, _selectedPdfY,
+                        _selectedText, selectedBounds);
+                }
+                return;
+            }
             if (!args.GetCurrentPoint(highlight).Properties.IsLeftButtonPressed) return;
             draggingText = true;
             dragStart = args.GetPosition(surface.Overlay);
@@ -1772,7 +1806,6 @@ public partial class EditorWindow : Window
                 !originalBold &&
                 editedRuns[0].IsItalic == originalItalic &&
                 Math.Abs(editedRuns[0].FontSize - originalFontSize) <= 0.75 &&
-                editedRuns[0].Foreground == originalForeground &&
                 editedRuns[0].Background == originalBackground &&
                 string.Equals(
                     NormalizePdfFontFamily(editedRuns[0].FontFamily),
@@ -1932,8 +1965,16 @@ public partial class EditorWindow : Window
 
                     if (cidBoldOnlyEdit)
                     {
+                        var boldRun = editedRuns[0];
+                        Aspose.Pdf.Color? boldForeground = boldRun.Foreground is { } boldColor
+                            ? Aspose.Pdf.Color.FromRgb(
+                                boldColor.R / 255d,
+                                boldColor.G / 255d,
+                                boldColor.B / 255d)
+                            : null;
                         cidFontSwapApplied = CidFontOperatorFormatter.TryApplyBoldVariant(
-                            document, pageIndex + 1, target, out string cidSwapReason);
+                            document, pageIndex + 1, target, boldForeground,
+                            out string cidSwapReason);
                         formattingTrace.Add(
                             cidFontSwapApplied
                                 ? "FORMATAÇÃO CID: " + cidSwapReason
