@@ -6,8 +6,8 @@ using UglyToad.PdfPig.Tokens;
 
 internal static class OriginalContentOperandInspector
 {
-    private sealed record StringToken(int Start, int End, byte[] Bytes, string Kind);
-    private sealed record LocatedOperand(int Page, string ObjectId, int Offset, int Length, string Kind, string Hex);
+    private sealed record StringToken(int Start, int End, byte[] Bytes, string Kind, string RawHex = "");
+    private sealed record LocatedOperand(int Page, string ObjectId, int Offset, int Length, string Kind, string Hex, string RawTokenHex, string Context);
 
     public static void Run(PdfDocument document)
     {
@@ -43,9 +43,9 @@ internal static class OriginalContentOperandInspector
                 {
                     found++;
                     totalFound++;
-                    locatedForPage.Add((item, id));
+                    locatedForPage.Add((item with { RawHex = Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)) }, id));
                     if (samples.Count < 40)
-                        samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes)));
+                         samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes), Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), GetContext(bytes, item.Start)));
                 }
                 totalParsed++;
             }
@@ -65,7 +65,7 @@ internal static class OriginalContentOperandInspector
                     {
                         empty++;
                         if (details.Count < 8)
-                            details.Add($"#{index + 1}: PdfPig Bytes VAZIO; stream={Convert.ToHexString(locatedForPage[index].Token.Bytes)}; obj={locatedForPage[index].ObjectId}; offset={locatedForPage[index].Token.Start}; tipo={operation.GetType().Name}");
+                            details.Add($"#{index + 1}: PdfPig Bytes VAZIO; decodificado={Convert.ToHexString(locatedForPage[index].Token.Bytes)}; tokenBruto={locatedForPage[index].Token.RawHex}; contexto={GetContextForDiagnostic(locatedForPage[index].Token)}; obj={locatedForPage[index].ObjectId}; offset={locatedForPage[index].Token.Start}; tipo={operation.GetType().Name}; detalhes={DescribeOperation(operation)}");
                     }
                     else if (memory.Span.SequenceEqual(locatedForPage[index].Token.Bytes))
                         exact++;
@@ -179,6 +179,44 @@ internal static class OriginalContentOperandInspector
         }
         else if (resolved is StreamToken stream) output.Add((stream, id));
     }
+
+    private static string DescribeOperation(object operation)
+    {
+        var parts = new List<string>();
+        foreach (var property in operation.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (property.GetIndexParameters().Length != 0) continue;
+            try
+            {
+                object? value = property.GetValue(operation);
+                string rendered = value switch
+                {
+                    null => "null",
+                    ReadOnlyMemory<byte> memory => $"ReadOnlyMemory[{memory.Length}]={Convert.ToHexString(memory.Span)}",
+                    byte[] bytes => $"byte[{bytes.Length}]={Convert.ToHexString(bytes)}",
+                    _ => value.ToString() ?? "null"
+                };
+                parts.Add($"{property.Name}={rendered}");
+            }
+            catch (Exception ex) { parts.Add($"{property.Name}=<erro:{ex.GetType().Name}>"); }
+        }
+
+        try
+        {
+            var write = operation.GetType().GetMethod("Write", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(Stream) }, null);
+            if (write is not null)
+            {
+                using var output = new MemoryStream();
+                write.Invoke(operation, new object[] { output });
+                parts.Add($"WriteHex={Convert.ToHexString(output.ToArray())}");
+            }
+        }
+        catch (Exception ex) { parts.Add($"Write=<erro:{ex.GetType().Name}>"); }
+        return string.Join("; ", parts);
+    }
+
+    private static string GetContextForDiagnostic(StringToken token)
+        => $"raw={token.RawHex}; decoded={Convert.ToHexString(token.Bytes)}; kind={token.Kind}";
 
     private static bool IsWhite(byte b) => b is 0 or 9 or 10 or 12 or 13 or 32;
     private static bool IsDelimiter(byte b) => b is (byte)'(' or (byte)')' or (byte)'<' or (byte)'>' or (byte)'[' or (byte)']' or (byte)'{' or (byte)'}' or (byte)'/' or (byte)'%';
