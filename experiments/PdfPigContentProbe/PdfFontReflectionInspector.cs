@@ -217,9 +217,25 @@ internal static class PdfFontReflectionInspector
 
     private static object? ResolveToken(PdfDocument document, object token)
     {
-        if (token.GetType().Name != "IndirectReferenceToken") return token;
-        object? reference = GetProperty(token, "Data");
-        return reference is null ? null : ResolveReference(document, reference);
+        if (token.GetType().Name == "IndirectReferenceToken")
+        {
+            object? reference = GetProperty(token, "Data");
+            if (reference is null) return null;
+            object? resolved = ResolveReference(document, reference);
+            if (resolved is null) return null;
+            token = resolved;
+        }
+
+        // PdfPig wraps resolved indirect objects in ObjectToken.
+        // Unwrap only this container; preserve the actual StreamToken/DictionaryToken.
+        while (token.GetType().Name == "ObjectToken")
+        {
+            object? inner = GetProperty(token, "Data");
+            if (inner is null || ReferenceEquals(inner, token)) break;
+            token = inner;
+        }
+
+        return token;
     }
 
     private static object? ResolveReference(PdfDocument document, object reference)
