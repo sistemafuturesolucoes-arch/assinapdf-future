@@ -45,3 +45,8 @@ A second read-only pass tokenizes decoded content-stream bytes and locates liter
 Important: the reported offset is within the decoded stream, not the compressed bytes in the PDF file. This pass does not yet correlate each located operand with a specific `Letter`/glyph or prove that the byte sequence maps one-to-one to Unicode. Literal-string escapes are decoded for diagnostic byte values; unusual inline-image data and malformed content may still require separate handling. No stream bytes are modified, no PDF is serialized, and no file is saved.
 
 The offset pass also compares each located `Tj` string's decoded byte sequence, in stream order, against the corresponding PdfPig `Tj` operation's public `Bytes` value. It reports the exact-match count and a limited set of mismatches per page. This is a validation of operand-byte correlation for the inspected PDF, not yet a glyph-level byte-range map: multi-byte font codes, one-code-to-many-Unicode mappings, `TJ` arrays, and text positioning still require separate treatment.
+
+
+## Correlação de offsets com glifos
+
+A inspeção também emite linhas `GLIFO-MAP` para correlacionar, na ordem das operações da página, o offset do operando `Tj` no stream decodificado com a sequência `TextSequence` do PdfPig e as `Letter` associadas. São exibidas as primeiras 20 correlações e todas as operações cuja propriedade `Bytes` esteja vazia. A saída inclui texto da operação, texto reconstruído das letras, quantidade de letras e fontes observadas. Essa correlação é diagnóstica: não prova, por si só, a divisão de um operando em bytes por glifo nem o mapeamento de fontes complexas.
