@@ -216,6 +216,70 @@ finally
 static string Escape(string value) =>
     value.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
 
+static string? FindLatestEditorPdf()
+{
+    string appData = OperatingSystem.IsMacOS()
+        ? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Library", "Application Support")
+        : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+    if (string.IsNullOrWhiteSpace(appData))
+        appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+    string root = Path.Combine(appData, "FutureSolucoes", "AssinaPDF", "DocumentosEditados");
+    string historyPath = Path.Combine(root, "historico-edicao.json");
+    if (!File.Exists(historyPath))
+        return null;
+
+    try
+    {
+        using JsonDocument history = JsonDocument.Parse(File.ReadAllText(historyPath));
+        if (history.RootElement.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var candidates = new List<(DateTime LastModified, string Path)>();
+        foreach (JsonElement entry in history.RootElement.EnumerateArray())
+        {
+            if (!TryGetString(entry, "WorkingCopyPath", out string? workingCopy) ||
+                string.IsNullOrWhiteSpace(workingCopy) ||
+                !File.Exists(workingCopy))
+                continue;
+
+            DateTime modified = File.GetLastWriteTimeUtc(workingCopy);
+            if (TryGetString(entry, "LastModifiedAtUtc", out string? timestamp) &&
+                DateTime.TryParse(timestamp, null,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime parsed))
+                modified = parsed;
+
+            candidates.Add((modified, workingCopy));
+        }
+
+        return candidates
+            .OrderByDescending(candidate => candidate.LastModified)
+            .Select(candidate => candidate.Path)
+            .FirstOrDefault();
+    }
+    catch
+    {
+        return null;
+    }
+
+    static bool TryGetString(JsonElement element, string name, out string? value)
+    {
+        if (element.TryGetProperty(name, out JsonElement property) &&
+            property.ValueKind == JsonValueKind.String)
+        {
+            value = property.GetString();
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+}
+
+
 sealed class PdfiumApi
 {
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate void InitLibraryDelegate();
@@ -285,68 +349,5 @@ sealed class PdfiumApi
         {
             Marshal.FreeHGlobal(buffer);
         }
-    }
-}
-
-static string? FindLatestEditorPdf()
-{
-    string appData = OperatingSystem.IsMacOS()
-        ? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Library", "Application Support")
-        : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-
-    if (string.IsNullOrWhiteSpace(appData))
-        appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-
-    string root = Path.Combine(appData, "FutureSolucoes", "AssinaPDF", "DocumentosEditados");
-    string historyPath = Path.Combine(root, "historico-edicao.json");
-    if (!File.Exists(historyPath))
-        return null;
-
-    try
-    {
-        using JsonDocument history = JsonDocument.Parse(File.ReadAllText(historyPath));
-        if (history.RootElement.ValueKind != JsonValueKind.Array)
-            return null;
-
-        var candidates = new List<(DateTime LastModified, string Path)>();
-        foreach (JsonElement entry in history.RootElement.EnumerateArray())
-        {
-            if (!TryGetString(entry, "WorkingCopyPath", out string? workingCopy) ||
-                string.IsNullOrWhiteSpace(workingCopy) ||
-                !File.Exists(workingCopy))
-                continue;
-
-            DateTime modified = File.GetLastWriteTimeUtc(workingCopy);
-            if (TryGetString(entry, "LastModifiedAtUtc", out string? timestamp) &&
-                DateTime.TryParse(timestamp, null,
-                    System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime parsed))
-                modified = parsed;
-
-            candidates.Add((modified, workingCopy));
-        }
-
-        return candidates
-            .OrderByDescending(candidate => candidate.LastModified)
-            .Select(candidate => candidate.Path)
-            .FirstOrDefault();
-    }
-    catch
-    {
-        return null;
-    }
-
-    static bool TryGetString(JsonElement element, string name, out string? value)
-    {
-        if (element.TryGetProperty(name, out JsonElement property) &&
-            property.ValueKind == JsonValueKind.String)
-        {
-            value = property.GetString();
-            return true;
-        }
-
-        value = null;
-        return false;
     }
 }
