@@ -1751,9 +1751,9 @@ public partial class EditorWindow : Window
             }
 
             string replacementText = replacementBuilder.ToString();
-            if (string.IsNullOrWhiteSpace(replacementText))
+            if (originalText == null && string.IsNullOrWhiteSpace(replacementText))
             {
-                EditorStatusText.Text = "Digite algum texto antes de aplicar.";
+                EditorStatusText.Text = "Digite algum texto antes de inserir.";
                 return;
             }
 
@@ -1981,7 +1981,7 @@ public partial class EditorWindow : Window
                 if (originalText == null)
                     new TextBuilder(document.Pages[pageIndex + 1]).AppendText(target);
 
-                if (!cidFontSwapApplied)
+                if (!cidFontSwapApplied && replacementText.Length > 0)
                 {
                     ApplyRichTextFormatting(
                         target, editedRuns, originalFontName, originalFontEmbedded,
@@ -2010,8 +2010,29 @@ public partial class EditorWindow : Window
                     string savedPageText = NormalizePdfText(
                         string.Concat(verificationAbsorber.TextFragments.Select(item => item.Text)));
                     string expectedText = NormalizePdfText(replacementText);
-                    if (expectedText.Length == 0 || !savedPageText.Contains(
-                        expectedText, StringComparison.Ordinal))
+                    if (expectedText.Length == 0)
+                    {
+                        // Excluir todo o conteúdo da caixa é uma edição válida.
+                        // Confirme que o fragmento original deixou de existir na
+                        // região selecionada; não use uma verificação global vazia.
+                        if (originalText == null || originalBounds == null)
+                            return false;
+
+                        bool originalStillPresent = verificationAbsorber.TextFragments.Any(fragment =>
+                            string.Equals(
+                                NormalizePdfText(fragment.Text),
+                                NormalizePdfText(originalText),
+                                StringComparison.Ordinal) &&
+                            fragment.Rectangle is { } rectangle &&
+                            rectangle.URX >= originalBounds.LLX &&
+                            rectangle.LLX <= originalBounds.URX &&
+                            rectangle.URY >= originalBounds.LLY &&
+                            rectangle.LLY <= originalBounds.URY);
+
+                        return !originalStillPresent;
+                    }
+
+                    if (!savedPageText.Contains(expectedText, StringComparison.Ordinal))
                         return false;
 
                     string? formattingFailure = VerifyRichTextFormatting(
