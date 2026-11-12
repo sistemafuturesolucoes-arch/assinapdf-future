@@ -6,7 +6,7 @@ using UglyToad.PdfPig.Tokens;
 
 internal static class OriginalContentOperandInspector
 {
-    private sealed record StringToken(int Start, int End, byte[] Bytes, string Kind, string RawHex = "");
+    private sealed record StringToken(int Start, int End, byte[] Bytes, string Kind, string RawHex = "", string ContextHex = "");
     private sealed record LocatedOperand(int Page, string ObjectId, int Offset, int Length, string Kind, string Hex, string RawTokenHex, string Context);
 
     public static void Run(PdfDocument document)
@@ -43,7 +43,7 @@ internal static class OriginalContentOperandInspector
                 {
                     found++;
                     totalFound++;
-                    locatedForPage.Add((item with { RawHex = Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)) }, id));
+                    locatedForPage.Add((item with { RawHex = Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), ContextHex = GetContextHex(bytes, item.Start, item.End) }, id));
                     if (samples.Count < 40)
                          samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes), Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), GetContext(bytes, item.Start)));
                 }
@@ -215,8 +215,15 @@ internal static class OriginalContentOperandInspector
         return string.Join("; ", parts);
     }
 
+    private static string GetContextHex(byte[] data, int start, int end)
+    {
+        int from = Math.Max(0, start - 24);
+        int to = Math.Min(data.Length, end + 24);
+        return Convert.ToHexString(data.AsSpan(from, to - from));
+    }
+
     private static string GetContextForDiagnostic(StringToken token)
-        => $"raw={token.RawHex}; decoded={Convert.ToHexString(token.Bytes)}; kind={token.Kind}";
+        => $"raw={token.RawHex}; contextoAntesEDepois={token.ContextHex}; decoded={Convert.ToHexString(token.Bytes)}; kind={token.Kind}";
 
     private static bool IsWhite(byte b) => b is 0 or 9 or 10 or 12 or 13 or 32;
     private static bool IsDelimiter(byte b) => b is (byte)'(' or (byte)')' or (byte)'<' or (byte)'>' or (byte)'[' or (byte)']' or (byte)'{' or (byte)'}' or (byte)'/' or (byte)'%';
