@@ -198,89 +198,21 @@ internal static class PdfFontReflectionInspector
 
     private static void PrintCMapMappings(string text, string indent)
     {
-        // Diagnostic parser for the common ToUnicode bfchar/bfrange forms.
-        // It deliberately does not claim to support every PostScript CMap construct.
-        var mappings = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        int malformed = 0;
-        var lines = text.Replace("\r", "").Split('\n');
-        bool inBfChar = false;
-        bool inBfRange = false;
-
-        foreach (string rawLine in lines)
-        {
-            string line = rawLine.Trim();
-            if (line.Contains("beginbfchar", StringComparison.Ordinal)) { inBfChar = true; continue; }
-            if (line.Contains("endbfchar", StringComparison.Ordinal)) { inBfChar = false; continue; }
-            if (line.Contains("beginbfrange", StringComparison.Ordinal)) { inBfRange = true; continue; }
-            if (line.Contains("endbfrange", StringComparison.Ordinal)) { inBfRange = false; continue; }
-            if (!inBfChar && !inBfRange) continue;
-
-            var hex = Regex.Matches(line, "<([0-9A-Fa-f]+)>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
-            if (inBfChar)
-            {
-                if (hex.Length >= 2 && TryDecodeUnicodeHex(hex[1], out string unicode))
-                    mappings[NormalizeHex(hex[0])] = unicode;
-                else if (line.Length > 0) malformed++;
-            }
-            else if (inBfRange)
-            {
-                if (hex.Length < 3 || !TryParseHex(hex[0], out long first) ||
-                    !TryParseHex(hex[1], out long last) || last < first || last - first > 4096)
-                {
-                    if (line.Length > 0) malformed++;
-                    continue;
-                }
-
-                int sourceWidth = hex[0].Length;
-                if (line.Contains('['))
-                {
-                    int cursor = 0;
-                    var destinationTokens = Regex.Matches(line, "<([0-9A-Fa-f]+)>").Cast<Match>().Skip(2);
-                    foreach (Match destination in destinationTokens)
-                    {
-                        string value = destination.Groups[1].Value;
-                        if (cursor > last - first) break;
-                        if (TryDecodeUnicodeHex(value, out string unicode))
-                            mappings[NormalizeHex((first + cursor).ToString($"X{sourceWidth}"))] = unicode;
-                        else
-                            malformed++;
-                        cursor++;
-                    }
-                    if (cursor != last - first + 1) malformed++;
-                }
-                else if (TryParseHex(hex[2], out long destinationStart))
-                {
-                    for (long code = first; code <= last; code++)
-                    {
-                        long destination = destinationStart + (code - first);
-                        // Preserve the destination code-unit width from the CMap.
-                        // Using the numeric value's minimal width would turn <0041>
-                        // into <41>, which is not valid UTF-16BE for this decoder.
-                        string destinationHex = destination.ToString($"X{hex[2].Length}");
-                        if (destinationHex.Length > hex[2].Length)
-                        {
-                            malformed++;
-                            continue;
-                        }
-                        if (TryDecodeUnicodeHex(destinationHex, out string unicode))
-                            mappings[NormalizeHex(code.ToString($"X{sourceWidth}"))] = unicode;
-                        else
-                            malformed++;
-                    }
-                }
-                else malformed++;
-            }
-        }
-
-        Console.WriteLine($"{indent}Mapeamentos Unicode interpretados: {mappings.Count}; linhas não interpretadas: {malformed}");
-        foreach (var pair in mappings.Take(24))
+        CMapParseResult result = ToUnicodeCMapParser.Parse(text);
+        Console.WriteLine($"{indent}Mapeamentos Unicode interpretados: {result.Mappings.Count}; entradas inválidas/rejeitadas: {result.MalformedEntries}");
+        Console.WriteLine($"{indent}  bfchar: {result.ParsedBfCharEntries}; bfrange: {result.ParsedBfRangeEntries}");
+        foreach (var pair in result.Mappings.Take(24))
         {
             string scalars = string.Join(" ", pair.Value.EnumerateRunes().Select(r => $"U+{r.Value:X4}"));
             Console.WriteLine($"{indent}  código PDF <{pair.Key}> -> \"{EscapeForCMap(pair.Value)}\" ({scalars})");
         }
-        if (mappings.Count > 24)
-            Console.WriteLine($"{indent}  ... exibidos 24 de {mappings.Count} mapeamentos");
+        if (result.Mappings.Count > 24)
+            Console.WriteLine($"{indent}  ... exibidos 24 de {result.Mappings.Count} mapeamentos");
     }
+
+    private static string EscapeForCMap(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"")
+             .Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
 
     private static bool TryDecodeUnicodeHex(string hex, out string value)
     {
