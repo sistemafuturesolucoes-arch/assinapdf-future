@@ -1838,11 +1838,23 @@ public partial class EditorWindow : Window
                     pdfY < bounds.LLY || pdfY > bounds.URY)
                     continue;
 
-                using var imageStream = new MemoryStream();
-                placement.Save(imageStream);
-                byte[] imageBytes = imageStream.ToArray();
+                if (placement.Image == null)
+                    throw new InvalidDataException("A imagem selecionada não possui um objeto de imagem editável.");
+
+                // ToPng produz um fluxo PNG real e mantém a transparência da imagem,
+                // sem depender de System.Drawing/GDI+, que não é portátil para macOS.
+                byte[] imageBytes = placement.Image.ToPng();
                 if (imageBytes.Length == 0)
                     throw new InvalidDataException("Não foi possível extrair os dados da imagem selecionada.");
+
+                if (!string.Equals(
+                        placement.CompositingParameters.BlendMode.ToString(),
+                        "Normal", StringComparison.OrdinalIgnoreCase))
+                {
+                    EditorStatusText.Text =
+                        "Esta imagem usa um modo de mesclagem especial e não pode ser movida com segurança.";
+                    return false;
+                }
 
                 int rotation = ((int)Math.Round(placement.Rotation) % 360 + 360) % 360;
                 if (rotation != 0 && rotation != 90 && rotation != 180 && rotation != 270)
