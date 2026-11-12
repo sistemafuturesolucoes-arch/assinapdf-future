@@ -64,7 +64,48 @@ Run("unmapped glyph fails closed", () =>
     Assert(rejected, "An unmapped glyph must never be edited by guessed coordinates.");
 });
 
-Console.WriteLine($"PDF glyph lab: {passed}/5 checks passed.");
+
+Run("byte rewrite preserves bytes around a multi-byte glyph", () =>
+{
+    var removal = new OperandEditSpan(0, "stream", 2, 0, 1, 2, "FComposite");
+    var kept = OperandByteRewritePlanner.KeepUnselectedBytes(5, new[] { removal });
+    Assert(kept.SequenceEqual(new[]
+    {
+        new OperandByteSegment(0, 1),
+        new OperandByteSegment(3, 2)
+    }), "Only the exact two-byte glyph span should be removed from the plan.");
+});
+
+Run("byte rewrite supports disjoint selections", () =>
+{
+    var removals = new[]
+    {
+        new OperandEditSpan(0, "stream", 3, 0, 1, 1, "F1"),
+        new OperandEditSpan(0, "stream", 3, 0, 4, 2, "F1")
+    };
+    var kept = OperandByteRewritePlanner.KeepUnselectedBytes(7, removals);
+    Assert(kept.SequenceEqual(new[]
+    {
+        new OperandByteSegment(0, 1),
+        new OperandByteSegment(2, 2),
+        new OperandByteSegment(6, 1)
+    }), "Unselected byte ranges must remain addressable and ordered.");
+});
+
+Run("overlapping byte removals are rejected", () =>
+{
+    var removals = new[]
+    {
+        new OperandEditSpan(0, "stream", 3, 0, 1, 3, "F1"),
+        new OperandEditSpan(0, "stream", 3, 0, 2, 2, "F1")
+    };
+    bool rejected = false;
+    try { OperandByteRewritePlanner.KeepUnselectedBytes(6, removals); }
+    catch (InvalidOperationException) { rejected = true; }
+    Assert(rejected, "Overlapping encoded ranges must fail closed.");
+});
+
+Console.WriteLine($"PDF glyph lab: {passed}/8 checks passed.");
 
 void Run(string name, Action test)
 {
