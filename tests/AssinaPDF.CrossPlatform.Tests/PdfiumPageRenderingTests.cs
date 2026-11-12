@@ -29,8 +29,10 @@ public sealed class PdfiumPageRenderingTests
             RenderedPdfPage rendered = pdfium.RenderPage(0, 0.5f);
 
             Assert.Equal(1, rendered.PageRotation);
-            Assert.Equal(612, rendered.PageWidthPoints, 1);
-            Assert.Equal(792, rendered.PageHeightPoints, 1);
+            Assert.Equal(792, rendered.PageWidthPoints, 1);
+            Assert.Equal(612, rendered.PageHeightPoints, 1);
+            Assert.Equal(612, rendered.OriginalPageWidthPoints, 1);
+            Assert.Equal(792, rendered.OriginalPageHeightPoints, 1);
             Assert.True(rendered.Width > rendered.Height,
                 "Uma página retrato rotacionada 90 graus deve ser renderizada em orientação paisagem.");
             Assert.True(rendered.Pixels.Length >= rendered.Stride * rendered.Height);
@@ -80,12 +82,14 @@ public sealed class PdfiumPageRenderingTests
             Assert.True(second.Width > second.Height);
             Assert.True(third.Width > third.Height);
 
-            Assert.Equal(612, first.PageWidthPoints, 1);
-            Assert.Equal(792, first.PageHeightPoints, 1);
-            Assert.Equal(300, second.PageWidthPoints, 1);
-            Assert.Equal(500, second.PageHeightPoints, 1);
-            Assert.Equal(842, third.PageWidthPoints, 1);
-            Assert.Equal(595, third.PageHeightPoints, 1);
+            Assert.Equal(612, first.OriginalPageWidthPoints, 1);
+            Assert.Equal(792, first.OriginalPageHeightPoints, 1);
+            Assert.Equal(500, second.PageWidthPoints, 1);
+            Assert.Equal(300, second.PageHeightPoints, 1);
+            Assert.Equal(300, second.OriginalPageWidthPoints, 1);
+            Assert.Equal(500, second.OriginalPageHeightPoints, 1);
+            Assert.Equal(842, third.OriginalPageWidthPoints, 1);
+            Assert.Equal(595, third.OriginalPageHeightPoints, 1);
         }
         finally
         {
