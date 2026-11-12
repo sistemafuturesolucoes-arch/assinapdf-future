@@ -33,6 +33,12 @@ if (string.IsNullOrWhiteSpace(pdfPath) || !File.Exists(pdfPath))
     return 2;
 }
 
+bool summaryMode = args.Contains("--summary", StringComparer.Ordinal);
+TextWriter? originalOutput = summaryMode ? Console.Out : null;
+using var summaryBuffer = summaryMode ? new StringWriter() : null;
+if (summaryMode)
+    Console.SetOut(summaryBuffer!);
+
 try
 {
     using var document = PdfDocument.Open(pdfPath);
@@ -260,10 +266,17 @@ try
     Console.WriteLine("- O mapeamento candidato é apenas uma correlação operando/fonte/Unicode quando há exatamente 2 bytes e 1 Letter; não prova a codificação completa nem o offset no stream original.");
     Console.WriteLine("- A distribuição separa operandos de 1 byte, 2 bytes e tamanhos maiores, além da quantidade de Letters associadas.");
     Console.WriteLine("- Este teste não reescreve nem salva PDFs.");
+    if (summaryMode)
+    {
+        Console.SetOut(originalOutput!);
+        PrintSummary(summaryBuffer!.ToString());
+    }
     return 0;
 }
 catch (Exception ex)
 {
+    if (summaryMode)
+        Console.SetOut(originalOutput!);
     Console.Error.WriteLine($"Falha ao analisar PDF: {ex.GetType().Name}: {ex.Message}");
     return 10;
 }
@@ -403,6 +416,26 @@ static string DescribeOperands(object operation)
     }
 
     return parts.Count == 0 ? "(operandos não expostos por propriedades públicas conhecidas)" : string.Join("; ", parts);
+}
+
+static void PrintSummary(string report)
+{
+    string[] markers =
+    [
+        "PDF:", "Páginas:", "VALIDAÇÃO NOVO SCANNER", "TOTAL: streams",
+        "PÁGINA 1: código ToUnicode", "Alvo:", "Referência exata da fonte",
+        "Fonte exata da seleção:", "Código(s) bruto(s) da seleção:",
+        "Código 0x", "Larguras C/B iguais:", "Nenhuma letra B foi encontrada",
+        "NÃO EXECUTADA:", "SIMULAÇÃO DE SUBSTITUIÇÃO", "Texto original:",
+        "Glifo alterado:", "Bytes dos outros", "Bytes do glifo selecionado",
+        "IMPORTANTE:", "RESUMO GERAL", "Letras:", "Operações Tj/TJ",
+        "Letras ligadas por TextSequence:", "Letras sem operação Tj/TJ visível:",
+        "ABORTADO:", "Falha ao analisar PDF:"
+    ];
+    Console.WriteLine("RESUMO DO DIAGNÓSTICO (use sem --summary para relatório completo)");
+    foreach (string line in report.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+        if (markers.Any(marker => line.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+            Console.WriteLine(line);
 }
 
 static string GetFontIdentity(object letter)
