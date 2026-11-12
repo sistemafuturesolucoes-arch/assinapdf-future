@@ -1,5 +1,6 @@
 using System.Reflection;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Filters;
 using UglyToad.PdfPig.Tokens;
 
