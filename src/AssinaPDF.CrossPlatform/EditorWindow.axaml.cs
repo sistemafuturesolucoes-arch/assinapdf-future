@@ -1903,9 +1903,23 @@ public partial class EditorWindow : Window
                 .FirstOrDefault(annotation =>
                 {
                     var bounds = annotation.Rect;
-                    return bounds != null &&
-                        pdfX >= bounds.LLX && pdfX <= bounds.URX &&
-                        pdfY >= bounds.LLY && pdfY <= bounds.URY;
+                    if (bounds == null ||
+                        pdfX < bounds.LLX || pdfX > bounds.URX ||
+                        pdfY < bounds.LLY || pdfY > bounds.URY)
+                        return false;
+
+                    if (annotation is Aspose.Pdf.Annotations.CircleAnnotation)
+                    {
+                        double centerX = (bounds.LLX + bounds.URX) / 2;
+                        double centerY = (bounds.LLY + bounds.URY) / 2;
+                        double radiusX = Math.Max(0.001, (bounds.URX - bounds.LLX) / 2);
+                        double radiusY = Math.Max(0.001, (bounds.URY - bounds.LLY) / 2);
+                        double normalizedX = (pdfX - centerX) / radiusX;
+                        double normalizedY = (pdfY - centerY) / radiusY;
+                        return normalizedX * normalizedX + normalizedY * normalizedY <= 1;
+                    }
+
+                    return true;
                 });
 
             if (shape?.Rect is { } shapeBounds &&
