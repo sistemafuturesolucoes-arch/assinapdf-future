@@ -46,7 +46,7 @@ public sealed class PdfiumPageCoordinateMapperTests
     [InlineData(0, 25, 150, 25, 50)]
     [InlineData(1, 25, 100, 100, 25)]
     [InlineData(2, 25, 150, 75, 150)]
-    [InlineData(3, 25, 100, 100, 175)]
+    [InlineData(3, 25, 100, 100, 75)]
     public void TryViewToPdf_MapsAllPageRotations(
         int rotation, double expectedX, double expectedY,
         double viewX, double viewY)
