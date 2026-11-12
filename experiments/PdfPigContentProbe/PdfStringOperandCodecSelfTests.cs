@@ -90,6 +90,15 @@ internal static class PdfStringOperandCodecSelfTests
                    Convert.ToHexString(decoded.DecodedBytes) == "4142";
         });
 
+        Check("rejects a byte-origin map from a different raw token", () =>
+        {
+            byte[] source = System.Text.Encoding.ASCII.GetBytes("(AB)");
+            byte[] other = System.Text.Encoding.ASCII.GetBytes("(CD)");
+            PdfStringOperandCodec.TryDecodeToken(source, out var decoded, out _);
+            return !PdfStringOperandCodec.TryReplaceBytesSameLength(
+                other, decoded, 0, new byte[] { 0x58 }, out _, out _);
+        });
+
         Console.WriteLine($"PDF raw-string codec self-tests: {passed}/{passed + failed} passed.");
         return failed;
 
