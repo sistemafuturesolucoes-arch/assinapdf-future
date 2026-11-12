@@ -50,3 +50,6 @@ The offset pass also compares each located `Tj` string's decoded byte sequence, 
 ## Correlação de offsets com glifos
 
 A inspeção também emite linhas `GLIFO-MAP` para correlacionar, na ordem das operações da página, o offset do operando `Tj` no stream decodificado com a sequência `TextSequence` do PdfPig e as `Letter` associadas. São exibidas as primeiras 20 correlações e todas as operações cuja propriedade `Bytes` esteja vazia. A saída inclui texto da operação, texto reconstruído das letras, quantidade de letras e fontes observadas. Essa correlação é diagnóstica: não prova, por si só, a divisão de um operando em bytes por glifo nem o mapeamento de fontes complexas.
+
+
+A saída também agrupa por fonte a quantidade de operandos em que o número de bytes decodificados coincide com o número de `Letter`, os casos divergentes e os candidatos de um byte/uma letra Unicode. Essa igualdade é apenas uma triagem: não autoriza dividir operandos multibyte nem inferir a codificação completa da fonte.
