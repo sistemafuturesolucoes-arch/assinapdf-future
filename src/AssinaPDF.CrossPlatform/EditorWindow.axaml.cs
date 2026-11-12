@@ -1271,7 +1271,7 @@ public partial class EditorWindow : Window
         if (!PdfiumPageCoordinateMapper.TryViewToPdf(
             point.X, point.Y, image.Bounds.Width, image.Bounds.Height,
             pageInfo.WidthPoints, pageInfo.HeightPoints,
-            out double pdfX, out double pdfY))
+            out double pdfX, out double pdfY, pageInfo.Rotation))
             return;
 
         // A ferramenta T usa o mesmo editor rico inline da edição de texto:
