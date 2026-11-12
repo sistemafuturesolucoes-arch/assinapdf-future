@@ -23,6 +23,7 @@ public partial class SignaturePositioningWindow : Window
     private int _pageIndex;
     private float _pageWidthPoints;
     private float _pageHeightPoints;
+    private int _pageRotation;
     private Point _dragStart;
     private Point _dragCurrent;
     private bool _isDragging;
@@ -234,8 +235,9 @@ public partial class SignaturePositioningWindow : Window
 
             _bitmap = newBitmap;
             _pageIndex = pageIndex;
-            _pageWidthPoints = renderedPage.PageWidthPoints;
-            _pageHeightPoints = renderedPage.PageHeightPoints;
+            _pageWidthPoints = renderedPage.OriginalPageWidthPoints;
+            _pageHeightPoints = renderedPage.OriginalPageHeightPoints;
+            _pageRotation = renderedPage.PageRotation;
 
             PdfPageImage.Source = newBitmap;
             PdfPageImage.Width = renderedPage.Width;
@@ -335,7 +337,8 @@ public partial class SignaturePositioningWindow : Window
             width / bounds.Width,
             height / bounds.Height,
             _pageWidthPoints,
-            _pageHeightPoints));
+            _pageHeightPoints,
+            _pageRotation));
 
         RefreshMarkers();
         PositionStatusText.Text =
