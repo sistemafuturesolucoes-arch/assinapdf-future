@@ -144,6 +144,55 @@ internal static class ToUnicodeCMapParserSelfTests
             return result.Mappings.Count == 1 && result.MalformedEntries == 1;
         });
 
+        Check("mixed-width source codes decode to exact Unicode values", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "2 begincodespacerange <00> <7F> <8100> <81FF> endcodespacerange " +
+                "2 beginbfchar <41> <0041> <8102> <00E9> endbfchar");
+            return ToUnicodeCMapParser.TryDecodeBytes(
+                       new byte[] { 0x41, 0x81, 0x02 }, cmap, out var decoded) &&
+                   decoded.SequenceEqual(new[]
+                   {
+                       new CMapDecodedCode("41", "A"),
+                       new CMapDecodedCode("8102", "é")
+                   });
+        });
+
+        Check("multi-character Unicode mapping remains one source code", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "1 begincodespacerange <2100> <21FF> endcodespacerange " +
+                "1 beginbfchar <21AF> <004E0049> endbfchar");
+            return ToUnicodeCMapParser.TryDecodeBytes(
+                       new byte[] { 0x21, 0xAF }, cmap, out var decoded) &&
+                   decoded.Count == 1 && decoded[0].Unicode == "NI";
+        });
+
+        Check("trailing bytes outside every code space fail closed", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "1 begincodespacerange <00> <7F> endcodespacerange " +
+                "1 beginbfchar <41> <0041> endbfchar");
+            return !ToUnicodeCMapParser.TryDecodeBytes(new byte[] { 0x41, 0xFF }, cmap, out _);
+        });
+
+        Check("code-space match without a ToUnicode entry fails closed", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "1 begincodespacerange <00> <7F> endcodespacerange " +
+                "1 beginbfchar <41> <0041> endbfchar");
+            return !ToUnicodeCMapParser.TryDecodeBytes(new byte[] { 0x42 }, cmap, out _);
+        });
+
+        Check("empty source byte sequence decodes to an empty result", () =>
+        {
+            var cmap = ToUnicodeCMapParser.Parse(
+                "1 begincodespacerange <00> <7F> endcodespacerange");
+            return ToUnicodeCMapParser.TryDecodeBytes(
+                       ReadOnlySpan<byte>.Empty, cmap, out var decoded) &&
+                   decoded.Count == 0;
+        });
+
         Console.WriteLine($"ToUnicode CMap self-tests: {passed}/{passed + failed} passed.");
         return failed;
 
