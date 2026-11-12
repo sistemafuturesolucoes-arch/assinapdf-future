@@ -44,6 +44,7 @@ try
     InspectOriginalContentStreams(document);
     OriginalContentOperandInspector.Run(document);
     PdfRealStreamGlyphDryRunInspector.Run(document);
+    Type3EncodingGlyphInspector.Run(document);
     PdfFontReflectionInspector.Run(document);
     PdfGlyphOperandValidationInspector.Run(document);
 
