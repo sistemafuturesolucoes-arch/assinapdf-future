@@ -32,6 +32,7 @@ try
     Console.WriteLine();
 
     InspectOriginalContentStreams(document);
+    OriginalContentOperandInspector.Run(document);
 
     int totalLetters = 0, totalTextOps = 0, totalMappedLetters = 0, totalUnmappedLetters = 0;
     int candidateMappings = 0, ambiguousByteOperations = 0;
