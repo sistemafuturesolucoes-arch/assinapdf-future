@@ -31,3 +31,13 @@ For the first 24 text operations on each page, it prints the public operand info
 - No PDF is rewritten, moved, deleted, or saved.
 
 PdfPig is distributed under Apache-2.0. It is used only in this isolated research project and is not added to the product runtime.
+
+## Original page content stream inspection
+
+The probe also inspects each page's `/Contents` entry through PdfPig's public document structure:
+- Resolves indirect stream references and arrays of content streams.
+- Reads each stream's original stored bytes and decodes supported PDF filters in memory.
+- Reports stream object number, stored/decoded lengths, filter pipeline, and visible `Tj`/`TJ` operator counts.
+- Uses Latin-1 only for diagnostic preview so each decoded byte remains represented by one character; it does not claim these preview characters are decoded PDF text.
+
+This is still read-only. It does not modify stream bytes, serialize a PDF, or establish a glyph-to-byte mapping. The next validation must correlate the parsed operands with exact string-token offsets in the decoded content stream, including multi-stream pages and `TJ` arrays.
