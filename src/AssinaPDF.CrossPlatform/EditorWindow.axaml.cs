@@ -1340,33 +1340,99 @@ public partial class EditorWindow : Window
             return;
 
         string selectedText = _selectedText;
+        string normalizedSelection = NormalizePdfText(selectedText);
+        double centerX = (bounds.Left + bounds.Right) / 2;
+        double centerY = (bounds.Bottom + bounds.Top) / 2;
+
         try
         {
-            var selectedRectangle = new Aspose.Pdf.Rectangle(
-                bounds.Left, bounds.Bottom, bounds.Right, bounds.Top);
             ApplyPdfEdit(document =>
             {
                 var absorber = new TextFragmentAbsorber();
-                absorber.RemoveAllText(document.Pages[pageIndex + 1], selectedRectangle);
+                document.Pages[pageIndex + 1].Accept(absorber);
+
+                var fragments = absorber.TextFragments
+                    .Where(fragment => fragment.Rectangle != null &&
+                        !string.IsNullOrWhiteSpace(fragment.Text))
+                    .ToArray();
+
+                // Primeiro, procura um único objeto com o texto exato e centro
+                // compatível com a seleção do PDFium.
+                var exact = fragments
+                    .Where(fragment => string.Equals(
+                        NormalizePdfText(fragment.Text),
+                        normalizedSelection,
+                        StringComparison.Ordinal))
+                    .Select(fragment => new
+                    {
+                        Fragment = fragment,
+                        Bounds = fragment.Rectangle!,
+                        Distance = Math.Pow(
+                            (fragment.Rectangle!.LLX + fragment.Rectangle.URX) / 2 - centerX, 2) +
+                            Math.Pow(
+                            (fragment.Rectangle.LLY + fragment.Rectangle.URY) / 2 - centerY, 2)
+                    })
+                    .Where(item => item.Distance <= 400)
+                    .OrderBy(item => item.Distance)
+                    .ToArray();
+
+                if (exact.Length > 0)
+                {
+                    if (exact.Length > 1 &&
+                        Math.Abs(exact[1].Distance - exact[0].Distance) < 1)
+                        throw new InvalidOperationException(
+                            "Há textos idênticos na mesma posição. Nenhum conteúdo foi excluído.");
+
+                    exact[0].Fragment.Text = string.Empty;
+                    return;
+                }
+
+                // Quando a seleção é composta por mais de um TextFragment,
+                // só removemos os fragmentos inteiramente contidos no retângulo
+                // e cuja concatenação corresponde exatamente ao texto selecionado.
+                const double tolerance = 2.0;
+                var contained = fragments.Where(fragment =>
+                {
+                    var rectangle = fragment.Rectangle!;
+                    return rectangle.LLX >= bounds.Left - tolerance &&
+                           rectangle.LLY >= bounds.Bottom - tolerance &&
+                           rectangle.URX <= bounds.Right + tolerance &&
+                           rectangle.URY <= bounds.Top + tolerance;
+                }).ToArray();
+
+                string containedText = string.Concat(contained.Select(fragment => fragment.Text));
+                if (contained.Length == 0 ||
+                    !string.Equals(
+                        NormalizePdfText(containedText),
+                        normalizedSelection,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "A seleção não corresponde exatamente a um objeto ou conjunto de objetos de texto do PDF. " +
+                        "Para evitar apagar conteúdo vizinho, a exclusão foi cancelada.");
+                }
+
+                foreach (TextFragment fragment in contained)
+                    fragment.Text = string.Empty;
             }, "Texto selecionado excluído do PDF.", savedDocument =>
             {
                 var verify = new TextFragmentAbsorber();
                 savedDocument.Pages[pageIndex + 1].Accept(verify);
                 return !verify.TextFragments.Any(fragment =>
                     fragment.Rectangle is { } rectangle &&
-                    rectangle.URX >= bounds.Left && rectangle.LLX <= bounds.Right &&
-                    rectangle.URY >= bounds.Bottom && rectangle.LLY <= bounds.Top &&
                     string.Equals(
                         NormalizePdfText(fragment.Text),
-                        NormalizePdfText(selectedText),
-                        StringComparison.Ordinal));
+                        normalizedSelection,
+                        StringComparison.Ordinal) &&
+                    Math.Pow((rectangle.LLX + rectangle.URX) / 2 - centerX, 2) +
+                    Math.Pow((rectangle.LLY + rectangle.URY) / 2 - centerY, 2) <= 400);
             });
             ClearTextSelection();
         }
         catch (Exception ex)
         {
             EditorStatusText.Text =
-                $"Não foi possível excluir a seleção. A versão anterior foi preservada. {ex.Message}";
+                $"Não foi possível excluir com segurança a seleção. A versão anterior foi preservada. {ex.Message}";
         }
     }
 
