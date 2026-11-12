@@ -194,6 +194,12 @@ internal static class PdfiumNative
 
     [DllImport(
         LibraryName,
+        EntryPoint = "FPDFPage_GetRotation",
+        CallingConvention = NativeCallingConvention)]
+    internal static extern int GetPageRotation(IntPtr page);
+
+    [DllImport(
+        LibraryName,
         EntryPoint = "FPDFBitmap_CreateEx",
         CallingConvention = NativeCallingConvention)]
     internal static extern IntPtr BitmapCreateEx(
