@@ -66,7 +66,7 @@ try
     {
         Console.WriteLine();
         Console.WriteLine("Export check concluído. Para testar o mapeamento, informe o caminho de um PDF:");
-        Console.WriteLine("dotnet run --project experiments/PdfiumExportProbe/PdfiumExportProbe.csproj -- ""C:\\caminho\\arquivo.pdf""");
+        Console.WriteLine("dotnet run --project experiments/PdfiumExportProbe/PdfiumExportProbe.csproj -- <caminho-do-pdf>");
         return 0;
     }
 
