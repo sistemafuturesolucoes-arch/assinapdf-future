@@ -21,7 +21,7 @@ internal static class PdfFontReflectionInspector
         {
             foreach (var letter in document.GetPage(pageNumber).Letters)
             {
-                var nullableReference = letter.Font.FontDictionaryReference;
+                var nullableReference = letter.FontDetails.FontDictionaryReference;
                 if (!nullableReference.HasValue) continue;
 
                 var reference = nullableReference.Value;
