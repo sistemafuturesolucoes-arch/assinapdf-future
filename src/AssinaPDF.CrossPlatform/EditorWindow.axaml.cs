@@ -1843,10 +1843,10 @@ public partial class EditorWindow : Window
                 $"fontes=[{string.Join("; ", editedRuns.Select(run =>
                     $"início={run.Start}, tamanho={run.Length}, fonte={run.FontFamily}, pt={run.FontSize:0.##}"))}]"
             };
+            bool deletionByBoundsFallback = false;
             ApplyPdfEdit(document =>
             {
                 bool cidFontSwapApplied = false;
-                bool deletionByBoundsFallback = false;
                 TextFragment target;
                 if (originalBounds != null && originalText != null)
                 {
@@ -1907,29 +1907,24 @@ public partial class EditorWindow : Window
                             .FirstOrDefault()!;
 
                         if (target == null)
-                    {
-                        // Para exclusão, o Aspose pode não expor a seleção como um único
-                        // TextFragment, embora consiga remover texto pela região geométrica.
-                        // Use o mesmo mecanismo já empregado pelo comando "Excluir seleção".
-                        // Essa rota é restrita a conteúdo vazio e à caixa exata selecionada;
-                        // substituições/formatações continuam exigindo correspondência textual.
-                        if (replacementText.Length == 0)
                         {
-                            pageAbsorber.RemoveAllText(
-                                document.Pages[pageIndex + 1], originalBounds);
-                            deletionByBoundsFallback = true;
-                        }
-                        else
-                        {
+                            // Exclusão geométrica como fallback quando o Aspose divide
+                            // a seleção em vários TextFragments. O retorno encerra esta
+                            // ação antes de qualquer acesso ao TextFragment inexistente.
+                            if (replacementText.Length == 0)
+                            {
+                                pageAbsorber.RemoveAllText(
+                                    document.Pages[pageIndex + 1], originalBounds);
+                                deletionByBoundsFallback = true;
+                                return;
+                            }
+
                             throw new InvalidOperationException(
                                 "O texto selecionado foi reconhecido pelo PDFium, mas o Aspose não encontrou um fragmento editável com o mesmo conteúdo. O PDF foi preservado sem alterações. " +
                                 "A seleção múltipla foi mantida para evitar substituir apenas uma letra ou apagar conteúdo vizinho.");
                         }
                     }
-                    }
 
-                    if (!deletionByBoundsFallback)
-                    {
                     if (cidBoldOnlyEdit)
                     {
                         cidFontSwapApplied = CidFontOperatorFormatter.TryApplyBoldVariant(
@@ -2016,7 +2011,6 @@ public partial class EditorWindow : Window
                     expectedBounds = new Aspose.Pdf.Rectangle(
                         originalBounds.LLX, originalBounds.LLY,
                         originalBounds.URX, originalBounds.URY);
-                    }
             }, originalText == null
                 ? $"Texto inserido na página {pageIndex + 1}."
                 : "Texto e formatação atualizados.",
@@ -2041,10 +2035,8 @@ public partial class EditorWindow : Window
                         bool originalStillPresent;
                         if (deletionByBoundsFallback)
                         {
-                            // RemoveAllText trabalha por região e pode deixar os
-                            // fragmentos remanescentes repartidos. Para a rota de
-                            // exclusão geométrica, confirme que não restou texto na
-                            // área selecionada, em vez de exigir um fragmento idêntico.
+                            // RemoveAllText pode deixar fragmentos vizinhos repartidos.
+                            // Confirme que a área selecionada não contém mais texto.
                             originalStillPresent = verificationAbsorber.TextFragments.Any(fragment =>
                                 fragment.Rectangle is { } rectangle &&
                                 rectangle.URX >= originalBounds.LLX &&
