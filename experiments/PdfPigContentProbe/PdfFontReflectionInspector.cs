@@ -214,33 +214,6 @@ internal static class PdfFontReflectionInspector
         value.Replace("\\", "\\\\").Replace("\"", "\\\"")
              .Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
 
-    private static bool TryDecodeUnicodeHex(string hex, out string value)
-    {
-        value = "";
-        if (hex.Length == 0 || hex.Length % 4 != 0) return false;
-        try
-        {
-            var bytes = Convert.FromHexString(hex);
-            // Reject invalid UTF-16 (including unpaired surrogates) instead of
-            // silently replacing malformed destination data with U+FFFD.
-            value = new UnicodeEncoding(bigEndian: true, byteOrderMark: false, throwOnInvalidBytes: true)
-                .GetString(bytes);
-            return true;
-        }
-        catch { return false; }
-    }
-
-    private static bool TryParseHex(string hex, out long value) =>
-        long.TryParse(hex, System.Globalization.NumberStyles.HexNumber,
-            System.Globalization.CultureInfo.InvariantCulture, out value);
-
-    private static string NormalizeHex(string hex) =>
-        hex.Length % 2 == 0 ? hex.ToUpperInvariant() : ("0" + hex).ToUpperInvariant();
-
-    private static string EscapeForCMap(string value) =>
-        value.Replace("\\", "\\\\").Replace("\"", "\\\"")
-             .Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
-
     private static void PrintCMapStatistics(string text, string indent)
     {
         int codeSpaces = Count(text, "begincodespacerange");
