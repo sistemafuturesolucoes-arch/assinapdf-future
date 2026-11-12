@@ -107,3 +107,10 @@ This stage changes only an in-memory **decoded content stream**. It does not rec
 The probe now attempts an integrated in-memory dry run for the known `CONFIRME` → `BONFIRME` sample. It correlates page `Tj` operations with decoded content-stream operands, resolves the font's ToUnicode CMap, maps the selected source code, requires a unique replacement code of the same byte length, plans the token replacement, and then plans the decoded stream replacement. It checks that the scanner can read the rewritten stream and that all bytes before and after the selected token remain identical.
 
 This remains strictly diagnostic: it does not modify the PDF object, recompress streams, update `/Length`, rebuild xref data, or write a file. It also does not calculate text advance compensation or prove that the replacement glyph has identical visual width. If any correlation, font mapping, or replacement uniqueness check fails, it aborts without producing a plan.
+
+
+## Type3 Encoding, Differences, CharProcs e larguras
+
+Uma inspeção adicional localiza o trecho de teste `CONFIRME` e examina o dicionário Type3 da primeira letra. Ela tenta ler `/Encoding`, `/BaseEncoding`, a sequência `/Differences`, os nomes presentes em `/CharProcs`, `/FirstChar`, `/Widths`, `/FontMatrix` e `/FontBBox`. O objetivo é verificar se os nomes de glifo `C` e `B` existem estruturalmente e se os códigos associados têm larguras declaradas iguais.
+
+A inspeção não depende de existir um mapeamento ToUnicode para todos os glifos: o ToUnicode é uma camada de extração textual, enquanto Encoding/Differences e CharProcs descrevem a codificação e os programas de desenho da fonte Type3. Ainda assim, encontrar um nome em Differences e CharProcs não comprova que o desenho seja visualmente equivalente, nem basta para editar o PDF. Codificações baseadas em nomes, aliases, ausência de Differences, métricas dos operadores d0/d1, estado de texto e posicionamento dos próximos operadores ainda exigem validação. Nenhum objeto é modificado e nenhum arquivo é salvo.
