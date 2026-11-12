@@ -37,8 +37,8 @@ public sealed class PdfVisualElementTests
                     InteriorColor = Color.FromRgb(0.88, 0.84, 0.96),
                     Opacity = 0.22
                 };
-                rectangle.UpdateAppearances();
                 page.Annotations.Add(rectangle);
+                rectangle.UpdateAppearances();
 
                 var image = new ImageStamp(imagePath)
                 {
@@ -66,12 +66,12 @@ public sealed class PdfVisualElementTests
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
                 var placement = Assert.Single(absorber.ImagePlacements);
-                using var imageData = new MemoryStream();
-                placement.Save(imageData);
-                Assert.NotEmpty(imageData.ToArray());
+                Assert.NotNull(placement.Image);
+                byte[] imageData = placement.Image!.ToPng();
+                Assert.NotEmpty(imageData);
                 placement.Hide();
 
-                using var imageStream = new MemoryStream(imageData.ToArray(), writable: false);
+                using var imageStream = new MemoryStream(imageData, writable: false);
                 page.AddStamp(new ImageStamp(imageStream)
                 {
                     X = 160,
