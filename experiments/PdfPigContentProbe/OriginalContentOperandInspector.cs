@@ -1,4 +1,5 @@
 using System.Text;
+using System.Reflection;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Filters;
 using UglyToad.PdfPig.Tokens;
@@ -19,6 +20,7 @@ internal static class OriginalContentOperandInspector
             var page = document.GetPage(pageNumber);
             int expected = page.Operations.Count(x => x.Operator == "Tj");
             int found = 0;
+            var locatedForPage = new List<(StringToken Token, string ObjectId)>();
             if (!page.Dictionary.Data.TryGetValue("Contents", out var contents))
             {
                 Console.WriteLine($"  Página {pageNumber}: /Contents ausente; PdfPig Tj={expected}; offsets=0");
@@ -40,12 +42,34 @@ internal static class OriginalContentOperandInspector
                 {
                     found++;
                     totalFound++;
+                    locatedForPage.Add((item, id));
                     if (samples.Count < 40)
                         samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes)));
                 }
                 totalParsed++;
             }
-            Console.WriteLine($"  Página {pageNumber}: PdfPig Tj={expected}; operandos Tj localizados={found}; diferença={found - expected}");
+
+            var pdfPigOperations = page.Operations.Where(x => x.Operator == "Tj").ToArray();
+            int compared = Math.Min(pdfPigOperations.Length, locatedForPage.Count);
+            int exact = 0;
+            var mismatches = new List<string>();
+            for (int index = 0; index < compared; index++)
+            {
+                var value = pdfPigOperations[index].GetType()
+                    .GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?.GetValue(pdfPigOperations[index]);
+                if (value is ReadOnlyMemory<byte> memory && memory.Span.SequenceEqual(locatedForPage[index].Token.Bytes))
+                    exact++;
+                else if (mismatches.Count < 8)
+                {
+                    string parsedHex = value is ReadOnlyMemory<byte> parsed ? Convert.ToHexString(parsed.Span) : "(Bytes indisponível)";
+                    string streamHex = Convert.ToHexString(locatedForPage[index].Token.Bytes);
+                    mismatches.Add($"#{index + 1}: PdfPig={parsedHex}; stream={streamHex}; obj={locatedForPage[index].ObjectId}; offset={locatedForPage[index].Token.Start}");
+                }
+            }
+
+            Console.WriteLine($"  Página {pageNumber}: PdfPig Tj={expected}; operandos localizados={found}; bytes comparados={compared}; correspondências exatas={exact}; divergências={compared - exact}; diferença de contagem={found - expected}");
+            foreach (string mismatch in mismatches)
+                Console.WriteLine($"    DIVERGÊNCIA {mismatch}");
         }
 
         Console.WriteLine($"  TOTAL: streams analisados={totalParsed}; streams ignorados por filtro={totalUnsupported}; operandos Tj localizados={totalFound}");
