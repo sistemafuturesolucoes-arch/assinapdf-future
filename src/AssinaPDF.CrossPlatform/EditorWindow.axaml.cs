@@ -3197,6 +3197,12 @@ public partial class EditorWindow : Window
                         "O PDF foi gerado, mas o texto ou a formatação não foram preservados no arquivo salvo. A cópia anterior foi preservada.");
             }
 
+            // A leitura pelo Aspose não basta: o arquivo final também precisa
+            // continuar válido para o mesmo PDFium usado na visualização.
+            // Renderizamos todas as páginas em baixa resolução antes de trocar
+            // a cópia de trabalho; se uma página falhar, o arquivo anterior fica intacto.
+            ValidatePdfWithPdfium(outputPath);
+
             _document?.Dispose();
             _document = null;
 
@@ -3216,6 +3222,24 @@ public partial class EditorWindow : Window
         {
             try { if (File.Exists(outputPath)) File.Delete(outputPath); }
             catch { /* Limpeza temporária best-effort. */ }
+        }
+    }
+
+    private static void ValidatePdfWithPdfium(string pdfPath)
+    {
+        using var preview = new PdfiumDocument(pdfPath);
+        if (preview.PageCount <= 0)
+            throw new InvalidDataException("O PDF não contém páginas válidas para visualização.");
+
+        for (int pageIndex = 0; pageIndex < preview.PageCount; pageIndex++)
+        {
+            RenderedPdfPage page = preview.RenderPage(pageIndex, 0.25f);
+            if (page.Width <= 0 || page.Height <= 0 ||
+                page.Pixels.Length < checked(page.Stride * page.Height))
+            {
+                throw new InvalidDataException(
+                    $"O PDFium não conseguiu validar a renderização da página {pageIndex + 1}.");
+            }
         }
     }
 
@@ -3304,22 +3328,34 @@ public partial class EditorWindow : Window
                 return;
             }
 
-            bool destinationCreated = false;
+            string temporaryPath = targetPath + $".{Guid.NewGuid():N}.tmp";
             try
             {
-                using var sourceStream = new FileStream(_workingCopyPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using var destinationStream = new FileStream(targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                destinationCreated = true;
-                sourceStream.CopyTo(destinationStream);
-            }
-            catch
-            {
-                if (destinationCreated)
+                using (var sourceStream = new FileStream(
+                    _workingCopyPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var destinationStream = new FileStream(
+                    temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
-                    try { File.Delete(targetPath); }
-                    catch { /* Limpeza best-effort do arquivo criado nesta operação. */ }
+                    sourceStream.CopyTo(destinationStream);
+                    destinationStream.Flush(flushToDisk: true);
                 }
-                throw;
+
+                ValidatePdfWithPdfium(temporaryPath);
+
+                // CreateNew/Move sem overwrite impede substituir um arquivo do usuário.
+                File.Move(temporaryPath, targetPath, overwrite: false);
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(temporaryPath))
+                        File.Delete(temporaryPath);
+                }
+                catch
+                {
+                    // Limpeza temporária best-effort; o destino só existe após validação.
+                }
             }
 
             EditorStatusText.Text = $"Cópia exportada em: {targetPath}";
