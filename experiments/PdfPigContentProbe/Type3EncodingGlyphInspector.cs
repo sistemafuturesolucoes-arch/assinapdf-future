@@ -58,6 +58,7 @@ internal static class Type3EncodingGlyphInspector
         Console.WriteLine($"  Alvo: página={page}; sequência={sequence}; fonte={selected.FontName}; caractere selecionado='{selected.Value}'");
         object? details = Get(selected, "FontDetails");
         object? nullableReference = Get(details, "FontDictionaryReference");
+        Console.WriteLine($"  Referência exata da fonte selecionada: {nullableReference ?? "(indisponível)"}");
         if (nullableReference is null)
         {
             Console.WriteLine("  ABORTADO: referência do dicionário da fonte indisponível.");
@@ -263,7 +264,7 @@ internal static class Type3EncodingGlyphInspector
             string hash = Convert.ToHexString(SHA256.HashData(decoded.Span));
             Console.WriteLine($"    CharProc decodificado: {decoded.Length} bytes; SHA256={hash}");
             Console.WriteLine($"    Início do programa: {preview}");
-            var metrics = Regex.Match(source, @"(?m)^\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+d([01])\b");
+            var metrics = Regex.Match(source, @"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+d([01])\b");
             if (metrics.Success)
                 Console.WriteLine($"    Métrica inicial Type3: wx={metrics.Groups[1].Value}; wy={metrics.Groups[2].Value}; operador=d{metrics.Groups[3].Value}");
             else
