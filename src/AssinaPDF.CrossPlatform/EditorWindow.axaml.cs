@@ -1609,6 +1609,9 @@ public partial class EditorWindow : Window
             var cancelButton = (Button)actionPanel.Children[0];
             var applyButton = (Button)actionPanel.Children[1];
 
+            double insertionPdfX = x;
+            double insertionPdfY = y;
+
             var editorSurface = new Border
             {
                 Background = Avalonia.Media.Brushes.White,
@@ -1621,127 +1624,47 @@ public partial class EditorWindow : Window
                     HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
                     VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
                 },
-                Height = 220
-            };
-
-            if (!_pageSurfaces.TryGetValue(pageIndex, out var pageSurface) ||
-                pageSurface.Image.Tag is not PagePreviewInfo inlinePageInfo)
-            {
-                if (_formattingToolbar != null && _defaultToolbarEditor != null)
-                    _formattingToolbar.Target = _defaultToolbarEditor;
-                return;
-            }
-
-            double editorWidth = Math.Max(280, Math.Min(560, pageSurface.Image.Bounds.Width - 20));
-            var anchor = originalBounds != null
-                ? PdfiumPageCoordinateMapper.PdfToViewRect(
-                    originalBounds.LLX, originalBounds.LLY,
-                    originalBounds.URX, originalBounds.URY,
-                    pageSurface.Image.Bounds.Width, pageSurface.Image.Bounds.Height,
-                    inlinePageInfo.WidthPoints, inlinePageInfo.HeightPoints)
-                : PdfiumPageCoordinateMapper.PdfToViewRect(
-                    x - 3, y - 3, x + 3, y + 3,
-                    pageSurface.Image.Bounds.Width, pageSurface.Image.Bounds.Height,
-                    inlinePageInfo.WidthPoints, inlinePageInfo.HeightPoints);
-
-            double editorLeft = Math.Clamp(
-                anchor.X, 8, Math.Max(8, pageSurface.Image.Bounds.Width - editorWidth - 8));
-            double editorTop = anchor.Y + anchor.Height + 8;
-            if (editorTop + 250 > pageSurface.Image.Bounds.Height)
-                editorTop = Math.Max(8, anchor.Y - 250);
-
-            double insertionPdfX = x;
-            double insertionPdfY = y;
-            var dragHandle = new TextBlock
-            {
-                Text = originalText == null ? "↕  Arraste para posicionar o texto" : "Editando texto selecionado",
-                FontSize = 11,
-                FontWeight = Avalonia.Media.FontWeight.SemiBold,
-                Foreground = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.FromRgb(76, 52, 130)),
-                Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeAll)
+                MinHeight = 280
             };
 
             var inlineEditor = new Border
             {
-                Width = editorWidth,
                 Background = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.FromRgb(255, 255, 255)),
+                    Avalonia.Media.Color.FromRgb(37, 44, 55)),
                 BorderBrush = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.FromRgb(76, 52, 130)),
-                BorderThickness = new Thickness(2),
-                CornerRadius = new Avalonia.CornerRadius(5),
-                Padding = new Thickness(7),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new Avalonia.CornerRadius(6),
+                Padding = new Thickness(8),
                 Child = new StackPanel
                 {
-                    Spacing = 7,
+                    Spacing = 10,
                     Children =
                     {
-                        dragHandle,
+                        new TextBlock
+                        {
+                            Text = originalText == null ? "NOVO TEXTO" : "EDITAR TEXTO",
+                            FontSize = 10,
+                            FontWeight = Avalonia.Media.FontWeight.Bold,
+                            Foreground = new Avalonia.Media.SolidColorBrush(
+                                Avalonia.Media.Color.FromRgb(196, 181, 253))
+                        },
                         editorSurface,
                         actionPanel
                     }
                 }
             };
 
-            bool draggingEditor = false;
-            Avalonia.Point dragStart = default;
-            double dragStartLeft = editorLeft;
-            double dragStartTop = editorTop;
-            dragHandle.PointerPressed += (_, args) =>
-            {
-                if (!args.GetCurrentPoint(dragHandle).Properties.IsLeftButtonPressed)
-                    return;
-                draggingEditor = true;
-                dragStart = args.GetPosition(pageSurface.Overlay);
-                dragStartLeft = editorLeft;
-                dragStartTop = editorTop;
-                args.Pointer.Capture(dragHandle);
-                args.Handled = true;
-            };
-            dragHandle.PointerMoved += (_, args) =>
-            {
-                if (!draggingEditor)
-                    return;
-                var current = args.GetPosition(pageSurface.Overlay);
-                editorLeft = Math.Clamp(
-                    dragStartLeft + current.X - dragStart.X,
-                    4, Math.Max(4, pageSurface.Image.Bounds.Width - editorWidth - 4));
-                editorTop = Math.Clamp(
-                    dragStartTop + current.Y - dragStart.Y,
-                    4, Math.Max(4, pageSurface.Image.Bounds.Height - 300));
-                Canvas.SetLeft(inlineEditor, editorLeft);
-                Canvas.SetTop(inlineEditor, editorTop);
-                args.Handled = true;
-            };
-            dragHandle.PointerReleased += (_, args) =>
-            {
-                if (!draggingEditor)
-                    return;
-                draggingEditor = false;
-                args.Pointer.Capture(null);
-                if (originalText == null)
-                {
-                    var insertionAnchor = new Avalonia.Point(
-                        Math.Clamp(editorLeft + 12, 0, pageSurface.Image.Bounds.Width),
-                        Math.Clamp(editorTop + 48, 0, pageSurface.Image.Bounds.Height));
-                    PdfiumPageCoordinateMapper.TryViewToPdf(
-                        insertionAnchor.X, insertionAnchor.Y,
-                        pageSurface.Image.Bounds.Width, pageSurface.Image.Bounds.Height,
-                        inlinePageInfo.WidthPoints, inlinePageInfo.HeightPoints,
-                        out insertionPdfX, out insertionPdfY);
-                }
-                args.Handled = true;
-            };
-
-            Canvas.SetLeft(inlineEditor, editorLeft);
-            Canvas.SetTop(inlineEditor, editorTop);
-            pageSurface.Overlay.Children.Add(inlineEditor);
-            pageSurface.Overlay.IsHitTestVisible = true;
-            // Mantém o painel de edição visível mesmo quando o texto selecionado
-            // está próximo do limite inferior da área atualmente exibida.
-            inlineEditor.BringIntoView();
-            EditorStatusText.Text = "Edite o trecho diretamente na página. A barra superior permanece disponível para formatação.";
+            // O editor e sua barra de formatação ficam no painel lateral, como no
+            // Typecraft. A página permanece livre para visualizar o resultado.
+            EditorInlineEditorHost.Content = inlineEditor;
+            EditorInlineEditorHost.IsVisible = true;
+            EditorInstructionsPanel.IsVisible = false;
+            EditSelectedTextButton.IsVisible = false;
+            DeleteSelectedTextButton.IsVisible = false;
+            EditorStatusText.Text = originalText == null
+                ? "Digite e formate o novo texto no painel lateral."
+                : "Edite o conteúdo e a formatação no painel lateral.";
 
             var completion = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1751,8 +1674,9 @@ public partial class EditorWindow : Window
 
             bool accepted = await completion.Task;
 
-            pageSurface.Overlay.Children.Remove(inlineEditor);
-            pageSurface.Overlay.IsHitTestVisible = false;
+            EditorInlineEditorHost.Content = null;
+            EditorInlineEditorHost.IsVisible = false;
+            EditorInstructionsPanel.IsVisible = true;
             if (_formattingToolbar != null && _defaultToolbarEditor != null)
                 _formattingToolbar.Target = _defaultToolbarEditor;
 
