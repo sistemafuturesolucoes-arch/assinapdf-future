@@ -1,6 +1,9 @@
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using UglyToad.PdfPig.Filters;
+using UglyToad.PdfPig.Tokens;
 using UglyToad.PdfPig;
 
 Console.WriteLine("AssinaPDF - PDF content operation / glyph sequence probe");
@@ -27,6 +30,8 @@ try
     Console.WriteLine($"Páginas: {document.NumberOfPages}");
     Console.WriteLine("Atenção: análise somente leitura; nenhum arquivo será alterado.");
     Console.WriteLine();
+
+    InspectOriginalContentStreams(document);
 
     int totalLetters = 0, totalTextOps = 0, totalMappedLetters = 0, totalUnmappedLetters = 0;
     int candidateMappings = 0, ambiguousByteOperations = 0;
@@ -238,6 +243,97 @@ catch (Exception ex)
 {
     Console.Error.WriteLine($"Falha ao analisar PDF: {ex.GetType().Name}: {ex.Message}");
     return 10;
+}
+
+
+static void InspectOriginalContentStreams(PdfDocument document)
+{
+    Console.WriteLine("INSPEÇÃO DOS CONTENT STREAMS ORIGINAIS (decodificados em memória)");
+    int totalStreams = 0;
+    int totalDecodedBytes = 0;
+    int totalTj = 0;
+    int totalTjArray = 0;
+
+    for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
+    {
+        var page = document.GetPage(pageNumber);
+        if (!page.Dictionary.Data.TryGetValue("Contents", out var contentsToken))
+        {
+            Console.WriteLine($"  Página {pageNumber}: /Contents não encontrado.");
+            continue;
+        }
+
+        var streamTokens = new List<(StreamToken Stream, string ObjectId)>();
+        if (contentsToken is ArrayToken array)
+        {
+            foreach (var item in array.Data)
+                AddContentStream(item, document, streamTokens);
+        }
+        else
+        {
+            AddContentStream(contentsToken, document, streamTokens);
+        }
+
+        Console.WriteLine($"  Página {pageNumber}: {streamTokens.Count} stream(s) de conteúdo.");
+        for (int i = 0; i < streamTokens.Count; i++)
+        {
+            var (stream, objectId) = streamTokens[i];
+            var filters = document.Structure.FilterProvider.GetFilters(
+                stream.StreamDictionary, document.Structure.TokenScanner);
+
+            if (filters.Any(filter => !filter.IsSupported))
+            {
+                Console.WriteLine($"    Stream {i + 1} ({objectId}): filtro não suportado; bruto={stream.Data.Length} bytes; filtros={string.Join(",", filters.Select(x => x.GetType().Name))}");
+                continue;
+            }
+
+            Memory<byte> decoded = stream.Data;
+            for (int filterIndex = 0; filterIndex < filters.Count; filterIndex++)
+            {
+                decoded = filters[filterIndex].Decode(
+                    decoded, stream.StreamDictionary, document.Structure.FilterProvider, filterIndex);
+            }
+
+            string content = Encoding.Latin1.GetString(decoded.Span);
+            int tj = Regex.Matches(content, @"(?<![A-Za-z0-9])Tj(?![A-Za-z0-9])").Count;
+            int tjArray = Regex.Matches(content, @"(?<![A-Za-z0-9])TJ(?![A-Za-z0-9])").Count;
+            totalStreams++;
+            totalDecodedBytes += decoded.Length;
+            totalTj += tj;
+            totalTjArray += tjArray;
+
+            string filterNames = filters.Count == 0
+                ? "(sem filtro)"
+                : string.Join(" -> ", filters.Select(x => x.GetType().Name));
+            string preview = MakePreview(Escape(content.Replace("\\0", "")), 180);
+            Console.WriteLine($"    Stream {i + 1} ({objectId}): bruto={stream.Data.Length} bytes; decodificado={decoded.Length} bytes; filtros={filterNames}; Tj={tj}; TJ={tjArray}");
+            Console.WriteLine($"      Início decodificado: {preview}");
+        }
+    }
+
+    Console.WriteLine($"  TOTAL: streams decodificados={totalStreams}; bytes decodificados={totalDecodedBytes}; Tj={totalTj}; TJ={totalTjArray}");
+    Console.WriteLine("  Observação: Latin1 é usado somente para exibir bytes sem alterar a correspondência byte/posição; esta etapa ainda não reescreve nem salva conteúdo.");
+    Console.WriteLine();
+}
+
+static void AddContentStream(
+    IToken token,
+    PdfDocument document,
+    List<(StreamToken Stream, string ObjectId)> output)
+{
+    string objectId = "direto";
+    IToken resolved = token;
+    if (token is IndirectReferenceToken reference)
+    {
+        var objectToken = document.Structure.GetObject(reference.Data);
+        objectId = objectToken.Number.ToString();
+        resolved = objectToken.Data;
+    }
+
+    if (resolved is StreamToken stream)
+        output.Add((stream, objectId));
+    else
+        Console.WriteLine($"    Conteúdo ignorado: token {resolved.GetType().Name} ({objectId}), não é StreamToken.");
 }
 
 static bool HasInterestingOperands(object operation)
