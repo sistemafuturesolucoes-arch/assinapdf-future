@@ -14,6 +14,8 @@ internal static class OriginalContentOperandInspector
         Console.WriteLine("LOCALIZAÇÃO DE OFFSETS DOS OPERANDOS Tj (somente leitura)");
         int totalFound = 0, totalParsed = 0, totalUnsupported = 0;
         int totalExact = 0, totalEmpty = 0, totalDifferent = 0, totalUnavailable = 0;
+        int scannerCompleteStreams = 0, scannerRejectedStreams = 0;
+        int scannerMatchedOperands = 0, scannerMismatchedStreams = 0;
         var samples = new List<LocatedOperand>();
 
         for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
@@ -39,7 +41,42 @@ internal static class OriginalContentOperandInspector
                     decoded = filters[i].Decode(decoded, stream.StreamDictionary, document.Structure.FilterProvider, i);
 
                 var bytes = decoded.ToArray();
-                foreach (var item in FindTjOperands(bytes))
+                var legacyOperands = FindTjOperands(bytes).ToArray();
+                var scannerResult = PdfContentStreamTokenScanner.Scan(bytes);
+                if (scannerResult.IsComplete)
+                {
+                    scannerCompleteStreams++;
+                    int streamMismatches = 0;
+                    if (scannerResult.TjOperands.Count != legacyOperands.Length)
+                        streamMismatches++;
+
+                    int comparable = Math.Min(scannerResult.TjOperands.Count, legacyOperands.Length);
+                    for (int operandIndex = 0; operandIndex < comparable; operandIndex++)
+                    {
+                        var scanned = scannerResult.TjOperands[operandIndex];
+                        var legacy = legacyOperands[operandIndex];
+                        if (scanned.TokenStart != legacy.Start ||
+                            scanned.TokenEnd != legacy.End ||
+                            !string.Equals(scanned.Kind, legacy.Kind, StringComparison.Ordinal) ||
+                            !scanned.DecodedBytes.AsSpan().SequenceEqual(legacy.Bytes))
+                            streamMismatches++;
+                    }
+
+                    if (streamMismatches == 0)
+                        scannerMatchedOperands += scannerResult.TjOperands.Count;
+                    else
+                    {
+                        scannerMismatchedStreams++;
+                        Console.WriteLine($"    SCANNER DIVERGENTE stream {id}: scanner={scannerResult.TjOperands.Count}; legado={legacyOperands.Length}; divergências={streamMismatches}. Offsets do scanner NÃO serão aceitos.");
+                    }
+                }
+                else
+                {
+                    scannerRejectedStreams++;
+                    Console.WriteLine($"    SCANNER INTERROMPIDO stream {id}: {scannerResult.Reason} Offsets do scanner NÃO serão aceitos.");
+                }
+
+                foreach (var item in legacyOperands)
                 {
                     found++;
                     totalFound++;
@@ -47,6 +84,7 @@ internal static class OriginalContentOperandInspector
                     if (samples.Count < 40)
                          samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes), Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), GetContextHex(bytes, item.Start, item.End)));
                 }
+                Console.WriteLine($"    SCANNER stream {id}: completo={(scannerResult.IsComplete ? "SIM" : "NÃO")}; Tj scanner={scannerResult.TjOperands.Count}; Tj referência={legacyOperands.Length}; status={(scannerResult.IsComplete && scannerResult.TjOperands.Count == legacyOperands.Length ? "contagem igual (bytes/offsets verificados no agregado)" : "revisar")}");
                 totalParsed++;
             }
 
@@ -137,6 +175,8 @@ internal static class OriginalContentOperandInspector
 
         Console.WriteLine($"  TOTAL: streams analisados={totalParsed}; streams ignorados por filtro={totalUnsupported}; operandos Tj localizados={totalFound}");
         Console.WriteLine($"  CORRELAÇÃO TOTAL: exatos={totalExact}; Bytes vazios no PdfPig={totalEmpty}; bytes diferentes={totalDifferent}; Bytes indisponíveis={totalUnavailable}");
+        Console.WriteLine($"  VALIDAÇÃO DO NOVO SCANNER: streams completos={scannerCompleteStreams}; interrompidos={scannerRejectedStreams}; streams divergentes={scannerMismatchedStreams}; operandos com offset/tipo/bytes idênticos ao scanner legado={scannerMatchedOperands}");
+        Console.WriteLine("  Regra: qualquer stream interrompido ou divergente é rejeitado; os offsets de referência continuam vindo do scanner legado nesta etapa.");
         Console.WriteLine("  AMOSTRAS (offsets em bytes do stream DECODIFICADO, não do arquivo PDF bruto):");
         foreach (var item in samples)
             Console.WriteLine($"    pág={item.Page}; obj={item.ObjectId}; offset={item.Offset}; bytes={item.Length}; tipo={item.Kind}; hex={item.Hex}");
