@@ -44,7 +44,7 @@ try
         "FPDF_InitLibrary", "FPDF_LoadMemDocument64", "FPDF_GetPageCount",
         "FPDF_LoadPage", "FPDF_ClosePage", "FPDF_CloseDocument",
         "FPDFText_LoadPage", "FPDFText_ClosePage", "FPDFText_CountChars",
-        "FPDFText_GetUnicode", "FPDFText_GetTextObject",
+        "FPDFText_GetUnicode", "FPDFText_GetTextObject", "FPDFText_IsGenerated",
         "FPDFPage_CountObjects", "FPDFPage_GetObject", "FPDFTextObj_GetText"
     ];
 
@@ -115,6 +115,7 @@ try
         long totalAssociatedObjects = 0;
         long totalNullMappings = 0;
         long totalUnmatched = 0;
+        long totalNullGenerated = 0, totalNullNotGenerated = 0, totalNullUnicodeZero = 0, totalGenerated = 0;
         int failedPages = 0;
 
         for (int pageIndex = 0; pageIndex < pageCount; pageIndex++)
@@ -131,17 +132,24 @@ try
             totalAssociatedObjects += result.Objects;
             totalNullMappings += result.NullMappings;
             totalUnmatched += result.Unmatched;
+            totalNullGenerated += result.NullGenerated;
+            totalNullNotGenerated += result.NullNotGenerated;
+            totalNullUnicodeZero += result.NullUnicodeZero;
+            totalGenerated += result.GeneratedTotal;
 
             string status = result.NullMappings == 0 && result.Unmatched == 0 ? "OK" : "REVISAR";
             Console.WriteLine($"{pageIndex + 1,6} | {result.Characters,10} | {result.Objects,18} | {result.NullMappings,8} | {result.Unmatched,15} | {status}");
+            Console.WriteLine($"       NULL gerados: {result.NullGenerated}; NULL não gerados: {result.NullNotGenerated}; NULL Unicode U+0000: {result.NullUnicodeZero}; gerados no total: {result.GeneratedTotal}");
+            if (result.Samples.Length > 0) Console.WriteLine($"       Amostras NULL: {result.Samples}");
         }
 
         Console.WriteLine(new string('-', 83));
         string finalStatus = failedPages > 0 ? $"{failedPages} ERRO(S)" : "CONCLUÍDO";
         Console.WriteLine($"{ "TOTAL",6} | {totalCharacters,10} | {totalAssociatedObjects,18} | {totalNullMappings,8} | {totalUnmatched,15} | {finalStatus}");
         Console.WriteLine();
+        Console.WriteLine($"NULL gerados: {totalNullGenerated}; NULL não gerados: {totalNullNotGenerated}; NULL Unicode U+0000: {totalNullUnicodeZero}; caracteres gerados no total: {totalGenerated}.");
         Console.WriteLine("Objetos associados são contados por página; o total soma essas contagens.");
-        Console.WriteLine("NULL e ponteiros não localizados são métricas de diagnóstico, não prova isolada de corrupção.");
+        Console.WriteLine("NULL é detalhado por Unicode e pelo indicador de caractere gerado do PDFium; isso ajuda a classificar, mas não prova corrupção.");
         Console.WriteLine("O teste não revela bytes nem operadores Tj/TJ e não modifica o PDF.");
         return failedPages > 0 ? 13 : totalNullMappings == 0 && totalUnmatched == 0 ? 0 : 11;
     }
@@ -156,71 +164,72 @@ finally
     NativeLibrary.Free(library);
 }
 
-static (int Characters, int Objects, int NullMappings, int Unmatched, bool Error)
+static (int Characters, int Objects, int NullMappings, int Unmatched,
+        int NullGenerated, int NullNotGenerated, int NullUnicodeZero,
+        int GeneratedTotal, string Samples, bool Error)
     AnalyzePage(PdfiumApi api, IntPtr document, int pageIndex)
 {
     IntPtr page = IntPtr.Zero;
     IntPtr textPage = IntPtr.Zero;
-
     try
     {
         page = api.LoadPage(document, pageIndex);
-        if (page == IntPtr.Zero)
-            return (0, 0, 0, 0, true);
-
+        if (page == IntPtr.Zero) return (0,0,0,0,0,0,0,0,"",true);
         textPage = api.TextLoadPage(page);
-        if (textPage == IntPtr.Zero)
-            return (0, 0, 0, 0, true);
+        if (textPage == IntPtr.Zero) return (0,0,0,0,0,0,0,0,"",true);
 
         int charCount = api.TextCountChars(textPage);
         int objectCount = api.PageCountObjects(page);
-        if (charCount < 0 || objectCount < 0 ||
-            charCount > 1_000_000 || objectCount > 1_000_000)
-            return (0, 0, 0, 0, true);
+        if (charCount < 0 || objectCount < 0 || charCount > 1_000_000 || objectCount > 1_000_000)
+            return (0,0,0,0,0,0,0,0,"",true);
 
         var pageObjects = new HashSet<IntPtr>();
-        for (int i = 0; i < objectCount; i++)
+        for (int i=0; i<objectCount; i++)
         {
-            IntPtr obj = api.PageGetObject(page, i);
-            if (obj != IntPtr.Zero)
-                pageObjects.Add(obj);
+            IntPtr obj = api.PageGetObject(page,i);
+            if (obj != IntPtr.Zero) pageObjects.Add(obj);
         }
 
-        var associatedObjects = new HashSet<IntPtr>();
-        int nullMappings = 0;
-        int unmatched = 0;
-
-        for (int i = 0; i < charCount; i++)
+        var associated = new HashSet<IntPtr>();
+        int nulls=0, unmatched=0, nullGenerated=0, nullNotGenerated=0, nullUnicodeZero=0, generatedTotal=0;
+        var samples = new List<string>();
+        for (int i=0; i<charCount; i++)
         {
-            IntPtr textObject = api.GetTextObject(textPage, i);
-            if (textObject == IntPtr.Zero)
+            int generated = api.IsGenerated(textPage,i);
+            if (generated == 1) generatedTotal++;
+
+            IntPtr obj = api.GetTextObject(textPage,i);
+            if (obj == IntPtr.Zero)
             {
-                nullMappings++;
+                nulls++;
+                uint unicode = api.GetUnicode(textPage,i);
+                if (unicode == 0) nullUnicodeZero++;
+                if (generated == 1) nullGenerated++;
+                else if (generated == 0) nullNotGenerated++;
+
+                if (samples.Count < 12)
+                {
+                    string cp = unicode == 0 ? "U+0000" : $"U+{unicode:X4}";
+                    string gen = generated < 0 ? "n/d" : generated == 1 ? "sim" : "não";
+                    samples.Add($"#{i}:{cp},gerado={gen}");
+                }
                 continue;
             }
 
-            associatedObjects.Add(textObject);
-            if (!pageObjects.Contains(textObject))
-                unmatched++;
+            associated.Add(obj);
+            if (!pageObjects.Contains(obj)) unmatched++;
         }
 
-        return (charCount, associatedObjects.Count, nullMappings, unmatched, false);
+        return (charCount,associated.Count,nulls,unmatched,nullGenerated,nullNotGenerated,
+            nullUnicodeZero,generatedTotal,string.Join("; ",samples),false);
     }
-    catch
-    {
-        return (0, 0, 0, 0, true);
-    }
+    catch { return (0,0,0,0,0,0,0,0,"",true); }
     finally
     {
-        if (textPage != IntPtr.Zero)
-            api.TextClosePage(textPage);
-        if (page != IntPtr.Zero)
-            api.ClosePage(page);
+        if (textPage != IntPtr.Zero) api.TextClosePage(textPage);
+        if (page != IntPtr.Zero) api.ClosePage(page);
     }
 }
-
-static string Escape(string value) =>
-    value.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
 
 static string? FindLatestEditorPdf()
 {
@@ -299,6 +308,7 @@ sealed class PdfiumApi
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate int TextCountCharsDelegate(IntPtr textPage);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate uint GetUnicodeDelegate(IntPtr textPage, int index);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate IntPtr GetTextObjectDelegate(IntPtr textPage, int index);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate int IsGeneratedDelegate(IntPtr textPage, int index);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate int PageCountObjectsDelegate(IntPtr page);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate IntPtr PageGetObjectDelegate(IntPtr page, int index);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] internal delegate uint TextObjectGetTextDelegate(IntPtr textObject, IntPtr textPage, IntPtr buffer, uint length);
@@ -314,6 +324,7 @@ sealed class PdfiumApi
     internal readonly TextCountCharsDelegate TextCountChars;
     internal readonly GetUnicodeDelegate GetUnicode;
     internal readonly GetTextObjectDelegate GetTextObject;
+    private readonly IsGeneratedDelegate? _isGenerated;
     internal readonly PageCountObjectsDelegate PageCountObjects;
     internal readonly PageGetObjectDelegate PageGetObject;
     private readonly TextObjectGetTextDelegate _textObjectGetText;
@@ -334,10 +345,15 @@ sealed class PdfiumApi
         TextCountChars = Get<TextCountCharsDelegate>("FPDFText_CountChars");
         GetUnicode = Get<GetUnicodeDelegate>("FPDFText_GetUnicode");
         GetTextObject = Get<GetTextObjectDelegate>("FPDFText_GetTextObject");
+        _isGenerated = NativeLibrary.TryGetExport(library, "FPDFText_IsGenerated", out IntPtr generatedExport)
+            ? Marshal.GetDelegateForFunctionPointer<IsGeneratedDelegate>(generatedExport)
+            : null;
         PageCountObjects = Get<PageCountObjectsDelegate>("FPDFPage_CountObjects");
         PageGetObject = Get<PageGetObjectDelegate>("FPDFPage_GetObject");
         _textObjectGetText = Get<TextObjectGetTextDelegate>("FPDFTextObj_GetText");
     }
+
+    internal int IsGenerated(IntPtr textPage, int index) => _isGenerated is null ? -1 : _isGenerated(textPage,index);
 
     internal string? GetTextObjectText(IntPtr textObject, IntPtr textPage)
     {
