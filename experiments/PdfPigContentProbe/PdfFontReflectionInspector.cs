@@ -215,7 +215,7 @@ internal static class PdfFontReflectionInspector
             if (line.Contains("endbfrange", StringComparison.Ordinal)) { inBfRange = false; continue; }
             if (!inBfChar && !inBfRange) continue;
 
-            var hex = Regex.Matches(line, "<([0-9A-Fa-f]+)>").Select(m => m.Groups[1].Value).ToArray();
+            var hex = Regex.Matches(line, "<([0-9A-Fa-f]+)>").Cast<Match>().Select(m => m.Groups[1].Value).ToArray();
             if (inBfChar)
             {
                 if (hex.Length >= 2 && TryDecodeUnicodeHex(hex[1], out string unicode))
@@ -232,7 +232,7 @@ internal static class PdfFontReflectionInspector
                 }
 
                 int sourceWidth = hex[0].Length;
-                if (line.Contains('[', StringComparison.Ordinal))
+                if (line.Contains('['))
                 {
                     int cursor = 0;
                     foreach (Match destination in Regex.Matches(line, "<([0-9A-Fa-f]+)>"))
