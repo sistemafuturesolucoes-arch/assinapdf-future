@@ -330,10 +330,17 @@ static void AddContentStream(
         resolved = objectToken.Data;
     }
 
+    if (resolved is ArrayToken nestedArray)
+    {
+        foreach (var item in nestedArray.Data)
+            AddContentStream(item, document, output);
+        return;
+    }
+
     if (resolved is StreamToken stream)
         output.Add((stream, objectId));
     else
-        Console.WriteLine($"    Conteúdo ignorado: token {resolved.GetType().Name} ({objectId}), não é StreamToken.");
+        Console.WriteLine($"    Conteúdo ignorado: token {resolved.GetType().Name} ({objectId}), não é StreamToken nem ArrayToken.");
 }
 
 static bool HasInterestingOperands(object operation)
