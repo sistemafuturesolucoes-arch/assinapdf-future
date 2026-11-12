@@ -1675,7 +1675,7 @@ public partial class EditorWindow : Window
             ApplyPdfEdit(document =>
             {
                 var page = document.Pages[pageInfo.PageIndex + 1];
-                Aspose.Pdf.Annotations.Annotation annotation = isEllipse
+                Aspose.Pdf.Annotations.MarkupAnnotation annotation = isEllipse
                     ? new Aspose.Pdf.Annotations.CircleAnnotation(
                         page, new Aspose.Pdf.Rectangle(left, bottom, right, top))
                     : new Aspose.Pdf.Annotations.SquareAnnotation(
@@ -1848,6 +1848,7 @@ public partial class EditorWindow : Window
             var page = document.Pages[pageInfo.PageIndex + 1];
 
             var shape = page.Annotations
+                .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
                 .Where(annotation =>
                     string.Equals(annotation.Subject, "AssinaPDF Editor Rectangle", StringComparison.Ordinal) ||
                     string.Equals(annotation.Subject, "AssinaPDF Editor Ellipse", StringComparison.Ordinal))
@@ -2139,8 +2140,10 @@ public partial class EditorWindow : Window
                 var page = document.Pages[pageInfo.PageIndex + 1];
                 if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
                 {
-                    var annotation = page.Annotations.FirstOrDefault(item =>
-                        string.Equals(item.Name, selectedName, StringComparison.Ordinal));
+                    var annotation = page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                        .FirstOrDefault(item =>
+                            string.Equals(item.Name, selectedName, StringComparison.Ordinal));
                     if (annotation == null)
                         throw new InvalidOperationException("A forma selecionada não existe mais no PDF.");
 
@@ -2203,8 +2206,10 @@ public partial class EditorWindow : Window
                 var page = savedDocument.Pages[pageInfo.PageIndex + 1];
                 if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
                 {
-                    var annotation = page.Annotations.FirstOrDefault(item =>
-                        string.Equals(item.Name, selectedName, StringComparison.Ordinal));
+                    var annotation = page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                        .FirstOrDefault(item =>
+                            string.Equals(item.Name, selectedName, StringComparison.Ordinal));
                     return annotation?.Rect is { } rectangle &&
                         Math.Abs(rectangle.LLX - left) < 2 &&
                         Math.Abs(rectangle.LLY - bottom) < 2 &&
@@ -2275,8 +2280,10 @@ public partial class EditorWindow : Window
             {
                 var page = savedDocument.Pages[pageIndex + 1];
                 if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
-                    return !page.Annotations.Any(item => string.Equals(
-                        item.Name, selectedName, StringComparison.Ordinal));
+                    return !page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                        .Any(item => string.Equals(
+                            item.Name, selectedName, StringComparison.Ordinal));
 
                 var absorber = new ImagePlacementAbsorber();
                 page.Accept(absorber);
