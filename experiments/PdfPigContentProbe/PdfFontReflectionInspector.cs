@@ -14,6 +14,7 @@ internal static class PdfFontReflectionInspector
             foreach (var letter in page.Letters)
             {
                 var reference = letter.Font.FontDictionaryReference;
+                if (reference is null) continue;
                 string id = reference.ObjectNumber.ToString();
                 if (!seen.Add(id)) continue;
                 Console.WriteLine($"  FONTE: {letter.FontName}; objeto={id} 0");
