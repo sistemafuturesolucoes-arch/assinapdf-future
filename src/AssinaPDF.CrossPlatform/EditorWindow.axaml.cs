@@ -1846,6 +1846,7 @@ public partial class EditorWindow : Window
             ApplyPdfEdit(document =>
             {
                 bool cidFontSwapApplied = false;
+                bool deletionByBoundsFallback = false;
                 TextFragment target;
                 if (originalBounds != null && originalText != null)
                 {
@@ -1906,11 +1907,29 @@ public partial class EditorWindow : Window
                             .FirstOrDefault()!;
 
                         if (target == null)
+                    {
+                        // Para exclusão, o Aspose pode não expor a seleção como um único
+                        // TextFragment, embora consiga remover texto pela região geométrica.
+                        // Use o mesmo mecanismo já empregado pelo comando "Excluir seleção".
+                        // Essa rota é restrita a conteúdo vazio e à caixa exata selecionada;
+                        // substituições/formatações continuam exigindo correspondência textual.
+                        if (replacementText.Length == 0)
+                        {
+                            pageAbsorber.RemoveAllText(
+                                document.Pages[pageIndex + 1], originalBounds);
+                            deletionByBoundsFallback = true;
+                        }
+                        else
+                        {
                             throw new InvalidOperationException(
                                 "O texto selecionado foi reconhecido pelo PDFium, mas o Aspose não encontrou um fragmento editável com o mesmo conteúdo. O PDF foi preservado sem alterações. " +
                                 "A seleção múltipla foi mantida para evitar substituir apenas uma letra ou apagar conteúdo vizinho.");
+                        }
+                    }
                     }
 
+                    if (!deletionByBoundsFallback)
+                    {
                     if (cidBoldOnlyEdit)
                     {
                         cidFontSwapApplied = CidFontOperatorFormatter.TryApplyBoldVariant(
@@ -1997,6 +2016,7 @@ public partial class EditorWindow : Window
                     expectedBounds = new Aspose.Pdf.Rectangle(
                         originalBounds.LLX, originalBounds.LLY,
                         originalBounds.URX, originalBounds.URY);
+                    }
             }, originalText == null
                 ? $"Texto inserido na página {pageIndex + 1}."
                 : "Texto e formatação atualizados.",
@@ -2018,16 +2038,34 @@ public partial class EditorWindow : Window
                         if (originalText == null || originalBounds == null)
                             return false;
 
-                        bool originalStillPresent = verificationAbsorber.TextFragments.Any(fragment =>
-                            string.Equals(
-                                NormalizePdfText(fragment.Text),
-                                NormalizePdfText(originalText),
-                                StringComparison.Ordinal) &&
-                            fragment.Rectangle is { } rectangle &&
-                            rectangle.URX >= originalBounds.LLX &&
-                            rectangle.LLX <= originalBounds.URX &&
-                            rectangle.URY >= originalBounds.LLY &&
-                            rectangle.LLY <= originalBounds.URY);
+                        bool originalStillPresent;
+                        if (deletionByBoundsFallback)
+                        {
+                            // RemoveAllText trabalha por região e pode deixar os
+                            // fragmentos remanescentes repartidos. Para a rota de
+                            // exclusão geométrica, confirme que não restou texto na
+                            // área selecionada, em vez de exigir um fragmento idêntico.
+                            originalStillPresent = verificationAbsorber.TextFragments.Any(fragment =>
+                                fragment.Rectangle is { } rectangle &&
+                                rectangle.URX >= originalBounds.LLX &&
+                                rectangle.LLX <= originalBounds.URX &&
+                                rectangle.URY >= originalBounds.LLY &&
+                                rectangle.LLY <= originalBounds.URY &&
+                                !string.IsNullOrWhiteSpace(fragment.Text));
+                        }
+                        else
+                        {
+                            originalStillPresent = verificationAbsorber.TextFragments.Any(fragment =>
+                                string.Equals(
+                                    NormalizePdfText(fragment.Text),
+                                    NormalizePdfText(originalText),
+                                    StringComparison.Ordinal) &&
+                                fragment.Rectangle is { } rectangle &&
+                                rectangle.URX >= originalBounds.LLX &&
+                                rectangle.LLX <= originalBounds.URX &&
+                                rectangle.URY >= originalBounds.LLY &&
+                                rectangle.LLY <= originalBounds.URY);
+                        }
 
                         return !originalStillPresent;
                     }
