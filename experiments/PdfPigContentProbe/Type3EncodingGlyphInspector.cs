@@ -126,6 +126,14 @@ internal static class Type3EncodingGlyphInspector
         var charProcNames = charProcEntries.Keys.ToHashSet(StringComparer.Ordinal);
         Console.WriteLine($"  /CharProcs: {charProcNames.Count} programas; C={(charProcNames.Contains("C") ? "PRESENTE" : "AUSENTE")}; B={(charProcNames.Contains("B") ? "PRESENTE" : "AUSENTE")}");
         var widths = ReadWidths(fontDictionary);
+        Console.WriteLine("  Mapa completo dos CharProcs disponíveis (código / nome / largura):");
+        foreach (var procName in charProcNames.OrderBy(x => x, StringComparer.Ordinal))
+        {
+            var codes = differences.Where(x => x.Name == procName).Select(x => x.Code).Distinct().OrderBy(x => x).ToArray();
+            string codeInfo = codes.Length == 0 ? "(sem código em Differences)" :
+                string.Join(", ", codes.Select(code => $"0x{code:X2}/W={FindWidth(widths, code)}"));
+            Console.WriteLine($"    /{procName}: {codeInfo}");
+        }
         var selectedBytes = Get(operation, "Bytes") is ReadOnlyMemory<byte> selectedMemory
             ? selectedMemory.ToArray()
             : Array.Empty<byte>();
