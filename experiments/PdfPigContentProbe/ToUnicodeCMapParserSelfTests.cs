@@ -89,6 +89,20 @@ internal static class ToUnicodeCMapParserSelfTests
             return result.Mappings.Count == 2 && result.MalformedEntries == 1;
         });
 
+
+        Check("whitespace inside hexadecimal strings is ignored", () =>
+        {
+            var result = ToUnicodeCMapParser.Parse("1 beginbfchar <00 01> <00 41> endbfchar");
+            return result.Mappings.TryGetValue("0001", out string? value) && value == "A";
+        });
+
+        Check("malformed bfchar pair does not shift following entries", () =>
+        {
+            var result = ToUnicodeCMapParser.Parse("2 beginbfchar <1> <0041> <02> <0042> endbfchar");
+            return result.Mappings.Count == 1 && result.Mappings["02"] == "B" &&
+                   result.MalformedEntries == 1;
+        });
+
         Check("duplicate source mapping is rejected", () =>
         {
             var result = ToUnicodeCMapParser.Parse("2 beginbfchar <01> <0041> <01> <0042> endbfchar");
