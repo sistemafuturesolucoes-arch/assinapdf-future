@@ -1,0 +1,42 @@
+name: PDFium Export Probe Build
+
+on:
+  push:
+    branches:
+      - experiment/pdf-glyph-edit-lab
+    paths:
+      - "experiments/PdfiumExportProbe/**"
+      - ".github/workflows/pdfium-export-probe.yml"
+  pull_request:
+    branches:
+      - experiment/pdf-glyph-edit-lab
+    paths:
+      - "experiments/PdfiumExportProbe/**"
+      - ".github/workflows/pdfium-export-probe.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build probe (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore experiments/PdfiumExportProbe/PdfiumExportProbe.csproj
+
+      - name: Build
+        run: dotnet build experiments/PdfiumExportProbe/PdfiumExportProbe.csproj --configuration Release --no-restore
