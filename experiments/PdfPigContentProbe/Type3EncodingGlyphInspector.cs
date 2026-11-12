@@ -120,8 +120,21 @@ internal static class Type3EncodingGlyphInspector
         Console.WriteLine($"  /Differences: {differences.Count} nomes; C={FormatCodes(differences, "C")}; B={FormatCodes(differences, "B")}");
 
         object? charProcs = ValueObject(fontDictionary, "CharProcs");
-        var charProcNames = Entries(charProcs).Select(x => x.Key.TrimStart('/')).ToHashSet(StringComparer.Ordinal);
+        var charProcEntries = Entries(charProcs).ToDictionary(x => x.Key.TrimStart('/'), x => x.Value, StringComparer.Ordinal);
+        var charProcNames = charProcEntries.Keys.ToHashSet(StringComparer.Ordinal);
         Console.WriteLine($"  /CharProcs: {charProcNames.Count} programas; C={(charProcNames.Contains("C") ? "PRESENTE" : "AUSENTE")}; B={(charProcNames.Contains("B") ? "PRESENTE" : "AUSENTE")}");
+        var selectedBytes = Get(operation, "Bytes") is ReadOnlyMemory<byte> selectedMemory
+            ? selectedMemory.ToArray()
+            : Array.Empty<byte>();
+        if (selectedBytes.Length > 0)
+        {
+            Console.WriteLine($"  Código(s) bruto(s) da seleção: {Convert.ToHexString(selectedBytes)}");
+            if (selectedBytes.Length == 1)
+                DescribeCode(selectedBytes[0], differences, charProcNames, null, charProcEntries);
+            else
+                Console.WriteLine("  Mapeamento Differences direto não aplicado: operando com mais de um byte.");
+        }
+        DumpObservedCodesForExactFont(document, selected, differences, charProcNames, charProcEntries);
 
         var widths = ReadWidths(fontDictionary);
         var cCodes = differences.Where(x => x.Name == "C").Select(x => x.Code).Distinct().ToArray();
@@ -153,6 +166,63 @@ internal static class Type3EncodingGlyphInspector
             Console.WriteLine("    " + DescribeGeometry(sample));
         Console.WriteLine("  Conclusão: presença de nome/código e CharProc é evidência estrutural; não prova equivalência visual nem autoriza reescrita.");
         Console.WriteLine();
+    }
+
+    private static void DescribeCode(int code, List<GlyphEntry> differences, HashSet<string> charProcNames,
+        List<WidthEntry>? widths, Dictionary<string, object>? charProcEntries)
+    {
+        var matches = differences.Where(x => x.Code == code).ToArray();
+        if (matches.Length != 1)
+        {
+            Console.WriteLine($"  Código 0x{code:X2}: {(matches.Length == 0 ? "sem nome em Differences" : "mapeamento ambíguo")}");
+            return;
+        }
+        string glyphName = matches[0].Name;
+        bool hasProgram = charProcNames.Contains(glyphName);
+        Console.WriteLine($"  Código 0x{code:X2} -> /{glyphName}; CharProc={(hasProgram ? "PRESENTE" : "AUSENTE")}");
+        if (widths is not null)
+            Console.WriteLine($"    Width={FindWidth(widths, code)}");
+        if (hasProgram && charProcEntries is not null &&
+            charProcEntries.TryGetValue(glyphName, out object? token))
+            Console.WriteLine($"    CharProc token={token.GetType().Name}; referência={Get(token, "Data") ?? token}");
+    }
+
+    private static void DumpObservedCodesForExactFont(PdfDocument document, Letter selected,
+        List<GlyphEntry> differences, HashSet<string> charProcNames, Dictionary<string, object> charProcEntries)
+    {
+        object? selectedDetails = Get(selected, "FontDetails");
+        object? selectedReference = Get(selectedDetails, "FontDictionaryReference");
+        string selectedObject = selectedReference?.ToString() ?? "(sem referência)";
+        Console.WriteLine($"  Fonte exata da seleção: {selectedObject}");
+        int printed = 0;
+        foreach (int pageNumber in Enumerable.Range(1, document.NumberOfPages))
+        {
+            var page = document.GetPage(pageNumber);
+            var lettersBySequence = page.Letters.GroupBy(x => x.TextSequence)
+                .ToDictionary(x => x.Key, x => x.ToArray());
+            int sequence = 0;
+            foreach (var op in page.Operations)
+            {
+                if (op.Operator is not ("Tj" or "TJ")) continue;
+                sequence++;
+                if (!lettersBySequence.TryGetValue(sequence, out var letters) || letters.Length != 1)
+                    continue;
+                var letter = letters[0];
+                if (letter.Value != "B" ||
+                    !Equals(Get(Get(letter, "FontDetails"), "FontDictionaryReference"), selectedReference))
+                    continue;
+                object? raw = Get(op, "Bytes");
+                if (raw is not ReadOnlyMemory<byte> memory || memory.Length == 0) continue;
+                Console.WriteLine($"  Amostra B na fonte exata: página={pageNumber}; seq={sequence}; bytes={Convert.ToHexString(memory.Span)}");
+                if (memory.Length == 1)
+                    DescribeCode(memory.Span[0], differences, charProcNames, null, charProcEntries);
+                printed++;
+                if (printed >= 20) break;
+            }
+            if (printed >= 20) break;
+        }
+        if (printed == 0)
+            Console.WriteLine("  Nenhuma letra B foi encontrada com a mesma referência exata de dicionário de fonte.");
     }
 
     private static string FormatCodes(IEnumerable<GlyphEntry> entries, string name)
