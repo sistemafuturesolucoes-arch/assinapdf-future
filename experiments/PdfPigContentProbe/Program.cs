@@ -11,7 +11,11 @@ Console.WriteLine($"OS: {System.Runtime.InteropServices.RuntimeInformation.OSDes
 Console.WriteLine($"Architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
 
 if (args.Contains("--self-test", StringComparer.Ordinal))
-    return ToUnicodeCMapParserSelfTests.Run();
+{
+    int cmapFailures = ToUnicodeCMapParserSelfTests.Run();
+    int mapperFailures = PdfGlyphByteMapperSelfTests.Run();
+    return cmapFailures + mapperFailures;
+}
 
 string? pdfPath = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
 if (pdfPath is null)
