@@ -49,10 +49,18 @@ public partial class EditorWindow : Window
     private double _selectedPdfX;
     private double _selectedPdfY;
     private enum EditorToolMode { Select, AddText, AddImage, DrawRectangle }
+    private enum VisualElementKind { None, Image, Rectangle }
     private EditorToolMode _toolMode = EditorToolMode.Select;
     private bool _isDraggingSelection;
     private bool _isDrawingRectangle;
     private Border? _rectanglePreview;
+    private Border? _visualSelectionBorder;
+    private VisualElementKind _selectedVisualKind;
+    private string? _selectedVisualName;
+    private int _selectedImagePlacementIndex = -1;
+    private byte[]? _selectedImageBytes;
+    private int _selectedImageRotation;
+    private (double Left, double Bottom, double Right, double Top)? _selectedVisualBounds;
     private bool _isInlineEditorOpen;
     private bool _autoTextBoxesVisible;
     private Avalonia.Point _selectionStart;
@@ -823,6 +831,10 @@ public partial class EditorWindow : Window
         if (!PdfiumPageCoordinateMapper.TryViewToPdf(point.X, point.Y, image.Bounds.Width, image.Bounds.Height,
             pageInfo.WidthPoints, pageInfo.HeightPoints, out double pdfX, out double pdfY, pageInfo.Rotation) || _document == null)
             return;
+
+        if (TrySelectVisualElementAtPoint(image, pageInfo, pdfX, pdfY))
+            return;
+
         try
         {
             // Primeiro tenta selecionar o objeto de texto inteiro do PDF (em vez
@@ -1728,12 +1740,26 @@ public partial class EditorWindow : Window
         DeleteSelectedTextButton.IsVisible = false;
         _selectedText = string.Empty;
         _selectedTextBounds = null;
+        _visualSelectionBorder = null;
+        _selectedVisualKind = VisualElementKind.None;
+        _selectedVisualName = null;
+        _selectedImagePlacementIndex = -1;
+        _selectedImageBytes = null;
+        _selectedImageRotation = 0;
+        _selectedVisualBounds = null;
+        DeleteSelectedTextButton.Content = "Excluir texto";
     }
 
     private void DeleteSelectedText_Click(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (_selectedVisualKind != VisualElementKind.None)
+        {
+            _ = DeleteSelectedVisualElementAsync();
+            return;
+        }
+
         if (_selectedPageIndex is not int pageIndex ||
             _selectedTextBounds is not { } bounds ||
             string.IsNullOrWhiteSpace(_selectedText))
