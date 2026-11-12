@@ -280,9 +280,16 @@ internal static class Type3EncodingGlyphInspector
             string hash = Convert.ToHexString(SHA256.HashData(decoded.Span));
             Console.WriteLine($"    CharProc decodificado: {decoded.Length} bytes; SHA256={hash}");
             Console.WriteLine($"    Início do programa: {preview}");
-            var metrics = Regex.Match(source, @"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+d([01])\b");
+            const string number = @"-?\d+(?:\.\d+)?";
+            var metrics = Regex.Match(source,
+                $@"(?m)^\s*(?<wx>{number})\s+(?<wy>{number})\s+(?:(?<llx>{number})\s+(?<lly>{number})\s+(?<urx>{number})\s+(?<ury>{number})\s+)?d(?<op>[01])\b");
             if (metrics.Success)
-                Console.WriteLine($"    Métrica inicial Type3: wx={metrics.Groups[1].Value}; wy={metrics.Groups[2].Value}; operador=d{metrics.Groups[3].Value}");
+            {
+                string metricSummary = $"wx={metrics.Groups["wx"].Value}; wy={metrics.Groups["wy"].Value}; operador=d{metrics.Groups["op"].Value}";
+                if (metrics.Groups["op"].Value == "1" && metrics.Groups["llx"].Success)
+                    metricSummary += $"; bbox=[{metrics.Groups["llx"].Value}, {metrics.Groups["lly"].Value}, {metrics.Groups["urx"].Value}, {metrics.Groups["ury"].Value}]";
+                Console.WriteLine("    Métrica inicial Type3: " + metricSummary);
+            }
             else
                 Console.WriteLine("    Métrica inicial Type3 d0/d1: não identificada no início do stream.");
         }
