@@ -89,6 +89,13 @@
                   ToolTip.Tip="Desenhar retângulo no PDF"/>
           <TextBlock Text="Forma" FontSize="9" Foreground="#C5CBD5"
                      HorizontalAlignment="Center"/>
+          <Button x:Name="EllipseModeButton" Content="◯"
+                  Click="EllipseMode_Click" Height="48" FontSize="23"
+                  Background="#252D39" Foreground="#E7EAF0"
+                  BorderBrush="#3B4554"
+                  ToolTip.Tip="Desenhar elipse no PDF"/>
+          <TextBlock Text="Elipse" FontSize="9" Foreground="#C5CBD5"
+                     HorizontalAlignment="Center"/>
           <Border Height="1" Background="#343C49" Margin="4,8"/>
           <TextBlock Text="ATALHOS" FontSize="8" FontWeight="Bold"
                      Foreground="#7F8998" HorizontalAlignment="Center"/>
