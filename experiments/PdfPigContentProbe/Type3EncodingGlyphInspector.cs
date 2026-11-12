@@ -144,7 +144,7 @@ internal static class Type3EncodingGlyphInspector
         Console.WriteLine("  FontMatrix: " + Value(fontDictionary, "FontMatrix"));
         Console.WriteLine("  FontBBox: " + Value(fontDictionary, "FontBBox"));
         Console.WriteLine("  Geometria da letra selecionada: " + DescribeGeometry(selected));
-        var sameFontB = document.GetPages().SelectMany(x => x.Letters)
+        var sameFontB = Enumerable.Range(1, document.NumberOfPages).SelectMany(n => document.GetPage(n).Letters)
             .Where(x => string.Equals(x.FontName, selected.FontName, StringComparison.Ordinal) && x.Value == "B")
             .Take(5).ToArray();
         Console.WriteLine($"  Amostras de 'B' extraídas na mesma fonte: {sameFontB.Length}");
