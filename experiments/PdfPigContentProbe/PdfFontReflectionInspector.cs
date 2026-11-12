@@ -329,25 +329,38 @@ internal static class PdfFontReflectionInspector
 
     private static object? ResolveToken(PdfDocument document, object token)
     {
-        if (token.GetType().Name == "IndirectReferenceToken")
+        // References and ObjectToken wrappers can be nested. Resolve/unwrap in a
+        // bounded loop, stopping only when the underlying token is reached.
+        // StreamToken and DictionaryToken are deliberately preserved.
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        for (int depth = 0; depth < 16; depth++)
         {
-            object? reference = GetProperty(token, "Data");
-            if (reference is null) return null;
-            object? resolved = ResolveReference(document, reference);
-            if (resolved is null) return null;
-            token = resolved;
+            if (!visited.Add(token)) return null;
+
+            string typeName = token.GetType().Name;
+            if (typeName == "IndirectReferenceToken")
+            {
+                object? reference = GetProperty(token, "Data");
+                if (reference is null) return null;
+                object? resolved = ResolveReference(document, reference);
+                if (resolved is null) return null;
+                token = resolved;
+                continue;
+            }
+
+            if (typeName == "ObjectToken")
+            {
+                object? inner = GetProperty(token, "Data");
+                if (inner is null || ReferenceEquals(inner, token)) return null;
+                token = inner;
+                continue;
+            }
+
+            return token;
         }
 
-        // PdfPig wraps resolved indirect objects in ObjectToken.
-        // Unwrap only this container; preserve the actual StreamToken/DictionaryToken.
-        while (token.GetType().Name == "ObjectToken")
-        {
-            object? inner = GetProperty(token, "Data");
-            if (inner is null || ReferenceEquals(inner, token)) break;
-            token = inner;
-        }
-
-        return token;
+        // A cyclic or unexpectedly deep token chain is not safe to inspect.
+        return null;
     }
 
     private static object? ResolveReference(PdfDocument document, object reference)
