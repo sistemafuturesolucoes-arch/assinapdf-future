@@ -96,7 +96,7 @@ internal static class ToUnicodeCMapParser
                 last - first > MaxRangeExpansion)
             {
                 malformed++;
-                index += 2;
+                index += 3;
                 continue;
             }
 
@@ -187,7 +187,7 @@ internal static class ToUnicodeCMapParser
     {
         hex = "";
         if (token.Length < 3 || token[0] != '<' || token[^1] != '>') return false;
-        hex = token[1..^1];
+        hex = new string(token[1..^1].Where(character => !char.IsWhiteSpace(character)).ToArray());
         return hex.Length > 0 && hex.Length % 2 == 0 &&
                hex.All(Uri.IsHexDigit);
     }
