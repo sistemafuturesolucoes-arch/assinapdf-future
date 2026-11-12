@@ -43,10 +43,10 @@ public sealed class PdfiumPageCoordinateMapperTests
     }
 
     [Theory]
-    [InlineData(0, 25, 50, 100, 200)]
-    [InlineData(1, 100, 25, 100, 200)]
-    [InlineData(2, 75, 150, 100, 200)]
-    [InlineData(3, 100, 175, 100, 200)]
+    [InlineData(0, 25, 150, 25, 50)]
+    [InlineData(1, 25, 100, 100, 25)]
+    [InlineData(2, 25, 150, 75, 150)]
+    [InlineData(3, 25, 100, 100, 175)]
     public void TryViewToPdf_MapsAllPageRotations(
         int rotation, double expectedX, double expectedY,
         double viewX, double viewY)
@@ -64,10 +64,10 @@ public sealed class PdfiumPageCoordinateMapperTests
     }
 
     [Theory]
-    [InlineData(0, 10, 20, 30, 60)]
+    [InlineData(0, 10, 120, 30, 60)]
     [InlineData(1, 20, 10, 60, 30)]
-    [InlineData(2, 70, 140, 30, 60)]
-    [InlineData(3, 140, 70, 60, 30)]
+    [InlineData(2, 60, 20, 30, 60)]
+    [InlineData(3, 120, 60, 60, 30)]
     public void PdfToViewRect_MapsBoundsForAllPageRotations(
         int rotation, double expectedX, double expectedY,
         double expectedWidth, double expectedHeight)
