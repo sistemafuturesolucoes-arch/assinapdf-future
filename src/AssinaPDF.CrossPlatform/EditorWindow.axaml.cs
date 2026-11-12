@@ -28,7 +28,7 @@ using RichRun = AvaloniaRichEditor.Documents.Run;
 
 namespace AssinaPDF.MacPrototype;
 
-internal sealed record PagePreviewInfo(int PageIndex, float WidthPoints, float HeightPoints);
+internal sealed record PagePreviewInfo(int PageIndex, float WidthPoints, float HeightPoints, int Rotation);
 
 public partial class EditorWindow : Window
 {
@@ -446,7 +446,7 @@ public partial class EditorWindow : Window
                                 {
                                     Source = bitmap,
                                     Stretch = Avalonia.Media.Stretch.Uniform,
-                                    Tag = new PagePreviewInfo(i, rendered.PageWidthPoints, rendered.PageHeightPoints)
+                                    Tag = new PagePreviewInfo(i, rendered.PageWidthPoints, rendered.PageHeightPoints, rendered.PageRotation)
                                 },
                                 new Canvas
                                 {
@@ -780,7 +780,7 @@ public partial class EditorWindow : Window
     private void SelectTextAtPoint(AvaloniaImage image, PagePreviewInfo pageInfo, Avalonia.Point point)
     {
         if (!PdfiumPageCoordinateMapper.TryViewToPdf(point.X, point.Y, image.Bounds.Width, image.Bounds.Height,
-            pageInfo.WidthPoints, pageInfo.HeightPoints, out double pdfX, out double pdfY) || _document == null)
+            pageInfo.WidthPoints, pageInfo.HeightPoints, out double pdfX, out double pdfY, pageInfo.Rotation) || _document == null)
             return;
         try
         {
@@ -868,9 +868,9 @@ public partial class EditorWindow : Window
             return;
         }
         if (!PdfiumPageCoordinateMapper.TryViewToPdf(left, top, image.Bounds.Width, image.Bounds.Height,
-                pageInfo.WidthPoints, pageInfo.HeightPoints, out double x1, out double yTop) ||
+                pageInfo.WidthPoints, pageInfo.HeightPoints, out double x1, out double yTop, pageInfo.Rotation) ||
             !PdfiumPageCoordinateMapper.TryViewToPdf(right, bottom, image.Bounds.Width, image.Bounds.Height,
-                pageInfo.WidthPoints, pageInfo.HeightPoints, out double x2, out double yBottom))
+                pageInfo.WidthPoints, pageInfo.HeightPoints, out double x2, out double yBottom, pageInfo.Rotation))
             return;
         try
         {
@@ -905,7 +905,7 @@ public partial class EditorWindow : Window
         _selectedText = text;
         _selectedTextBounds = (left, bottom, right, top);
         var rect = PdfiumPageCoordinateMapper.PdfToViewRect(left, bottom, right, top,
-            image.Bounds.Width, image.Bounds.Height, pageInfo.WidthPoints, pageInfo.HeightPoints);
+            image.Bounds.Width, image.Bounds.Height, pageInfo.WidthPoints, pageInfo.HeightPoints, pageInfo.Rotation);
         if (drawHighlight)
         {
         var highlight = new Border
@@ -1127,7 +1127,7 @@ public partial class EditorWindow : Window
             var rect = PdfiumPageCoordinateMapper.PdfToViewRect(
                 line.Left, line.Bottom, line.Right, line.Top,
                 surface.Image.Bounds.Width, surface.Image.Bounds.Height,
-                pageInfo.WidthPoints, pageInfo.HeightPoints);
+                pageInfo.WidthPoints, pageInfo.HeightPoints, pageInfo.Rotation);
 
             var box = new Border
             {
