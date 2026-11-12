@@ -37,8 +37,8 @@ public partial class EditorWindow : Window
     private string _sessionDirectory;
     private PdfiumDocument? _document;
     private readonly List<WriteableBitmap> _bitmaps = new();
-    private readonly Stack<byte[]> _undoStack = new();
-    private readonly Stack<byte[]> _redoStack = new();
+    private readonly Stack<string> _undoStack = new();
+    private readonly Stack<string> _redoStack = new();
     private readonly EditorHistoryService _history = new();
     private string? _historyEntryId;
     private readonly Dictionary<int, (AvaloniaImage Image, Canvas Overlay)> _pageSurfaces = new();
@@ -1723,8 +1723,8 @@ public partial class EditorWindow : Window
             _sessionDirectory = Path.GetDirectoryName(entry.WorkingCopyPath)
                 ?? throw new InvalidOperationException("Não foi possível localizar a pasta de trabalho.");
             _historyEntryId = entry.Id;
-            _undoStack.Clear();
-            _redoStack.Clear();
+            ClearHistoryStack(_undoStack);
+            ClearHistoryStack(_redoStack);
             DocumentNameText.Text = Path.GetFileName(source);
             Title = $"AssinaPDF | Editor - {Path.GetFileName(source)}";
             await VerifyDocumentFontsAsync();
@@ -4158,10 +4158,18 @@ public partial class EditorWindow : Window
         Func<Document, bool>? verifySavedDocument = null)
     {
         string outputPath = Path.Combine(_sessionDirectory, $"edit-{Guid.NewGuid():N}.pdf");
-        byte[] before = File.ReadAllBytes(_workingCopyPath);
+        string historySnapshotPath = Path.Combine(
+            _sessionDirectory, $"undo-{Guid.NewGuid():N}.pdf");
+        bool snapshotCreated = false;
+        bool snapshotStored = false;
 
         try
         {
+            // O histórico usa arquivos temporários, não arrays de bytes em RAM.
+            // Assim, desfazer/refazer não mantém até dez PDFs completos na memória.
+            File.Copy(_workingCopyPath, historySnapshotPath, overwrite: false);
+            snapshotCreated = true;
+
             using (var document = Document.Open(_workingCopyPath))
             {
                 edit(document);
@@ -4171,9 +4179,6 @@ public partial class EditorWindow : Window
             if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
                 throw new IOException("A biblioteca não gerou um PDF de saída válido.");
 
-            // Reabre o arquivo efetivamente gravado antes de substituir a cópia de trabalho.
-            // Isso impede que uma gravação aparentemente concluída, mas sem a alteração,
-            // seja apresentada ao usuário como sucesso.
             using (var savedDocument = Document.Open(outputPath))
             {
                 if (savedDocument.Pages.Count == 0)
@@ -4181,24 +4186,23 @@ public partial class EditorWindow : Window
 
                 if (verifySavedDocument != null && !verifySavedDocument(savedDocument))
                     throw new IOException(
-                        "O PDF foi gerado, mas o texto ou a formatação não foram preservados no arquivo salvo. A cópia anterior foi preservada.");
+                        "O PDF foi gerado, mas o texto, elemento ou formatação não foi preservado no arquivo salvo. A cópia anterior foi preservada.");
             }
 
-            // A leitura pelo Aspose não basta: o arquivo final também precisa
-            // continuar válido para o mesmo PDFium usado na visualização.
-            // Renderizamos todas as páginas em baixa resolução antes de trocar
-            // a cópia de trabalho; se uma página falhar, o arquivo anterior fica intacto.
+            // O arquivo precisa abrir e renderizar em todas as páginas no PDFium
+            // antes de substituir a cópia de trabalho.
             ValidatePdfWithPdfium(outputPath);
 
             _document?.Dispose();
             _document = null;
 
-            // A substituição ocorre somente depois da validação do arquivo de saída.
             File.Move(outputPath, _workingCopyPath, true);
             if (!string.IsNullOrWhiteSpace(_historyEntryId))
                 _history.Touch(_historyEntryId);
-            PushHistory(_undoStack, before);
-            _redoStack.Clear();
+
+            PushHistory(_undoStack, historySnapshotPath);
+            snapshotStored = true;
+            ClearHistoryStack(_redoStack);
             LoadDocumentPreview();
 
             EditorStatusText.Text = successMessage +
@@ -4209,6 +4213,12 @@ public partial class EditorWindow : Window
         {
             try { if (File.Exists(outputPath)) File.Delete(outputPath); }
             catch { /* Limpeza temporária best-effort. */ }
+
+            if (snapshotCreated && !snapshotStored)
+            {
+                try { if (File.Exists(historySnapshotPath)) File.Delete(historySnapshotPath); }
+                catch { /* Limpeza temporária best-effort. */ }
+            }
         }
     }
 
@@ -4230,16 +4240,46 @@ public partial class EditorWindow : Window
         }
     }
 
-    private static void PushHistory(Stack<byte[]> stack, byte[] snapshot)
+    private static void PushHistory(Stack<string> stack, string snapshotPath)
     {
-        stack.Push(snapshot);
+        stack.Push(snapshotPath);
         if (stack.Count <= 10)
             return;
 
-        var keep = stack.Take(10).Reverse().ToArray();
+        string[] entries = stack.ToArray();
         stack.Clear();
-        foreach (var item in keep)
-            stack.Push(item);
+        foreach (string retained in entries.Take(10).Reverse())
+            stack.Push(retained);
+
+        foreach (string obsolete in entries.Skip(10))
+        {
+            try
+            {
+                if (File.Exists(obsolete))
+                    File.Delete(obsolete);
+            }
+            catch
+            {
+                // A falha ao limpar um snapshot antigo não deve cancelar a edição atual.
+            }
+        }
+    }
+
+    private static void ClearHistoryStack(Stack<string> stack)
+    {
+        foreach (string snapshot in stack)
+        {
+            try
+            {
+                if (File.Exists(snapshot))
+                    File.Delete(snapshot);
+            }
+            catch
+            {
+                // Limpeza best-effort ao trocar/fechar documento.
+            }
+        }
+        stack.Clear();
     }
 
     private void Undo_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -4262,30 +4302,71 @@ public partial class EditorWindow : Window
         RestoreHistory(_redoStack, _undoStack, "Alteração refeita.");
     }
 
-    private void RestoreHistory(Stack<byte[]> source, Stack<byte[]> destination, string message)
+    private void RestoreHistory(
+        Stack<string> source,
+        Stack<string> destination,
+        string message)
     {
-        string restorePath = Path.Combine(_sessionDirectory, $"history-{Guid.NewGuid():N}.pdf");
+        if (source.Count == 0)
+            return;
+
+        string targetSnapshot = source.Pop();
+        string currentSnapshot = Path.Combine(
+            _sessionDirectory, $"history-current-{Guid.NewGuid():N}.pdf");
+        string restorePath = Path.Combine(
+            _sessionDirectory, $"history-restore-{Guid.NewGuid():N}.pdf");
+        bool destinationStored = false;
+        bool targetConsumed = false;
+
         try
         {
-            byte[] current = File.ReadAllBytes(_workingCopyPath);
-            byte[] target = source.Pop();
-            File.WriteAllBytes(restorePath, target);
+            File.Copy(_workingCopyPath, currentSnapshot, overwrite: false);
+            File.Copy(targetSnapshot, restorePath, overwrite: false);
+            ValidatePdfWithPdfium(restorePath);
 
             _document?.Dispose();
             _document = null;
-            File.Copy(restorePath, _workingCopyPath, true);
-            PushHistory(destination, current);
+            File.Move(restorePath, _workingCopyPath, overwrite: true);
+
+            PushHistory(destination, currentSnapshot);
+            destinationStored = true;
+
+            if (File.Exists(targetSnapshot))
+                File.Delete(targetSnapshot);
+            targetConsumed = true;
+
+            if (!string.IsNullOrWhiteSpace(_historyEntryId))
+                _history.Touch(_historyEntryId);
+
             LoadDocumentPreview();
             EditorStatusText.Text = message + " O PDF original permanece preservado.";
         }
         catch (Exception ex)
         {
-            EditorStatusText.Text = $"Não foi possível restaurar a versão: {ex.Message}";
+            if (!targetConsumed && File.Exists(targetSnapshot))
+                source.Push(targetSnapshot);
+
+            EditorStatusText.Text =
+                $"Não foi possível restaurar a versão; o estado anterior foi preservado. {ex.Message}";
         }
         finally
         {
-            try { if (File.Exists(restorePath)) File.Delete(restorePath); }
+            try
+            {
+                if (File.Exists(restorePath))
+                    File.Delete(restorePath);
+            }
             catch { /* Limpeza temporária best-effort. */ }
+
+            if (!destinationStored)
+            {
+                try
+                {
+                    if (File.Exists(currentSnapshot))
+                        File.Delete(currentSnapshot);
+                }
+                catch { /* Limpeza temporária best-effort. */ }
+            }
         }
     }
 
@@ -4363,6 +4444,8 @@ public partial class EditorWindow : Window
 
     private void DisposeResources()
     {
+        ClearHistoryStack(_undoStack);
+        ClearHistoryStack(_redoStack);
         _document?.Dispose();
         _document = null;
         foreach (var bitmap in _bitmaps)
