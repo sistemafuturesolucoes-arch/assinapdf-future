@@ -41,6 +41,7 @@ public partial class EditorWindow : Window
     private readonly Stack<string> _redoStack = new();
     private readonly EditorHistoryService _history = new();
     private string? _historyEntryId;
+    private bool _hasExistingSignatures;
     private readonly Dictionary<int, (AvaloniaImage Image, Canvas Overlay)> _pageSurfaces = new();
     private readonly Dictionary<int, (Grid Surface, double Width, double Height)> _pageLayouts = new();
     private readonly Dictionary<int, Border> _pageCards = new();
@@ -153,6 +154,7 @@ public partial class EditorWindow : Window
         try
         {
             LoadDocumentPreview();
+            await AuditDocumentSignaturesAsync();
             // Preserve the result/warning produced by VerifyDocumentFontsAsync.
             // It is more useful than replacing it with a generic "opened" message.
         }
@@ -160,6 +162,38 @@ public partial class EditorWindow : Window
         {
             DisposeResources();
             throw;
+        }
+    }
+
+    private async Task AuditDocumentSignaturesAsync()
+    {
+        if (!File.Exists(_workingCopyPath))
+            return;
+
+        try
+        {
+            byte[] pdfBytes = await File.ReadAllBytesAsync(_workingCopyPath);
+            var signingService = new PdfSigningService();
+            var results = await signingService.ValidateAsync(pdfBytes);
+
+            _hasExistingSignatures = results.Count > 0;
+            if (results.Count == 0)
+                return;
+
+            int intact = results.Count(result =>
+                result.IsIntegrityValid && result.IsSignatureValid);
+            int notConfirmed = results.Count - intact;
+
+            EditorStatusText.Text = notConfirmed == 0
+                ? $"Auditoria concluída: {results.Count} assinatura(s) digital(is) confirmada(s). O original será preservado; qualquer edição afeta somente a cópia de trabalho e pode invalidar essas assinaturas."
+                : $"ATENÇÃO: o PDF contém {results.Count} assinatura(s); {notConfirmed} não tiveram integridade/validade confirmada. O arquivo original permanece preservado.";
+        }
+        catch (Exception ex)
+        {
+            _hasExistingSignatures = false;
+            EditorStatusText.Text =
+                "Não foi possível concluir a auditoria das assinaturas digitais. O PDF original permanece preservado. " +
+                ex.Message;
         }
     }
 
@@ -1741,6 +1775,7 @@ public partial class EditorWindow : Window
             Title = $"AssinaPDF | Editor - {Path.GetFileName(source)}";
             await VerifyDocumentFontsAsync();
             LoadDocumentPreview();
+            await AuditDocumentSignaturesAsync();
             // Keep the font-audit result (including download/substitution warnings)
             // visible after the page preview is rendered. Do not overwrite it with
             // a generic success message here.
@@ -4219,7 +4254,10 @@ public partial class EditorWindow : Window
 
             EditorStatusText.Text = successMessage +
                 " Alteração gravada e visualização atualizada. O PDF original permanece intacto. " +
-                "Atenção: qualquer alteração pode invalidar assinaturas digitais já existentes neste PDF.";
+                (_hasExistingSignatures
+                    ? "ATENÇÃO: este documento possuía assinaturas digitais; a cópia editada pode ter perdido a validade criptográfica. O arquivo original não foi alterado."
+                    : "Qualquer alteração pode invalidar assinaturas digitais existentes no PDF.");
+            _ = AuditDocumentSignaturesAsync();
         }
         finally
         {
