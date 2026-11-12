@@ -280,7 +280,7 @@ internal static class PdfiumNative
     internal static extern double TextGetCharacterFontSize(IntPtr textPage, int index);
 
     [DllImport(LibraryName, EntryPoint = "FPDFText_GetCharBox", CallingConvention = NativeCallingConvention)]
-    internal static extern void TextGetCharBox(IntPtr textPage, int index, out double left, out double right, out double bottom, out double top);
+    internal static extern int TextGetCharBox(IntPtr textPage, int index, out double left, out double right, out double bottom, out double top);
 
     // API experimental do PDFium: alguns builds podem não exportá-la.
     [DllImport(LibraryName, EntryPoint = "FPDFText_GetFontInfo", CallingConvention = NativeCallingConvention)]
