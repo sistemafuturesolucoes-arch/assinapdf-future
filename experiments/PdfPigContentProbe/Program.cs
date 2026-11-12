@@ -10,6 +10,9 @@ Console.WriteLine("AssinaPDF - PDF content operation / glyph sequence probe");
 Console.WriteLine($"OS: {System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
 Console.WriteLine($"Architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
 
+if (args.Contains("--self-test", StringComparer.Ordinal))
+    return ToUnicodeCMapParserSelfTests.Run();
+
 string? pdfPath = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
 if (pdfPath is null)
 {
