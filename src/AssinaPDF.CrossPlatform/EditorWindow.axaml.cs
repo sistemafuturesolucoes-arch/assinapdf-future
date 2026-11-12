@@ -2253,8 +2253,10 @@ public partial class EditorWindow : Window
                 var page = document.Pages[pageIndex + 1];
                 if (kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse)
                 {
-                    var annotation = page.Annotations.FirstOrDefault(item =>
-                        string.Equals(item.Name, selectedName, StringComparison.Ordinal));
+                    var annotation = page.Annotations
+                        .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                        .FirstOrDefault(item =>
+                            string.Equals(item.Name, selectedName, StringComparison.Ordinal));
                     if (annotation == null)
                         throw new InvalidOperationException("A forma selecionada não existe mais.");
                     page.Annotations.Delete(annotation);
