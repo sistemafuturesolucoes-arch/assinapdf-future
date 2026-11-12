@@ -36,7 +36,7 @@ try
             .ToDictionary(group => group.Key, group => group.ToArray());
 
         int sequence = 0;
-        int pageTextOps = 0, pageMapped = 0, pageUnmapped = 0, pageInterestingOperands = 0;
+        int pageTextOps = 0, pageMapped = 0, pageUnmapped = 0, pageInterestingOperands = 0, pageTjOps = 0, pageTjArrayOps = 0;
         var seenSequences = new HashSet<int>();
 
         Console.WriteLine($"PÁGINA {pageNumber}: {page.Letters.Count} glifos/letras; {page.Operations.Count} operações totais");
@@ -47,6 +47,8 @@ try
 
             sequence++;
             pageTextOps++;
+            if (operation.Operator == "Tj") pageTjOps++;
+            if (operation.Operator == "TJ") pageTjArrayOps++;
             seenSequences.Add(sequence);
             lettersBySequence.TryGetValue(sequence, out var letters);
             int count = letters?.Length ?? 0;
@@ -60,7 +62,11 @@ try
             if (HasInterestingOperands(operation))
             {
                 pageInterestingOperands++;
-                Console.WriteLine($"       OPERANDO INTERESSANTE: {DescribeOperands(operation)}");
+                if (pageInterestingOperands <= 30)
+                {
+                    string fonts = letters is null ? "(sem letra)" : string.Join(",", letters.Select(x => x.FontName).Distinct());
+                    Console.WriteLine($"       OPERANDO: fonte={fonts}; {DescribeOperands(operation)}");
+                }
             }
         }
 
@@ -73,7 +79,9 @@ try
         totalMappedLetters += pageMapped;
         totalUnmappedLetters += pageUnmapped;
 
-        Console.WriteLine($"  RESUMO página {pageNumber}: operações Tj/TJ={pageTextOps}; letras associadas={pageMapped}; letras sem operação Tj/TJ visível nesta página={pageUnmapped}; operandos com múltiplos bytes/arrays TJ={pageInterestingOperands}");
+        Console.WriteLine($"  RESUMO página {pageNumber}: Tj={pageTjOps}; TJ={pageTjArrayOps}; letras associadas={pageMapped}; letras sem operação visível={pageUnmapped}; operandos com múltiplos bytes/arrays={pageInterestingOperands}");
+        if (pageInterestingOperands > 30)
+            Console.WriteLine($"  (mostrados somente os primeiros 30 de {pageInterestingOperands} operandos interessantes)");
         Console.WriteLine();
     }
 
@@ -117,7 +125,7 @@ static string DescribeOperands(object operation)
 
     var bytesValue = type.GetProperty("Bytes", BindingFlags.Public | BindingFlags.Instance)?.GetValue(operation);
     if (bytesValue is ReadOnlyMemory<byte> bytes)
-        parts.Add($"HexBytes={Convert.ToHexString(bytes.Span[..Math.Min(bytes.Length, 48)])}{(bytes.Length > 48 ? "..." : "")}");
+        parts.Add($"BytesLength={bytes.Length}; HexBytes={Convert.ToHexString(bytes.Span[..Math.Min(bytes.Length, 48)])}{(bytes.Length > 48 ? "..." : "")}");
 
     var arrayValue = type.GetProperty("Array", BindingFlags.Public | BindingFlags.Instance)?.GetValue(operation);
     if (arrayValue is System.Collections.IEnumerable items)
