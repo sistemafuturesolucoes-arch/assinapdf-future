@@ -1,3 +1,5 @@
+using System.Text;
+
 internal sealed record PdfGlyphTokenRewritePlan(
     byte[] RewrittenToken,
     int DecodedByteOffset,
