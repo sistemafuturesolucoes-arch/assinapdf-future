@@ -1394,6 +1394,7 @@ public partial class MainWindow : Window
 
                 if (placement.PageWidthPoints <= 0 ||
                     placement.PageHeightPoints <= 0 ||
+                    placement.PageRotation is < 0 or > 3 ||
                     placement.NormalizedX < 0 ||
                     placement.NormalizedX > 1 ||
                     placement.NormalizedY < 0 ||
@@ -1407,12 +1408,37 @@ public partial class MainWindow : Window
                         $"A posição {i + 1} contém coordenadas inválidas.");
                 }
 
-                float pdfX = (float)(
-                    placement.NormalizedX * placement.PageWidthPoints);
+                double displayWidthPoints = placement.PageRotation is 1 or 3
+                    ? placement.PageHeightPoints
+                    : placement.PageWidthPoints;
+                double displayHeightPoints = placement.PageRotation is 1 or 3
+                    ? placement.PageWidthPoints
+                    : placement.PageHeightPoints;
 
-                float pdfY = (float)(
-                    (1.0 - placement.NormalizedY - placement.NormalizedHeight) *
-                    placement.PageHeightPoints);
+                double viewLeft = placement.NormalizedX * displayWidthPoints;
+                double viewTop = placement.NormalizedY * displayHeightPoints;
+                double viewRight =
+                    (placement.NormalizedX + placement.NormalizedWidth) * displayWidthPoints;
+                double viewBottom =
+                    (placement.NormalizedY + placement.NormalizedHeight) * displayHeightPoints;
+
+                if (!PdfiumPageCoordinateMapper.TryViewToPdf(
+                        viewLeft, viewTop,
+                        displayWidthPoints, displayHeightPoints,
+                        placement.PageWidthPoints, placement.PageHeightPoints,
+                        out double firstPdfX, out double firstPdfY, placement.PageRotation) ||
+                    !PdfiumPageCoordinateMapper.TryViewToPdf(
+                        viewRight, viewBottom,
+                        displayWidthPoints, displayHeightPoints,
+                        placement.PageWidthPoints, placement.PageHeightPoints,
+                        out double secondPdfX, out double secondPdfY, placement.PageRotation))
+                {
+                    throw new InvalidOperationException(
+                        $"Não foi possível converter a posição da assinatura {i + 1} para coordenadas PDF.");
+                }
+
+                float pdfX = (float)Math.Min(firstPdfX, secondPdfX);
+                float pdfY = (float)Math.Min(firstPdfY, secondPdfY);
 
                 StatusText.Text =
                     $"Aplicando assinatura {i + 1} de {placements.Length}...";
