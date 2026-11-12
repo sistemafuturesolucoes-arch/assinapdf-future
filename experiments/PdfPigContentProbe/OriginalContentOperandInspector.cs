@@ -43,6 +43,7 @@ internal static class OriginalContentOperandInspector
                 var bytes = decoded.ToArray();
                 var legacyOperands = FindTjOperands(bytes).ToArray();
                 var scannerResult = PdfContentStreamTokenScanner.Scan(bytes);
+                bool scannerAgrees = false;
                 if (scannerResult.IsComplete)
                 {
                     scannerCompleteStreams++;
@@ -63,7 +64,10 @@ internal static class OriginalContentOperandInspector
                     }
 
                     if (streamMismatches == 0)
+                    {
+                        scannerAgrees = true;
                         scannerMatchedOperands += scannerResult.TjOperands.Count;
+                    }
                     else
                     {
                         scannerMismatchedStreams++;
@@ -84,7 +88,7 @@ internal static class OriginalContentOperandInspector
                     if (samples.Count < 40)
                          samples.Add(new LocatedOperand(pageNumber, id, item.Start, item.Bytes.Length, item.Kind, Convert.ToHexString(item.Bytes), Convert.ToHexString(bytes.AsSpan(item.Start, item.End - item.Start)), GetContextHex(bytes, item.Start, item.End)));
                 }
-                Console.WriteLine($"    SCANNER stream {id}: completo={(scannerResult.IsComplete ? "SIM" : "NÃO")}; Tj scanner={scannerResult.TjOperands.Count}; Tj referência={legacyOperands.Length}; status={(scannerResult.IsComplete && scannerResult.TjOperands.Count == legacyOperands.Length ? "contagem igual (bytes/offsets verificados no agregado)" : "revisar")}");
+                Console.WriteLine($"    SCANNER stream {id}: completo={(scannerResult.IsComplete ? "SIM" : "NÃO")}; Tj scanner={scannerResult.TjOperands.Count}; Tj referência={legacyOperands.Length}; status={(scannerAgrees ? "offsets/tipo/bytes idênticos" : "REJEITADO / revisar")}");
                 totalParsed++;
             }
 
