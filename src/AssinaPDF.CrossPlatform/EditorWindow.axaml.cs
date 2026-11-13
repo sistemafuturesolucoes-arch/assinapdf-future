@@ -212,6 +212,16 @@ public partial class EditorWindow : Window
         if (command)
             return;
 
+        if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
+        {
+            double step = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 10 : 1;
+            double deltaX = e.Key == Key.Left ? -step : e.Key == Key.Right ? step : 0;
+            double deltaY = e.Key == Key.Up ? -step : e.Key == Key.Down ? step : 0;
+            if (MoveSelectedElementByKeyboard(deltaX, deltaY))
+                e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.V:
@@ -227,6 +237,49 @@ public partial class EditorWindow : Window
                 e.Handled = true;
                 break;
         }
+    }
+
+    private bool MoveSelectedElementByKeyboard(double deltaXPoints, double deltaYPoints)
+    {
+        if (_selectedPageIndex is not int pageIndex ||
+            !_pageSurfaces.TryGetValue(pageIndex, out var surface) ||
+            surface.Image.Tag is not PagePreviewInfo pageInfo ||
+            surface.Image.Bounds.Width <= 0 ||
+            surface.Image.Bounds.Height <= 0)
+            return false;
+
+        bool rotated = pageInfo.Rotation is 90 or 270;
+        double visibleWidthPoints = rotated ? pageInfo.HeightPoints : pageInfo.WidthPoints;
+        double visibleHeightPoints = rotated ? pageInfo.WidthPoints : pageInfo.HeightPoints;
+        double scaleX = surface.Image.Bounds.Width / visibleWidthPoints;
+        double scaleY = surface.Image.Bounds.Height / visibleHeightPoints;
+        double deltaViewX = deltaXPoints * scaleX;
+        // Editor coordinates grow downward; PDF top-left Y moves opposite to PDF Y.
+        double deltaViewY = -deltaYPoints * scaleY;
+
+        if (_selectedVisualKind != VisualElementKind.None &&
+            _visualSelectionBorder is { } border)
+        {
+            double left = Canvas.GetLeft(border);
+            double top = Canvas.GetTop(border);
+            if (!double.IsFinite(left) || !double.IsFinite(top))
+                return false;
+
+            ApplyVisualElementBounds(
+                pageInfo, surface.Image,
+                left + deltaViewX, top + deltaViewY,
+                border.Width, border.Height);
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_selectedText) &&
+            _selectedTextBounds.HasValue)
+        {
+            _ = MoveSelectedTextAsync(pageInfo, surface.Image, deltaViewX, deltaViewY);
+            return true;
+        }
+
+        return false;
     }
 
     private void TextTool_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
