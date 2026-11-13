@@ -20,7 +20,8 @@ const A4={width:595.28,height:841.89};
 const uid=()=>crypto.randomUUID();
 const fontFor=(f:Font,b:boolean,i:boolean)=>f==="Times"?(b?(i?StandardFonts.TimesRomanBoldItalic:StandardFonts.TimesRomanBold):(i?StandardFonts.TimesRomanItalic:StandardFonts.TimesRoman)):f==="Courier"?(b?(i?StandardFonts.CourierBoldOblique:StandardFonts.CourierBold):(i?StandardFonts.CourierOblique:StandardFonts.Courier)):(b?(i?StandardFonts.HelveticaBoldOblique:StandardFonts.HelveticaBold):(i?StandardFonts.HelveticaOblique:StandardFonts.Helvetica));
 
-type PdfFontMetadata = { name?: string; psName?: string; fallbackName?: string; fontFamily?: string; fontName?: string; loadedName?: string; originalName?: string; bold?: boolean; italic?: boolean; fontWeight?: number };\ntype DetectedPdfFont = { family: string; style: string; pages: number[] };
+type PdfFontMetadata = { name?: string; psName?: string; fallbackName?: string; fontFamily?: string; fontName?: string; loadedName?: string; originalName?: string; bold?: boolean; italic?: boolean; fontWeight?: number };
+type DetectedPdfFont = { family: string; style: string; pages: number[] };
 function normalizePdfFontFamily(raw: string): string {
  const name = raw.replace(/^[A-Z]{6}\+/, "").trim();
  const known: [RegExp,string][] = [
@@ -42,15 +43,24 @@ function normalizePdfFontFamily(raw: string): string {
  ];
  return known.find(([pattern])=>pattern.test(name))?.[1] ?? name;
 }
-function readOriginalPdfFont(page: unknown, fontName: string, styleFamily?: string): string | undefined {
+function readOriginalPdfFontDetails(page: unknown, fontName: string, styleFamily?: string): { family: string; style: string } | undefined {
  try {
   const commonObjs = (page as { commonObjs?: { get?: (id: string) => unknown } }).commonObjs;
   const metadata = commonObjs?.get?.(fontName) as PdfFontMetadata | undefined;
-  const raw = metadata?.name || metadata?.psName || metadata?.fallbackName;
-  if (raw && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(raw.trim())) return normalizePdfFontFamily(raw);
+  const raw = metadata?.name || metadata?.psName || metadata?.originalName || metadata?.fontName || metadata?.fallbackName || metadata?.fontFamily;
+  if (raw && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(raw.trim())) {
+   const clean = raw.replace(/^[A-Z]{6}\+/, "").trim();
+   const bold = metadata?.bold === true || /bold|demi|semibold/i.test(clean) || (typeof metadata?.fontWeight === "number" && metadata.fontWeight >= 600);
+   const italic = metadata?.italic === true || /italic|oblique/i.test(clean);
+   const base = clean.replace(/[-_ ]?(bold|demi|semibold|italic|oblique|regular|medium|light|book|mt)$/ig, "").replace(/[-_ ]?(bold|italic|oblique)$/ig, "");
+   return { family: normalizePdfFontFamily(base || clean), style: bold && italic ? "Negrito itálico" : bold ? "Negrito" : italic ? "Itálico" : "Regular" };
+  }
  } catch { /* PDF.js may not have resolved font metadata for this object. */ }
- if (styleFamily && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(styleFamily.trim())) return styleFamily;
+ if (styleFamily && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(styleFamily.trim())) return { family: styleFamily, style: "Estilo não identificado" };
  return undefined;
+}
+function readOriginalPdfFont(page: unknown, fontName: string, styleFamily?: string): string | undefined {
+ return readOriginalPdfFontDetails(page, fontName, styleFamily)?.family;
 }
 const colorFor=(v:string)=>{const n=parseInt(v.slice(1),16);return rgb(((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255)};
 function PageCanvas({doc,index,info,zoom}:{doc:PDFDocumentProxy|null;index:number;info:PageInfo;zoom:number}){
