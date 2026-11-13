@@ -254,8 +254,8 @@ public partial class EditorWindow : Window
         double scaleX = surface.Image.Bounds.Width / visibleWidthPoints;
         double scaleY = surface.Image.Bounds.Height / visibleHeightPoints;
         double deltaViewX = deltaXPoints * scaleX;
-        // Editor coordinates grow downward; PDF top-left Y moves opposite to PDF Y.
-        double deltaViewY = -deltaYPoints * scaleY;
+        // Keyboard arrows use the same top-left coordinate convention as the Lovable editor.
+        double deltaViewY = deltaYPoints * scaleY;
 
         if (_selectedVisualKind != VisualElementKind.None &&
             _visualSelectionBorder is { } border)
