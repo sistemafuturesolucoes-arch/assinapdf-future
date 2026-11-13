@@ -64,9 +64,7 @@
 
 .paragraph-edit{width:100%;margin:0 0 10px;padding:8px 9px;border:1px solid #d8cfea;border-radius:6px;background:#f5f1fc;color:#5832a8;font-size:11px;font-weight:600;cursor:pointer}
 
-/* Selection mode: expose precise text-line and paragraph hit areas. */
-.element.text-element{display:block;box-sizing:border-box;cursor:text;user-select:none}
-.element.text-box-visible:not(.selected){outline:1px dashed #9b91b2;outline-offset:0}
-.paragraph-box{position:absolute;z-index:2;pointer-events:none;border:1px solid #8d79b5;border-radius:2px;background:#7654c508;box-sizing:border-box}
+/* Keep original PDF artwork clean; selection outlines appear only on the chosen object. */
+.element.text-element{display:block;box-sizing:border-box;cursor:text;user-select:none;background:transparent;outline:none}
 .element.image-element{cursor:move;pointer-events:auto;touch-action:none}
 .element.image-element img{pointer-events:none}
