@@ -4674,10 +4674,36 @@ public partial class EditorWindow : Window
         return family.Trim();
     }
 
+    private void AddPage_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            int newPageCount = 0;
+            ApplyPdfEdit(document =>
+            {
+                var lastPage = document.Pages[document.Pages.Count];
+                double width = lastPage.Rect.Width;
+                double height = lastPage.Rect.Height;
+                var newPage = document.Pages.Add();
+                newPage.SetPageSize(width, height);
+                newPageCount = document.Pages.Count;
+            }, "Nova página adicionada ao final do documento.",
+            savedDocument => savedDocument.Pages.Count == newPageCount,
+            allowPageCountChange: true);
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text = "Não foi possível adicionar a página. " + ex.Message;
+        }
+    }
+
     private void ApplyPdfEdit(
         Action<Document> edit,
         string successMessage,
-        Func<Document, bool>? verifySavedDocument = null)
+        Func<Document, bool>? verifySavedDocument = null,
+        bool allowPageCountChange = false)
     {
         string outputPath = Path.Combine(_sessionDirectory, $"edit-{Guid.NewGuid():N}.pdf");
         string historySnapshotPath = Path.Combine(
@@ -4685,6 +4711,7 @@ public partial class EditorWindow : Window
         bool snapshotCreated = false;
         bool snapshotStored = false;
         int originalPageCount;
+        int expectedPageCount;
 
         try
         {
@@ -4697,6 +4724,9 @@ public partial class EditorWindow : Window
             {
                 originalPageCount = document.Pages.Count;
                 edit(document);
+                expectedPageCount = document.Pages.Count;
+                if (!allowPageCountChange && expectedPageCount != originalPageCount)
+                    throw new IOException("Esta operação não pode alterar a quantidade de páginas.");
                 document.Save(outputPath);
             }
 
@@ -4707,9 +4737,9 @@ public partial class EditorWindow : Window
             {
                 if (savedDocument.Pages.Count == 0)
                     throw new IOException("O PDF gerado não contém páginas.");
-                if (savedDocument.Pages.Count != originalPageCount)
+                if (savedDocument.Pages.Count != expectedPageCount)
                     throw new IOException(
-                        "A edição alterou inesperadamente a quantidade de páginas. A cópia anterior foi preservada.");
+                        "A quantidade de páginas do PDF salvo não corresponde à alteração solicitada. A cópia anterior foi preservada.");
 
                 if (verifySavedDocument != null && !verifySavedDocument(savedDocument))
                     throw new IOException(
@@ -4718,7 +4748,7 @@ public partial class EditorWindow : Window
 
             // O arquivo precisa abrir e renderizar em todas as páginas no PDFium
             // antes de substituir a cópia de trabalho.
-            ValidatePdfWithPdfium(outputPath, originalPageCount);
+            ValidatePdfWithPdfium(outputPath, expectedPageCount);
 
             _document?.Dispose();
             _document = null;
