@@ -10,6 +10,15 @@ namespace AssinaPDF.CrossPlatform.Tests;
 public sealed class PdfTextFormattingTests
 {
     [Theory]
+    [InlineData("Helvetica")]
+    [InlineData("Times")]
+    [InlineData("Courier")]
+    public void TypecraftStandardFontFamilies_AreAvailableWithoutSystemDownloads(string family)
+    {
+        Assert.True(FontDownloadService.IsAvailable(family));
+    }
+
+    [Theory]
     [InlineData("BQVIXP+VerdanaBold", "Verdana")]
     [InlineData("Verdana-Bold", "Verdana")]
     [InlineData("Verdana-BoldItalic", "Verdana")]
