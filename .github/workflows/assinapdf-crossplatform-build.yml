@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - integracao-assinapdf-crossplatform
+      - feature/documento-pdf-editavel
     paths:
       - 'src/AssinaPDF.CrossPlatform/**'
       - 'tests/AssinaPDF.CrossPlatform.Tests/**'
