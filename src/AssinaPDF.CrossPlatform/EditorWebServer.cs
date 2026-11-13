@@ -105,7 +105,7 @@ internal sealed class EditorWebServer : IAsyncDisposable
 
     private static async Task WriteResponseAsync(Stream stream, int status, string reason, string contentType, byte[] body, CancellationToken token, int? contentLength = null)
     {
-        var header = Encoding.ASCII.GetBytes($"HTTP/1.1 {status} {reason}\r\nContent-Type: {contentType}\r\nContent-Length: {contentLength ?? body.Length}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n");
+        var header = Encoding.ASCII.GetBytes($"HTTP/1.1 {status} {reason}\r\nContent-Type: {contentType}\r\nContent-Length: {contentLength ?? body.Length}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'\r\nConnection: close\r\n\r\n");
         await stream.WriteAsync(header, token);
         if (body.Length > 0) await stream.WriteAsync(body, token);
         await stream.FlushAsync(token);
