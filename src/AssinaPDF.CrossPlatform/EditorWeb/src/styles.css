@@ -53,3 +53,11 @@
 .resize-handle.e{right:-5px;top:calc(50% - 4px);cursor:ew-resize}.resize-handle.se{right:-5px;bottom:-5px;cursor:nwse-resize}.resize-handle.s{left:calc(50% - 4px);bottom:-5px;cursor:ns-resize}
 .resize-handle.sw{left:-5px;bottom:-5px;cursor:nesw-resize}.resize-handle.w{left:-5px;top:calc(50% - 4px);cursor:ew-resize}
 .element.selected{outline:1px solid #7654c5;outline-offset:0}
+
+.brush-tool{position:relative;display:flex;align-items:center;justify-content:center}
+.brush-palette{position:absolute;z-index:21;left:48px;top:0;width:178px;padding:10px;background:#fff;border:1px solid #d9dce4;border-radius:9px;box-shadow:0 8px 24px #11182730;color:#303746}
+.brush-palette label{display:flex;flex-direction:column;gap:7px;margin:0 0 9px;font-size:11px;font-weight:600}
+.brush-palette input[type=color]{width:100%;height:30px;border:1px solid #dfe2e8;border-radius:5px;background:#fff}
+.brush-palette input[type=range]{width:100%}
+.brush-palette small{font-size:10px;color:#687080}
+.brush-preview{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
