@@ -27,6 +27,9 @@ export interface StripTarget {
   box: Box;
 }
 
+/** Original image paint operation to remove from a page before drawing its moved copy. */
+export interface StripImageTarget extends StripTarget {}
+
 type Matrix = [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const mul = (m: Matrix, n: Matrix): Matrix => [
@@ -313,6 +316,7 @@ function processStream(
   boxes: StripTarget[],
   matched: Set<string>,
   probe?: GlyphProbe,
+  imageTargets: StripImageTarget[] = [],
 ): Uint8Array | null {
   const crop = page.getCropBox();
   const resources = page.node.normalizedEntries().Resources;
@@ -348,6 +352,28 @@ function processStream(
     for (const t of boxes) {
       const b = t.box;
       if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) return t.id;
+    }
+    return null;
+  };
+
+  // PDF image XObjects paint a unit square through the current transformation matrix.
+  // Match by area overlap rather than only the centre, so clipped/scaled images still match.
+  const hitImage = () => {
+    if (!imageTargets.length) return null;
+    const corners = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([x, y]) => apply(gs.ctm, x!, y!));
+    const left = Math.min(...corners.map(p => p.x)) - crop.x;
+    const right = Math.max(...corners.map(p => p.x)) - crop.x;
+    const top = crop.y + crop.height - Math.max(...corners.map(p => p.y));
+    const bottom = crop.y + crop.height - Math.min(...corners.map(p => p.y));
+    const area = Math.max(0, right - left) * Math.max(0, bottom - top);
+    if (area <= 0) return null;
+    for (const target of imageTargets) {
+      const b = target.box;
+      const iw = Math.max(0, Math.min(right, b.x + b.width) - Math.max(left, b.x));
+      const ih = Math.max(0, Math.min(bottom, b.y + b.height) - Math.max(top, b.y));
+      const overlap = iw * ih;
+      const targetArea = Math.max(1, b.width * b.height);
+      if (overlap / Math.min(area, targetArea) >= 0.8) return target.id;
     }
     return null;
   };
@@ -506,6 +532,20 @@ function processStream(
         gs.font = getFont(typeof o[0] === "string" ? o[0] : "");
         gs.tfs = n(1);
         break;
+      case "Do": {
+        const name = typeof o[0] === "string" ? o[0] : "";
+        const xobjects = resources.lookup(PDFName.of("XObject"));
+        const xobject = xobjects instanceof PDFDict ? xobjects.lookup(PDFName.of(name)) : undefined;
+        const subtype = xobject instanceof PDFStream ? xobject.dict.lookup(PDFName.of("Subtype")) : undefined;
+        if (subtype instanceof PDFName && subtype.asString() === "/Image") {
+          const id = hitImage();
+          if (id) {
+            matched.add(id);
+            replace(start, tok.e, "q Q");
+          }
+        }
+        break;
+      }
       case "Tj": {
         const r = show([o[0] as Val]);
         if (r) replace(start, tok.e, r);
@@ -574,10 +614,10 @@ function pageContents(pdf: PDFDocument, page: PDFPage): Uint8Array | null {
 }
 
 /** Removes target glyphs in place on an already-loaded document. Returns ids that were found. */
-export function stripTextInDocument(pdf: PDFDocument, targets: StripTarget[]): Set<string> {
+export function stripTextInDocument(pdf: PDFDocument, targets: StripTarget[], imageTargets: StripImageTarget[] = []): Set<string> {
   const matched = new Set<string>();
   const byPage = new Map<number, StripTarget[]>();
-  for (const t of targets) byPage.set(t.page, [...(byPage.get(t.page) ?? []), t]);
+  for (const t of [...targets, ...imageTargets]) byPage.set(t.page, [...(byPage.get(t.page) ?? []), t]);
   const pages = pdf.getPages();
   for (const [index, list] of byPage) {
     const page = pages[index];
@@ -585,7 +625,9 @@ export function stripTextInDocument(pdf: PDFDocument, targets: StripTarget[]): S
     try {
       const content = pageContents(pdf, page);
       if (!content) continue;
-      const next = processStream(content, page, list, matched);
+      const pageImages = imageTargets.filter(t => t.page === index);
+      const pageTexts = targets.filter(t => t.page === index);
+      const next = processStream(content, page, pageTexts, matched, undefined, pageImages);
       if (next) {
         const ref = pdf.context.register(pdf.context.flateStream(next));
         page.node.set(PDFName.of("Contents"), pdf.context.obj([ref]));
@@ -613,9 +655,9 @@ export async function scanGlyphColors(original: Uint8Array) {
   });
 }
 
-export async function stripText(original: Uint8Array, targets: StripTarget[]) {
+export async function stripText(original: Uint8Array, targets: StripTarget[], imageTargets: StripImageTarget[] = []) {
   const pdf = await PDFDocument.load(original, { ignoreEncryption: true, updateMetadata: false });
-  const matched = stripTextInDocument(pdf, targets);
+  const matched = stripTextInDocument(pdf, targets, imageTargets);
   const bytes = await pdf.save({ useObjectStreams: false });
   return { bytes, matched };
 }
