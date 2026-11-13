@@ -163,6 +163,66 @@
                       Background="#482B35" Foreground="#FFC5CC"
                       BorderBrush="#75404B"/>
             </StackPanel>
+            <StackPanel x:Name="ShapePropertiesPanel" IsVisible="False" Spacing="9">
+              <Border Height="1" Background="#343C49"/>
+              <TextBlock Text="APARÊNCIA DA FORMA" FontSize="9"
+                         FontWeight="Bold" Foreground="#A78BFA"/>
+              <TextBlock Text="Preenchimento" FontSize="10"
+                         Foreground="#C5CBD5"/>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBox x:Name="ShapeFillColorTextBox" Text="#FFFFFF"
+                         FontFamily="Consolas" FontSize="11"
+                         VerticalContentAlignment="Center"
+                         Watermark="#RRGGBB"
+                         KeyUp="ShapeFillColorTextBox_KeyUp"/>
+                <Button Grid.Column="1" Content="Aplicar"
+                        Click="ApplyShapeFillColor_Click"
+                        Padding="9,5" Background="#6D4BC3"
+                        Foreground="White" BorderThickness="0"/>
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Tag="#000000" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#000000"
+                        BorderBrush="#667085" ToolTip.Tip="Preto"/>
+                <Button Tag="#FFFFFF" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#FFFFFF"
+                        BorderBrush="#667085" ToolTip.Tip="Branco"/>
+                <Button Tag="#1F2937" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#1F2937"
+                        BorderBrush="#667085" ToolTip.Tip="Grafite"/>
+                <Button Tag="#DC2626" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#DC2626"
+                        BorderBrush="#667085" ToolTip.Tip="Vermelho"/>
+                <Button Tag="#EA580C" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#EA580C"
+                        BorderBrush="#667085" ToolTip.Tip="Laranja"/>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Tag="#CA8A04" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#CA8A04"
+                        BorderBrush="#667085" ToolTip.Tip="Amarelo"/>
+                <Button Tag="#16A34A" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#16A34A"
+                        BorderBrush="#667085" ToolTip.Tip="Verde"/>
+                <Button Tag="#2563EB" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#2563EB"
+                        BorderBrush="#667085" ToolTip.Tip="Azul"/>
+                <Button Tag="#7C3AED" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#7C3AED"
+                        BorderBrush="#667085" ToolTip.Tip="Violeta"/>
+                <Button Tag="#DB2777" Click="ShapeColorSwatch_Click"
+                        Width="25" Height="25" Padding="0" Background="#DB2777"
+                        BorderBrush="#667085" ToolTip.Tip="Rosa"/>
+              </StackPanel>
+              <TextBlock x:Name="ShapeOpacityValueText" Text="Opacidade · 100%"
+                         FontSize="10" Foreground="#C5CBD5"/>
+              <Slider x:Name="ShapeOpacitySlider" Minimum="0.05"
+                      Maximum="1" Value="1" SmallChange="0.05"
+                      LargeChange="0.1"
+                      ValueChanged="ShapeOpacitySlider_ValueChanged"
+                      PointerReleased="ShapeOpacitySlider_PointerReleased"
+                      KeyUp="ShapeOpacitySlider_KeyUp"/>
+            </StackPanel>
             <Border Height="1" Background="#343C49"/>
             <TextBlock Text="FORMATAÇÃO" FontSize="9" FontWeight="Bold"
                        Foreground="#A78BFA"/>
