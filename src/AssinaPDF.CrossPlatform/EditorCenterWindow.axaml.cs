@@ -170,9 +170,6 @@ public partial class EditorCenterWindow : Window
 
         try
         {
-            string documentDirectory = Path.GetDirectoryName(entry.WorkingCopyPath)
-                ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
-
             var editor = new EditorWebWindow(entry.WorkingCopyPath, entry.Id);
 
             CenterStatusText.Text = $"Abrindo {entry.OriginalFileName}...";
