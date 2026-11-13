@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.EditorWebWindow"
+        Title="AssinaPDF | Editor Future"
+        Width="1440" Height="920"
+        MinWidth="980" MinHeight="680"
+        WindowStartupLocation="CenterOwner"
+        Background="#F3F4F6">
+  <Grid RowDefinitions="Auto,*">
+    <Border Grid.Row="0" Background="#292D36" Padding="18,9">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="AssinaPDF Future · Editor de PDF"
+                   Foreground="White" FontSize="13"
+                   VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Content="Voltar"
+                Click="Close_Click" Padding="16,7"
+                Background="#FFFFFF" Foreground="#292D36"
+                BorderThickness="0"/>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1">
+      <NativeWebView x:Name="EditorWebView"
+                     NavigationCompleted="EditorWebView_NavigationCompleted"
+                     WebMessageReceived="EditorWebView_WebMessageReceived"/>
+      <Border x:Name="LoadingOverlay" Background="#F3F4F6"
+              IsVisible="True" Padding="28">
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center" Spacing="10">
+          <TextBlock x:Name="LoadingTitle" Text="Preparando editor…"
+                     FontSize="18" FontWeight="SemiBold"
+                     Foreground="#292D36" HorizontalAlignment="Center"/>
+          <TextBlock x:Name="LoadingDetails"
+                     Text="O editor é carregado localmente neste computador."
+                     FontSize="12" Foreground="#737B87"
+                     TextWrapping="Wrap" MaxWidth="520"
+                     HorizontalAlignment="Center" TextAlignment="Center"/>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>
