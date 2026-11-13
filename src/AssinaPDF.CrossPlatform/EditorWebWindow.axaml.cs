@@ -73,7 +73,7 @@ public partial class EditorWebWindow : Window
                 ? Path.GetFileName(fileName.GetString() ?? "documento-editado.pdf")
                 : "documento-editado.pdf";
 
-            var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var bytes = Convert.FromBase64String(base64);\n            if (!string.IsNullOrWhiteSpace(_workingCopyPath))\n            {\n                var directory = Path.GetDirectoryName(_workingCopyPath);\n                if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);\n                await File.WriteAllBytesAsync(_workingCopyPath, bytes);\n                return;\n            }\n\n            var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Salvar PDF editado",
                 SuggestedFileName = suggestedName,
