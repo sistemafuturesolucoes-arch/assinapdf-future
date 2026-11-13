@@ -68,7 +68,8 @@ internal sealed class EditorWebServer : IAsyncDisposable
                 if (string.IsNullOrWhiteSpace(rawPath)) rawPath = "index.html";
                 var candidate = Path.GetFullPath(Path.Combine(_root, rawPath.Replace('/', Path.DirectorySeparatorChar)));
                 var rootPrefix = _root.EndsWith(Path.DirectorySeparatorChar) ? _root : _root + Path.DirectorySeparatorChar;
-                if (!candidate.StartsWith(rootPrefix, StringComparison.Ordinal) && !string.Equals(candidate, Path.Combine(_root, "index.html"), StringComparison.Ordinal))
+                var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+                if (!candidate.StartsWith(rootPrefix, pathComparison) && !string.Equals(candidate, Path.Combine(_root, "index.html"), pathComparison))
                 {
                     await WriteResponseAsync(stream, 403, "Forbidden", "text/plain", Encoding.UTF8.GetBytes("Forbidden"), cancellationToken);
                     return;
