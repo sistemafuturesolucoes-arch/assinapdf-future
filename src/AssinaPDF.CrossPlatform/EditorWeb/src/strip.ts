@@ -619,7 +619,7 @@ export function stripTextInDocument(pdf: PDFDocument, targets: StripTarget[], im
   const byPage = new Map<number, StripTarget[]>();
   for (const t of [...targets, ...imageTargets]) byPage.set(t.page, [...(byPage.get(t.page) ?? []), t]);
   const pages = pdf.getPages();
-  for (const [index, list] of byPage) {
+  for (const index of byPage.keys()) {
     const page = pages[index];
     if (!page || page.getRotation().angle % 360 !== 0) continue;
     try {
