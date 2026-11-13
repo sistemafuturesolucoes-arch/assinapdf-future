@@ -1,24 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
   <Package
     Name="AssinaPDF | Future Soluções"
     Manufacturer="Future Soluções"
-    Version="0.4.1"
+    Version="0.4.2"
     UpgradeCode="B7D9E2A1-6F43-4C85-9A12-8D5E7B3F2046"
     Scope="perMachine"
     Language="1046">
 
-    <SummaryInformation Description="AssinaPDF Future - leitor e assinatura digital de PDFs" />
+    <SummaryInformation Description="AssinaPDF Future - leitor, editor e assinatura digital de PDFs" />
     <MajorUpgrade DowngradeErrorMessage="Já existe uma versão mais recente do AssinaPDF instalada." />
     <MediaTemplate EmbedCab="yes" />
 
     <Icon Id="AssinaPDFIcon" SourceFile="../src/AssinaPDF.CrossPlatform/Assets/assinapdf.ico" />
     <Property Id="ARPPRODUCTICON" Value="AssinaPDFIcon" />
 
-    <Feature Id="MainFeature" Title="AssinaPDF" Level="1">
+    <!-- Tela padrão com aceite obrigatório dos termos e seleção de recursos. -->
+    <WixVariable Id="WixUILicenseRtf" Value="TermosUso.rtf" />
+    <ui:WixUI Id="WixUI_FeatureTree" />
+
+    <Feature Id="MainFeature" Title="AssinaPDF" Description="Aplicativo AssinaPDF e atalho no Menu Iniciar." Level="1">
       <ComponentGroupRef Id="PublishedAppFiles" />
       <ComponentRef Id="AssinaPDFExecutableComponent" />
       <ComponentRef Id="AssinaPDFStartMenuShortcut" />
+    </Feature>
+
+    <Feature Id="DesktopShortcutFeature"
+             Title="Criar atalho na área de trabalho"
+             Description="Adiciona um atalho do AssinaPDF na área de trabalho."
+             Level="1">
       <ComponentRef Id="AssinaPDFDesktopShortcut" />
     </Feature>
   </Package>
