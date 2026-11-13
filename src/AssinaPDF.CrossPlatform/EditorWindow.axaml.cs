@@ -1728,7 +1728,7 @@ public partial class EditorWindow : Window
                 annotation.Title = "AssinaPDF";
                 annotation.Subject = annotationSubject;
                 annotation.Contents = "Forma inserida pelo AssinaPDF";
-                annotation.Color = Aspose.Pdf.Color.FromRgb(0.42, 0.29, 0.75);
+                annotation.Color = Aspose.Pdf.Color.FromRgb(1.0, 1.0, 1.0);
                 // Mesmo padrão funcional do Typecraft: preenchimento branco
                 // totalmente opaco, editável pelo painel de propriedades.
                 annotation.InteriorColor = Aspose.Pdf.Color.FromRgb(1.0, 1.0, 1.0);
@@ -2271,6 +2271,7 @@ public partial class EditorWindow : Window
                 if (annotation == null)
                     throw new InvalidOperationException("A forma selecionada não existe mais no PDF.");
 
+                annotation.Color = fillColor;
                 annotation.InteriorColor = fillColor;
                 annotation.UpdateAppearances();
             }, "Cor da forma atualizada.", savedDocument =>
