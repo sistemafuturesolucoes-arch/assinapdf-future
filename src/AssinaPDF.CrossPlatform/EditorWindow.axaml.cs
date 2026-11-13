@@ -129,11 +129,9 @@ public partial class EditorWindow : Window
 
     private void InitializeFormattingToolbar()
     {
-        RichEditorToolbar.FontSizes = new[]
-        {
-            6d, 7d, 8d, 9d, 10d, 11d, 12d, 14d, 16d,
-            18d, 20d, 22d, 24d, 26d, 28d, 36d, 48d, 72d
-        };
+        RichEditorToolbar.FontSizes = Enumerable.Range(0, 393)
+            .Select(index => 4d + index * 0.5d)
+            .ToArray();
 
         _defaultToolbarEditor = new RichEditorControl
         {
@@ -3134,11 +3132,9 @@ public partial class EditorWindow : Window
                 ShowPageBoundaries = false
             };
 
-            RichEditorToolbar.FontSizes = new[]
-            {
-                6d, 7d, 8d, 9d, 10d, 11d, 12d, 14d, 16d,
-                18d, 20d, 22d, 24d, 26d, 28d, 36d, 48d, 72d
-            };
+            RichEditorToolbar.FontSizes = Enumerable.Range(0, 393)
+                .Select(index => 4d + index * 0.5d)
+                .ToArray();
 
             if (_formattingToolbar == null)
                 InitializeFormattingToolbar();
