@@ -9,10 +9,13 @@ namespace AssinaPDF.MacPrototype;
 public partial class EditorWebWindow : Window
 {
     private EditorWebServer? _server;
+    private readonly string? _workingCopyPath;
+    private bool _initialPdfSent;
 
-    public EditorWebWindow()
+    public EditorWebWindow(string? workingCopyPath = null)
     {
         InitializeComponent();
+        _workingCopyPath = workingCopyPath;
         Opened += async (_, _) => await StartEditorAsync();
         Closed += async (_, _) =>
         {
@@ -43,15 +46,25 @@ public partial class EditorWebWindow : Window
         }
     }
 
-    private void EditorWebView_NavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
+    private async void EditorWebView_NavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
     {
-        if (e.IsSuccess)
-            LoadingOverlay.IsVisible = false;
-        else
+        if (!e.IsSuccess)
         {
             LoadingTitle.Text = "Não foi possível carregar o editor";
             LoadingDetails.Text = "Verifique se os arquivos da pasta EditorWeb/dist foram incluídos na distribuição.";
+            return;
         }
+
+        LoadingOverlay.IsVisible = false;
+        if (_initialPdfSent || string.IsNullOrWhiteSpace(_workingCopyPath) || !File.Exists(_workingCopyPath))
+            return;
+
+        _initialPdfSent = true;
+        var bytes = await File.ReadAllBytesAsync(_workingCopyPath);
+        var base64 = Convert.ToBase64String(bytes);
+        var fileName = Path.GetFileName(_workingCopyPath);
+        await EditorWebView.InvokeScript(
+            $"window.receivePdfFromHost && window.receivePdfFromHost({JsonSerializer.Serialize(base64)}, {JsonSerializer.Serialize(fileName)})");
     }
 
     private async void EditorWebView_WebMessageReceived(object? sender, WebMessageReceivedEventArgs e)
@@ -69,11 +82,24 @@ public partial class EditorWebWindow : Window
             if (string.IsNullOrWhiteSpace(base64))
                 return;
 
+            var bytes = Convert.FromBase64String(base64);
+            if (bytes.Length == 0 || bytes.Length > 150 * 1024 * 1024)
+                throw new InvalidDataException("O PDF exportado está vazio ou excede o limite de 150 MB.");
+
+            if (!string.IsNullOrWhiteSpace(_workingCopyPath))
+            {
+                var directory = Path.GetDirectoryName(_workingCopyPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                    Directory.CreateDirectory(directory);
+                await File.WriteAllBytesAsync(_workingCopyPath, bytes);
+                return;
+            }
+
             var suggestedName = root.TryGetProperty("fileName", out var fileName)
                 ? Path.GetFileName(fileName.GetString() ?? "documento-editado.pdf")
                 : "documento-editado.pdf";
 
-            var bytes = Convert.FromBase64String(base64);\n            if (!string.IsNullOrWhiteSpace(_workingCopyPath))\n            {\n                var directory = Path.GetDirectoryName(_workingCopyPath);\n                if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);\n                await File.WriteAllBytesAsync(_workingCopyPath, bytes);\n                return;\n            }\n\n            var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Salvar PDF editado",
                 SuggestedFileName = suggestedName,
@@ -83,9 +109,9 @@ public partial class EditorWebWindow : Window
                     new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } }
                 }
             });
-            if (target is null) return;
+            if (target is null)
+                return;
 
-            var bytes = Convert.FromBase64String(base64);
             await using var output = await target.OpenWriteAsync();
             await output.WriteAsync(bytes);
         }
