@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon Condition="'$(RuntimeIdentifier)' == 'win-x64'">Assets/assinapdf.ico</ApplicationIcon>
+    <!-- Required by Avalonia NativeWebView when creating its native child window on Windows. -->
+    <ApplicationManifest Condition="'$(OS)' == 'Windows_NT'">app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
@@ -44,4 +46,5 @@
   -->
   <ItemGroup>
     <Compile Remove="ThirdParty\Danfe.NFe.Core\**\*.cs" />
-  </ItemGroup></Project>
+  </ItemGroup>
+</Project>
