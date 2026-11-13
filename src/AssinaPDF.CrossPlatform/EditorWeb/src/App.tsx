@@ -22,7 +22,7 @@ const fontFor=(f:Font,b:boolean,i:boolean)=>f==="Times"?(b?(i?StandardFonts.Time
 
 type PdfFontMetadata = { name?: string; psName?: string; fallbackName?: string };
 function normalizePdfFontFamily(raw: string): string {
- const name = raw.replace(/^[A-Z]{6}\\+/, "").trim();
+ const name = raw.replace(/^[A-Z]{6}\+/, "").trim();
  const known: [RegExp,string][] = [
   [/^Arial(?:MT)?(?:[-_].*)?$/i,"Arial"],
   [/^TimesNewRomanPS?(?:[-_].*)?$/i,"Times New Roman"],
