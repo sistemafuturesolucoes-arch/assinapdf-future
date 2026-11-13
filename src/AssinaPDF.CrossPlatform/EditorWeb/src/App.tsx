@@ -77,7 +77,7 @@ function PageCanvas({doc,index,info,zoom}:{doc:PDFDocumentProxy|null;index:numbe
   if(!canvas)return;
   if(typeof IntersectionObserver==="undefined"){setVisible(true);return}
   const root=canvas.closest(".pages");
-  const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.target===canvas)setVisible(entry.isIntersecting)},{root,rootMargin:"900px 0px"});
+  const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.target===canvas)setVisible(entry.isIntersecting)},{root,rootMargin:"350px 0px"});
   observer.observe(canvas);
   return()=>observer.disconnect();
  },[]);
@@ -91,7 +91,7 @@ function PageCanvas({doc,index,info,zoom}:{doc:PDFDocumentProxy|null;index:numbe
     const page=await doc.getPage(index+1);
     if(cancelled||!ref.current)return;
     const dpr=Math.min(devicePixelRatio||1,2);
-    const pixelBudgetScale=Math.sqrt(12000000/Math.max(1,info.width*info.height));
+    const pixelBudgetScale=Math.sqrt(3500000/Math.max(1,info.width*info.height));
     const scale=Math.max(.1,Math.min(zoom*dpr,2,pixelBudgetScale));
     const vp=page.getViewport({scale});
     const target=ref.current;
@@ -111,15 +111,36 @@ function PageCanvas({doc,index,info,zoom}:{doc:PDFDocumentProxy|null;index:numbe
 }
 export default function App(){
  const [name,setName]=useState("documento"),[source,setSource]=useState<Uint8Array|null>(null),[doc,setDoc]=useState<PDFDocumentProxy|null>(null),[previewDoc,setPreviewDoc]=useState<PDFDocumentProxy|null>(null),[strippedIds,setStrippedIds]=useState<Set<string>>(()=>new Set()),[pages,setPages]=useState<PageInfo[]>([]),[els,setEls]=useState<El[]>([]),[past,setPast]=useState<El[][]>([]),[future,setFuture]=useState<El[][]>([]),[selected,setSelected]=useState<string|null>(null),[tool,setTool]=useState<"select"|"text"|"shape"|"brush">("select"),[brushColor,setBrushColor]=useState("#292d36"),[brushSize,setBrushSize]=useState(3),[brushMenu,setBrushMenu]=useState(false),[activeShape,setActiveShape]=useState<ShapeKind>("rect"),[shapeMenu,setShapeMenu]=useState(false),[zoom,setZoom]=useState(1),[busy,setBusy]=useState(false),[active,setActive]=useState(0),[documentFonts,setDocumentFonts]=useState<DetectedPdfFont[]>([]);
- const pdfInput=useRef<HTMLInputElement>(null),imageInput=useRef<HTMLInputElement>(null),pagesRef=useRef<HTMLElement>(null);
+ const pdfInput=useRef<HTMLInputElement>(null),imageInput=useRef<HTMLInputElement>(null),pagesRef=useRef<HTMLElement>(null),previewQueueRef=useRef<Promise<void>>(Promise.resolve());
  const current=els.find(e=>e.id===selected)??null;
  const stripTargets=useMemo(()=>els.filter((e):e is TextEl=>e.type==="text"&&e.modified&&!!e.origin).map(e=>({id:e.id,page:e.page,box:e.origin!})),[els]);
  const stripImageTargets=useMemo(()=>els.filter((e):e is ImageEl=>e.type==="image"&&(e.modified===true||e.hidden===true)&&!!e.origin).map(e=>({id:e.id,page:e.page,box:e.origin!})),[els]);
  const stripKey=[...stripTargets,...stripImageTargets].map(t=>`${t.id}:${t.page}:${t.box.x}:${t.box.y}:${t.box.width}:${t.box.height}`).join("|");
  const fitToScreen=()=>{const viewport=pagesRef.current;const page=pages[active]??pages[0];if(!viewport||!page)return;const availableWidth=Math.max(240,viewport.clientWidth-112);const availableHeight=Math.max(240,viewport.clientHeight-112);const next=Math.min(1,availableWidth/page.width,availableHeight/page.height);setZoom(Math.max(.3,Math.round(next*100)/100))};
 
- // Rebuild the preview PDF with edited original glyphs removed, matching Typecraft behavior.
- useEffect(()=>{if(!source||(!stripTargets.length&&!stripImageTargets.length)){setPreviewDoc(doc);setStrippedIds(new Set());return}let cancelled=false;const timer=window.setTimeout(async()=>{try{const stripped=await stripText(source,stripTargets,stripImageTargets);if(cancelled)return;const next=await getDocument({data:stripped.bytes}).promise;if(cancelled){next.cleanup();return}setPreviewDoc(next);setStrippedIds(stripped.matched)}catch(error){console.warn("Não foi possível atualizar a prévia sem remover os objetos originais",error)}},120);return()=>{cancelled=true;window.clearTimeout(timer)}},[source,stripKey,doc]);
+ // Keep editing responsive: large PDFs use lightweight masks while the full strip runs only on export.
+ useEffect(()=>{
+  if(!source||(!stripTargets.length&&!stripImageTargets.length)){setPreviewDoc(doc);setStrippedIds(new Set());return}
+  // Rebuilding a large PDF for every edit duplicates its buffers and can exhaust WebView memory.
+  if(source.byteLength>8*1024*1024||pages.length>30){setPreviewDoc(doc);setStrippedIds(new Set());return}
+  let cancelled=false;
+  setPreviewDoc(doc);
+  setStrippedIds(new Set());
+  const timer=window.setTimeout(()=>{
+   previewQueueRef.current=previewQueueRef.current.then(async()=>{
+    if(cancelled)return;
+    try{
+     const stripped=await stripText(source,stripTargets,stripImageTargets);
+     if(cancelled)return;
+     const next=await getDocument({data:stripped.bytes}).promise;
+     if(cancelled){next.cleanup();return}
+     setPreviewDoc(next);
+     setStrippedIds(stripped.matched);
+    }catch(error){console.warn("Não foi possível atualizar a prévia sem remover os objetos originais",error)}
+   }).catch(error=>console.warn("Falha na fila de prévias do PDF",error));
+  },650);
+  return()=>{cancelled=true;window.clearTimeout(timer)};
+ },[source,stripKey,doc,pages.length]);
  useEffect(()=>()=>{if(previewDoc&&previewDoc!==doc)previewDoc.cleanup()},[previewDoc,doc]);
  const checkpoint=()=>{setPast(p=>[...p.slice(-79),structuredClone(els)]);setFuture([])};
  const patch=(id:string,v:Partial<El>)=>setEls(a=>a.map(e=>e.id===id?({...e,...v} as El):e));
