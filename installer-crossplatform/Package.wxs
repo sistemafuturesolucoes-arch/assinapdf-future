@@ -19,6 +19,8 @@
 
     <!-- Tela padrão com aceite obrigatório dos termos e seleção de recursos. -->
     <WixVariable Id="WixUILicenseRtf" Value="TermosUso.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="FutureInstallerBanner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="FutureInstallerDialog.bmp" />
     <ui:WixUI Id="WixUI_FeatureTree" />
 
     <Feature Id="MainFeature" Title="AssinaPDF" Description="Aplicativo AssinaPDF e atalho no Menu Iniciar." Level="1">
