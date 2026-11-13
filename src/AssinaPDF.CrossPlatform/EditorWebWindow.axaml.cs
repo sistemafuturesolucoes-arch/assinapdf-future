@@ -51,30 +51,16 @@ public partial class EditorWebWindow : Window
         }
     }
 
-    private async void EditorWebView_NavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
+    private void EditorWebView_NavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
     {
-        if (!e.IsSuccess)
+        if (e.IsSuccess)
         {
-            LoadingTitle.Text = "Não foi possível carregar o editor";
-            LoadingDetails.Text = "Verifique se os arquivos da pasta EditorWeb/dist foram incluídos na distribuição.";
+            LoadingOverlay.IsVisible = false;
             return;
         }
 
-        LoadingOverlay.IsVisible = false;
-        if (_initialPdfSent || string.IsNullOrWhiteSpace(_workingCopyPath) || !File.Exists(_workingCopyPath))
-            return;
-
-        _initialPdfSent = true;
-        await SendPdfToWebAsync(_workingCopyPath);
-    }
-
-    private async System.Threading.Tasks.Task SendPdfToWebAsync(string path)
-    {
-        var bytes = await File.ReadAllBytesAsync(path);
-        var base64 = Convert.ToBase64String(bytes);
-        var fileName = Path.GetFileName(path);
-        await EditorWebView.InvokeScript(
-            $"window.receivePdfFromHost && window.receivePdfFromHost({JsonSerializer.Serialize(base64)}, {JsonSerializer.Serialize(fileName)})");
+        LoadingTitle.Text = "Não foi possível carregar o editor";
+        LoadingDetails.Text = "Verifique se os arquivos da pasta EditorWeb/dist foram incluídos na distribuição.";
     }
 
     private async void EditorWebView_WebMessageReceived(object? sender, WebMessageReceivedEventArgs e)
@@ -86,13 +72,24 @@ public partial class EditorWebWindow : Window
             if (!root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String)
                 return;
 
-            if (type.GetString() == "editorReady")\n            {\n                if (!_initialPdfSent && !string.IsNullOrWhiteSpace(_workingCopyPath) && File.Exists(_workingCopyPath))\n                {\n                    _initialPdfSent = true;\n                    await SendPdfToWebAsync(_workingCopyPath);\n                }\n                return;\n            }\n\n            if (type.GetString() == "openPdf")
+            var messageType = type.GetString();
+            if (messageType == "editorReady")
+            {
+                if (!_initialPdfSent && !string.IsNullOrWhiteSpace(_workingCopyPath) && File.Exists(_workingCopyPath))
+                {
+                    _initialPdfSent = true;
+                    await SendPdfToWebAsync(_workingCopyPath);
+                }
+                return;
+            }
+
+            if (messageType == "openPdf")
             {
                 await OpenPdfAsync();
                 return;
             }
 
-            if (type.GetString() != "savePdf" ||
+            if (messageType != "savePdf" ||
                 !root.TryGetProperty("base64", out var payload) ||
                 payload.ValueKind != JsonValueKind.String)
                 return;
@@ -146,6 +143,15 @@ public partial class EditorWebWindow : Window
             LoadingDetails.Text = ex.Message;
             LoadingOverlay.IsVisible = true;
         }
+    }
+
+    private async System.Threading.Tasks.Task SendPdfToWebAsync(string path)
+    {
+        var bytes = await File.ReadAllBytesAsync(path);
+        var base64 = Convert.ToBase64String(bytes);
+        var fileName = Path.GetFileName(path);
+        await EditorWebView.InvokeScript(
+            $"window.receivePdfFromHost && window.receivePdfFromHost({JsonSerializer.Serialize(base64)}, {JsonSerializer.Serialize(fileName)})");
     }
 
     private async System.Threading.Tasks.Task OpenPdfAsync()
