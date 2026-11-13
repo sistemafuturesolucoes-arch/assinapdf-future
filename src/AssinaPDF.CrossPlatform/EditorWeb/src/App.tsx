@@ -43,54 +43,30 @@ function normalizePdfFontFamily(raw: string): string {
  ];
  return known.find(([pattern])=>pattern.test(name))?.[1] ?? name;
 }
-async function readPdfResourceFonts(bytes: Uint8Array): Promise<DetectedPdfFont[]> {
- const parsed = await PDFDocument.load(bytes, { ignoreEncryption: true });
- const found = new Map<string, DetectedPdfFont>();
- for (let pageIndex = 0; pageIndex < parsed.getPages().length; pageIndex++) {
-  const page = parsed.getPages()[pageIndex];
-  try {
-   const resources = page.node.Resources();
-   const fontResources = resources.lookup(PDFName.of("Font"), PDFDict);
-   for (const [resourceKey] of fontResources.entries()) {
-    try {
-     const font = fontResources.lookup(resourceKey, PDFDict);
-     const baseFont = font.lookup(PDFName.of("BaseFont"), PDFName);
-     const rawName = baseFont.toString().replace(/^\//, "").replace(/#2B/gi, "+");
-     const clean = rawName.replace(/^[A-Z]{6}\+/, "").trim();
-     const bold = /bold|demi|semibold|black|heavy/i.test(clean);
-     const italic = /italic|oblique/i.test(clean);
-     const base = clean.replace(/[-_ ]?(bold|demi|semibold|black|heavy|italic|oblique|regular|medium|light|book|mt)$/ig, "").replace(/[-_ ]?(bold|italic|oblique)$/ig, "");
-     let family = normalizePdfFontFamily(base || clean);
-     if (/^Times-Roman$/i.test(family)) family = "Times Roman";
-     const style = bold && italic ? "Negrito itálico" : bold ? "Negrito" : italic ? "Itálico" : "Regular";
-     const key = family + "|" + style;
-     const entry = found.get(key) ?? { family, style, pages: [] };
-     if (!entry.pages.includes(pageIndex + 1)) entry.pages.push(pageIndex + 1);
-     found.set(key, entry);
-    } catch { /* Ignora recursos de fonte inválidos sem interromper a leitura do PDF. */ }
-   }
-  } catch { /* Páginas sem recursos de fonte ou com estrutura incomum. */ }
- }
- return Array.from(found.values()).sort((a,b)=>a.family.localeCompare(b.family)||a.style.localeCompare(b.style));
-}
-function readOriginalPdfFontDetails(page: unknown, fontName: string, styleFamily?: string): { family: string; style: string } | undefined {
+function readPdfJsFontDetails(pdf: PDFDocumentProxy, fontName: string, styleFamily?: string): { family: string; style: string } | undefined {
  try {
-  const commonObjs = (page as { commonObjs?: { get?: (id: string) => unknown } }).commonObjs;
-  const metadata = commonObjs?.get?.(fontName) as PdfFontMetadata | undefined;
-  const raw = metadata?.name || metadata?.psName || metadata?.originalName || metadata?.fontName || metadata?.fallbackName || metadata?.fontFamily;
-  if (raw && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(raw.trim())) {
+  const transport = (pdf as unknown as { _transport?: { commonObjs?: { get?: (id: string) => unknown } } })._transport;
+  const metadata = transport?.commonObjs?.get?.(fontName) as PdfFontMetadata | undefined;
+  const candidates = [metadata?.name, metadata?.psName, metadata?.originalName, metadata?.fontName, metadata?.fontFamily, metadata?.fallbackName];
+  const raw = candidates.find(value => typeof value === "string" && value.trim() && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(value.trim()) && !/^g_[a-z0-9]+_f\d+$/i.test(value.trim()));
+  if (raw) {
    const clean = raw.replace(/^[A-Z]{6}\+/, "").trim();
-   const bold = metadata?.bold === true || /bold|demi|semibold/i.test(clean) || (typeof metadata?.fontWeight === "number" && metadata.fontWeight >= 600);
+   const bold = metadata?.bold === true || /bold|demi|semibold|black|heavy/i.test(clean) || (typeof metadata?.fontWeight === "number" && metadata.fontWeight >= 600);
    const italic = metadata?.italic === true || /italic|oblique/i.test(clean);
-   const base = clean.replace(/[-_ ]?(bold|demi|semibold|italic|oblique|regular|medium|light|book|mt)$/ig, "").replace(/[-_ ]?(bold|italic|oblique)$/ig, "");
-   return { family: normalizePdfFontFamily(base || clean), style: bold && italic ? "Negrito itálico" : bold ? "Negrito" : italic ? "Itálico" : "Regular" };
+   const base = clean.replace(/[-_ ]?(bold|demi|semibold|black|heavy|italic|oblique|regular|medium|light|book|mt)$/ig, "").replace(/[-_ ]?(bold|italic|oblique)$/ig, "");
+   let family = normalizePdfFontFamily(base || clean);
+   if (/^Times-Roman$/i.test(family)) family = "Times Roman";
+   return { family, style: bold && italic ? "Negrito itálico" : bold ? "Negrito" : italic ? "Itálico" : "Regular" };
   }
- } catch { /* PDF.js may not have resolved font metadata for this object. */ }
- if (styleFamily && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(styleFamily.trim())) return { family: styleFamily, style: "Estilo não identificado" };
+ } catch { /* Fontes não resolvidas pelo PDF.js são ignoradas sem interromper a abertura. */ }
+ if (styleFamily && !/^(sans-serif|serif|monospace|cursive|fantasy|system-ui)$/i.test(styleFamily.trim())) {
+  const clean = styleFamily.trim();
+  const bold = /bold|demi|semibold|black|heavy/i.test(clean);
+  const italic = /italic|oblique/i.test(clean);
+  const base = clean.replace(/[-_ ]?(bold|demi|semibold|black|heavy|italic|oblique|regular)$/ig, "");
+  return { family: normalizePdfFontFamily(base || clean), style: bold && italic ? "Negrito itálico" : bold ? "Negrito" : italic ? "Itálico" : "Regular" };
+ }
  return undefined;
-}
-function readOriginalPdfFont(page: unknown, fontName: string, styleFamily?: string): string | undefined {
- return readOriginalPdfFontDetails(page, fontName, styleFamily)?.family;
 }
 const colorFor=(v:string)=>{const n=parseInt(v.slice(1),16);return rgb(((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255)};
 function PageCanvas({doc,index,info,zoom}:{doc:PDFDocumentProxy|null;index:number;info:PageInfo;zoom:number}){
@@ -112,7 +88,7 @@ export default function App(){
  const patch=(id:string,v:Partial<El>)=>setEls(a=>a.map(e=>e.id===id?({...e,...v} as El):e));
  const undo=()=>{const p=past[past.length-1];if(!p)return;setFuture(f=>[structuredClone(els),...f]);setEls(p);setPast(a=>a.slice(0,-1));setSelected(null)};
  const redo=()=>{const f=future[0];if(!f)return;setPast(p=>[...p,structuredClone(els)]);setEls(f);setFuture(a=>a.slice(1));setSelected(null)};
- const loadBytes=async(bytes:Uint8Array,fileName:string)=>{setBusy(true);try{const pdf=await getDocument({data:bytes.slice()}).promise;const ps:PageInfo[]=[];const items:El[]=[];const detectedFonts=await readPdfResourceFonts(bytes);for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const vp=p.getViewport({scale:1});ps.push({width:vp.width,height:vp.height});const tc=await p.getTextContent();const pageTextStart=items.length;const lineItems:{str:string;x:number;baseline:number;size:number;width:number;font:Font;bold:boolean;italic:boolean;originalFontFamily?:string}[]=[];for(const it of tc.items){if(!("str"in it)||!it.str.trim())continue;const tx=(await import("pdfjs-dist")).Util.transform(vp.transform,it.transform);const [a,b,c,d,x,base]=tx;if(Math.abs(b)>.01||Math.abs(c)>.01||a<=0)continue;const size=Math.max(4,Math.hypot(c,d));const styleFamily=tc.styles[it.fontName]?.fontFamily;const originalFontFamily=readOriginalPdfFont(p,it.fontName,styleFamily);const fam=styleFamily??it.fontName;lineItems.push({str:it.str,x,baseline:base,size,width:it.width,font:/courier|mono/i.test(fam)?"Courier":/times|serif/i.test(fam)?"Times":"Helvetica",bold:/bold/i.test(fam),italic:/italic|oblique/i.test(fam),originalFontFamily})}lineItems.sort((a,b)=>a.baseline-b.baseline||a.x-b.x);const lines:{items:typeof lineItems}[]=[];for(const item of lineItems){let line=lines.find(candidate=>Math.abs(candidate.items[0].baseline-item.baseline)<=Math.max(2.5,item.size*.24));if(!line){line={items:[]};lines.push(line)}line.items.push(item)}for(const line of lines){line.items.sort((a,b)=>a.x-b.x);const first=line.items[0];let textValue="",left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;for(const item of line.items){const previous=line.items[line.items.indexOf(item)-1];if(previous){const gap=item.x-(previous.x+previous.width);if(gap>Math.max(1,item.size*.18)&&!textValue.endsWith(" ")&&!item.str.startsWith(" "))textValue+=" "}textValue+=item.str;left=Math.min(left,item.x);right=Math.max(right,item.x+item.width);top=Math.min(top,item.baseline-item.size*1.18);bottom=Math.max(bottom,item.baseline+item.size*.08)}const height=Math.max(first.size*1.2,bottom-top);items.push({id:uid(),type:"text",page:i-1,x:left,y:top,text:textValue,fontSize:first.size,fontFamily:first.font,bold:first.bold,italic:first.italic,color:"#171717",modified:false,originalFontFamilies:Array.from(new Set(line.items.map(item=>item.originalFontFamily).filter((value):value is string=>!!value))),origin:{x:left-1,y:top-1,width:Math.max(right-left,3)+2,height:height+2}})}const pageLines=items.slice(pageTextStart).filter((entry):entry is TextEl=>entry.type==="text").sort((a,b)=>(a.origin?.y??a.y)-(b.origin?.y??b.y));let paragraph:TextEl[]=[];const flushParagraph=()=>{if(paragraph.length>1){const paragraphId=uid();for(const line of paragraph)line.paragraphId=paragraphId}paragraph=[]};for(const line of pageLines){const previous=paragraph[paragraph.length-1];if(previous&&previous.origin&&line.origin){const gap=line.origin.y-(previous.origin.y+previous.origin.height);const aligned=Math.abs(line.origin.x-previous.origin.x)<=Math.max(12,line.fontSize*2.2);if(!aligned||gap>line.fontSize*.75||gap< -line.fontSize*.35)flushParagraph()}paragraph.push(line)}flushParagraph()}try{const glyphColors=await scanGlyphColors(bytes);for(const el of items){if(el.type!=="text"||!el.origin)continue;const counts=new Map<string,number>();for(const point of glyphColors[el.page]??[]){if(point.x>=el.origin.x&&point.x<=el.origin.x+el.origin.width&&point.y>=el.origin.y&&point.y<=el.origin.y+el.origin.height)counts.set(point.color,(counts.get(point.color)??0)+1)}let best="";let max=0;for(const [color,count] of counts)if(count>max){best=color;max=count}if(best)el.color=best}}catch{/* text colour detection is optional */}setSource(bytes);setDoc(pdf);setPreviewDoc(pdf);setDocumentFonts(detectedFonts);setStrippedIds(new Set());setPages(ps);setEls(items);setPast([]);setFuture([]);setSelected(null);setActive(0);setName(fileName.replace(/\.pdf$/i,""))}catch(e){console.error(e);alert("Não foi possível abrir este PDF.")}finally{setBusy(false)}};
+ const loadBytes=async(bytes:Uint8Array,fileName:string)=>{setBusy(true);try{const pdf=await getDocument({data:bytes.slice()}).promise;const ps:PageInfo[]=[];const items:El[]=[];const fontMap=new Map<string,DetectedPdfFont>();for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const vp=p.getViewport({scale:1});ps.push({width:vp.width,height:vp.height});const tc=await p.getTextContent();const pageTextStart=items.length;const lineItems:{str:string;x:number;baseline:number;size:number;width:number;font:Font;bold:boolean;italic:boolean;originalFontFamily?:string}[]=[];for(const it of tc.items){if(!("str"in it)||!it.str.trim())continue;const styleFamily=tc.styles[it.fontName]?.fontFamily;const originalFont=readPdfJsFontDetails(pdf,it.fontName,styleFamily);if(originalFont){const key=originalFont.family+"|"+originalFont.style;const entry=fontMap.get(key)??{family:originalFont.family,style:originalFont.style,pages:[]};if(!entry.pages.includes(i))entry.pages.push(i);fontMap.set(key,entry)}const tx=(await import("pdfjs-dist")).Util.transform(vp.transform,it.transform);const [a,b,c,d,x,base]=tx;if(Math.abs(b)>.01||Math.abs(c)>.01||a<=0)continue;const size=Math.max(4,Math.hypot(c,d));const originalFontFamily=originalFont?.family;const fam=styleFamily??it.fontName;lineItems.push({str:it.str,x,baseline:base,size,width:it.width,font:/courier|mono/i.test(fam)?"Courier":/times|serif/i.test(fam)?"Times":"Helvetica",bold:/bold/i.test(fam),italic:/italic|oblique/i.test(fam),originalFontFamily})}lineItems.sort((a,b)=>a.baseline-b.baseline||a.x-b.x);const lines:{items:typeof lineItems}[]=[];for(const item of lineItems){let line=lines.find(candidate=>Math.abs(candidate.items[0].baseline-item.baseline)<=Math.max(2.5,item.size*.24));if(!line){line={items:[]};lines.push(line)}line.items.push(item)}for(const line of lines){line.items.sort((a,b)=>a.x-b.x);const first=line.items[0];let textValue="",left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;for(const item of line.items){const previous=line.items[line.items.indexOf(item)-1];if(previous){const gap=item.x-(previous.x+previous.width);if(gap>Math.max(1,item.size*.18)&&!textValue.endsWith(" ")&&!item.str.startsWith(" "))textValue+=" "}textValue+=item.str;left=Math.min(left,item.x);right=Math.max(right,item.x+item.width);top=Math.min(top,item.baseline-item.size*1.18);bottom=Math.max(bottom,item.baseline+item.size*.08)}const height=Math.max(first.size*1.2,bottom-top);items.push({id:uid(),type:"text",page:i-1,x:left,y:top,text:textValue,fontSize:first.size,fontFamily:first.font,bold:first.bold,italic:first.italic,color:"#171717",modified:false,originalFontFamilies:Array.from(new Set(line.items.map(item=>item.originalFontFamily).filter((value):value is string=>!!value))),origin:{x:left-1,y:top-1,width:Math.max(right-left,3)+2,height:height+2}})}const pageLines=items.slice(pageTextStart).filter((entry):entry is TextEl=>entry.type==="text").sort((a,b)=>(a.origin?.y??a.y)-(b.origin?.y??b.y));let paragraph:TextEl[]=[];const flushParagraph=()=>{if(paragraph.length>1){const paragraphId=uid();for(const line of paragraph)line.paragraphId=paragraphId}paragraph=[]};for(const line of pageLines){const previous=paragraph[paragraph.length-1];if(previous&&previous.origin&&line.origin){const gap=line.origin.y-(previous.origin.y+previous.origin.height);const aligned=Math.abs(line.origin.x-previous.origin.x)<=Math.max(12,line.fontSize*2.2);if(!aligned||gap>line.fontSize*.75||gap< -line.fontSize*.35)flushParagraph()}paragraph.push(line)}flushParagraph()}try{const glyphColors=await scanGlyphColors(bytes);for(const el of items){if(el.type!=="text"||!el.origin)continue;const counts=new Map<string,number>();for(const point of glyphColors[el.page]??[]){if(point.x>=el.origin.x&&point.x<=el.origin.x+el.origin.width&&point.y>=el.origin.y&&point.y<=el.origin.y+el.origin.height)counts.set(point.color,(counts.get(point.color)??0)+1)}let best="";let max=0;for(const [color,count] of counts)if(count>max){best=color;max=count}if(best)el.color=best}}catch{/* text colour detection is optional */}setSource(bytes);setDoc(pdf);setPreviewDoc(pdf);setDocumentFonts(Array.from(fontMap.values()).sort((a,b)=>a.family.localeCompare(b.family)||a.style.localeCompare(b.style)));setStrippedIds(new Set());setPages(ps);setEls(items);setPast([]);setFuture([]);setSelected(null);setActive(0);setName(fileName.replace(/\.pdf$/i,""))}catch(e){console.error(e);alert("Não foi possível abrir este PDF.")}finally{setBusy(false)}};
  const open=async(file:File)=>loadBytes(new Uint8Array(await file.arrayBuffer()),file.name);
  useEffect(()=>{window.receivePdfFromHost=(base64,fileName)=>{const binary=atob(base64);const bytes=Uint8Array.from(binary,ch=>ch.charCodeAt(0));void loadBytes(bytes,fileName)};if(window.invokeCSharpAction)window.invokeCSharpAction(JSON.stringify({type:"editorReady"}));return()=>{delete window.receivePdfFromHost}},[]);
  const choosePdf=()=>{if(window.invokeCSharpAction)window.invokeCSharpAction(JSON.stringify({type:"openPdf"}));else pdfInput.current?.click()};
