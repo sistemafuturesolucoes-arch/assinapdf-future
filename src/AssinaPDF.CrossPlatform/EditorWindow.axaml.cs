@@ -111,6 +111,18 @@ public partial class EditorWindow : Window
         Opened += async (_, _) => await InitializeDocumentAsync();
     }
 
+    private static IReadOnlyList<string> GetEditorFontChoices()
+    {
+        // Keep the three PDF editor families from Typecraft at the top of the
+        // list. The remaining installed families stay available as an extension.
+        var installed = InstalledFontCatalogService.GetInstalledFamilyNames();
+        return new[] { "Helvetica", "Times", "Courier" }
+            .Concat(installed.Where(name =>
+                !new[] { "Helvetica", "Times", "Courier" }.Contains(
+                    name, StringComparer.OrdinalIgnoreCase)))
+            .ToArray();
+    }
+
     private void InitializeFormattingToolbar()
     {
         RichEditorToolbar.FontSizes = new[]
@@ -122,7 +134,7 @@ public partial class EditorWindow : Window
         _defaultToolbarEditor = new RichEditorControl
         {
             Document = new RichFlowDocument(),
-            FontFamilyChoices = InstalledFontCatalogService.GetInstalledFamilyNames(),
+            FontFamilyChoices = GetEditorFontChoices(),
             DefaultFontSize = 12,
             DefaultForeground = Avalonia.Media.Brushes.Black,
             AllowImages = false,
@@ -2908,8 +2920,6 @@ public partial class EditorWindow : Window
                 originalFontName = mappedFamily;
             }
 
-            var installedFonts = InstalledFontCatalogService.GetInstalledFamilyNames();
-
             var richDocument = new RichFlowDocument();
             var initialParagraph = new RichParagraph();
             initialParagraph.Inlines.Add(new RichRun
@@ -2934,7 +2944,7 @@ public partial class EditorWindow : Window
             var richEditor = new RichEditorControl
             {
                 Document = richDocument,
-                FontFamilyChoices = installedFonts,
+                FontFamilyChoices = GetEditorFontChoices(),
                 DefaultFontSize = originalFontSize,
                 DefaultForeground = Avalonia.Media.Brushes.Black,
                 AllowImages = false,
