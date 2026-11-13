@@ -1729,8 +1729,10 @@ public partial class EditorWindow : Window
                 annotation.Subject = annotationSubject;
                 annotation.Contents = "Forma inserida pelo AssinaPDF";
                 annotation.Color = Aspose.Pdf.Color.FromRgb(0.42, 0.29, 0.75);
-                annotation.InteriorColor = Aspose.Pdf.Color.FromRgb(0.88, 0.84, 0.96);
-                annotation.Opacity = 0.22;
+                // Mesmo padrão funcional do Typecraft: preenchimento branco
+                // totalmente opaco, editável pelo painel de propriedades.
+                annotation.InteriorColor = Aspose.Pdf.Color.FromRgb(1.0, 1.0, 1.0);
+                annotation.Opacity = 1.0;
                 annotation.Flags = Aspose.Pdf.Annotations.AnnotationFlags.Print;
                 page.Annotations.Add(annotation);
                 annotation.UpdateAppearances();
@@ -1935,7 +1937,9 @@ public partial class EditorWindow : Window
                     image, pageInfo, shapeKind,
                     shape.Name, -1, null, 0,
                     (shapeBounds.LLX, shapeBounds.LLY,
-                     shapeBounds.URX, shapeBounds.URY));
+                     shapeBounds.URX, shapeBounds.URY),
+                    GetAsposeColorHex(shape.InteriorColor),
+                    Math.Clamp(shape.Opacity, 0.05, 1.0));
                 return true;
             }
 
@@ -2000,7 +2004,9 @@ public partial class EditorWindow : Window
         int imagePlacementIndex,
         byte[]? imageBytes,
         int imageRotation,
-        (double Left, double Bottom, double Right, double Top) bounds)
+        (double Left, double Bottom, double Right, double Top) bounds,
+        string fillHex = "#FFFFFF",
+        double opacity = 1.0)
     {
         ClearTextSelection();
         _selectedPageIndex = pageInfo.PageIndex;
@@ -2022,6 +2028,15 @@ public partial class EditorWindow : Window
         EditSelectedTextButton.IsVisible = false;
         DeleteSelectedTextButton.Content = "Excluir elemento";
         DeleteSelectedTextButton.IsVisible = true;
+        ShapePropertiesPanel.IsVisible =
+            kind is VisualElementKind.Rectangle or VisualElementKind.Ellipse;
+        if (ShapePropertiesPanel.IsVisible)
+        {
+            ShapeFillColorTextBox.Text = fillHex;
+            ShapeOpacitySlider.Value = Math.Clamp(opacity, 0.05, 1.0);
+            ShapeOpacityValueText.Text =
+                $"Opacidade · {Math.Round(ShapeOpacitySlider.Value * 100):0}%";
+        }
 
         if (!_pageSurfaces.TryGetValue(pageInfo.PageIndex, out var surface))
             return;
@@ -2146,6 +2161,214 @@ public partial class EditorWindow : Window
         PositionHandle();
         EditorStatusText.Text =
             elementLabel + ". Arraste para mover; use o puxador roxo no canto para redimensionar.";
+    }
+
+    private static string GetAsposeColorHex(Aspose.Pdf.Color? color)
+    {
+        if (color == null)
+            return "#FFFFFF";
+
+        // ToRgb pode retornar um System.Drawing.Color ou outro objeto de cor,
+        // conforme a versão do Aspose. A leitura reflexiva mantém o editor
+        // compatível com ambas as representações sem depender de GDI+.
+        object rgb = color.GetType().GetMethod("ToRgb", Type.EmptyTypes)
+            ?.Invoke(color, null) ?? color;
+        Type type = rgb.GetType();
+
+        byte ReadChannel(string propertyName, int dataIndex)
+        {
+            object? raw = type.GetProperty(propertyName)?.GetValue(rgb);
+            if (raw != null)
+                return Convert.ToByte(raw, CultureInfo.InvariantCulture);
+
+            if (type.GetProperty("Data")?.GetValue(rgb) is Array data &&
+                data.Length > dataIndex &&
+                data.GetValue(dataIndex) is { } component)
+            {
+                double value = Convert.ToDouble(component, CultureInfo.InvariantCulture);
+                if (value <= 1.0)
+                    value *= 255.0;
+                return (byte)Math.Clamp(Math.Round(value), 0, 255);
+            }
+
+            return 255;
+        }
+
+        return $"#{ReadChannel("R", 0):X2}{ReadChannel("G", 1):X2}{ReadChannel("B", 2):X2}";
+    }
+
+    private void ShapeColorSwatch_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not string color)
+            return;
+
+        ShapeFillColorTextBox.Text = color;
+        ApplySelectedShapeFillColor();
+    }
+
+    private void ApplyShapeFillColor_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e) =>
+        ApplySelectedShapeFillColor();
+
+    private void ShapeFillColorTextBox_KeyUp(
+        object? sender,
+        KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        ApplySelectedShapeFillColor();
+        e.Handled = true;
+    }
+
+    private void ShapeOpacitySlider_ValueChanged(
+        object? sender,
+        Avalonia.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        ShapeOpacityValueText.Text =
+            $"Opacidade · {Math.Round(e.NewValue * 100):0}%";
+    }
+
+    private void ShapeOpacitySlider_PointerReleased(
+        object? sender,
+        PointerReleasedEventArgs e) =>
+        ApplySelectedShapeOpacity();
+
+    private void ShapeOpacitySlider_KeyUp(
+        object? sender,
+        KeyEventArgs e)
+    {
+        if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End)
+            ApplySelectedShapeOpacity();
+    }
+
+    private void ApplySelectedShapeFillColor()
+    {
+        if (_selectedVisualKind is not (VisualElementKind.Rectangle or VisualElementKind.Ellipse) ||
+            _selectedPageIndex is not int pageIndex ||
+            string.IsNullOrWhiteSpace(_selectedVisualName))
+            return;
+
+        string selectedName = _selectedVisualName;
+        string requestedHex = ShapeFillColorTextBox.Text?.Trim() ?? string.Empty;
+        if (!TryParseHexColor(requestedHex, out Aspose.Pdf.Color fillColor))
+        {
+            EditorStatusText.Text = "Informe uma cor hexadecimal válida, por exemplo #2563EB.";
+            return;
+        }
+
+        try
+        {
+            ApplyPdfEdit(document =>
+            {
+                var annotation = document.Pages[pageIndex + 1].Annotations
+                    .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                    .FirstOrDefault(item => string.Equals(
+                        item.Name, selectedName, StringComparison.Ordinal));
+                if (annotation == null)
+                    throw new InvalidOperationException("A forma selecionada não existe mais no PDF.");
+
+                annotation.InteriorColor = fillColor;
+                annotation.UpdateAppearances();
+            }, "Cor da forma atualizada.", savedDocument =>
+            {
+                var annotation = savedDocument.Pages[pageIndex + 1].Annotations
+                    .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                    .FirstOrDefault(item => string.Equals(
+                        item.Name, selectedName, StringComparison.Ordinal));
+                return annotation != null &&
+                    string.Equals(
+                        GetAsposeColorHex(annotation.InteriorColor),
+                        requestedHex.StartsWith("#", StringComparison.Ordinal)
+                            ? requestedHex
+                            : "#" + requestedHex,
+                        StringComparison.OrdinalIgnoreCase);
+            });
+
+            RestoreVisualElementSelection(pageIndex, selectedName);
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                "Não foi possível aplicar a cor. A versão anterior foi preservada. " + ex.Message;
+        }
+    }
+
+    private void ApplySelectedShapeOpacity()
+    {
+        if (_selectedVisualKind is not (VisualElementKind.Rectangle or VisualElementKind.Ellipse) ||
+            _selectedPageIndex is not int pageIndex ||
+            string.IsNullOrWhiteSpace(_selectedVisualName))
+            return;
+
+        string selectedName = _selectedVisualName;
+        double requestedOpacity = Math.Clamp(ShapeOpacitySlider.Value, 0.05, 1.0);
+        try
+        {
+            ApplyPdfEdit(document =>
+            {
+                var annotation = document.Pages[pageIndex + 1].Annotations
+                    .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                    .FirstOrDefault(item => string.Equals(
+                        item.Name, selectedName, StringComparison.Ordinal));
+                if (annotation == null)
+                    throw new InvalidOperationException("A forma selecionada não existe mais no PDF.");
+
+                annotation.Opacity = requestedOpacity;
+                annotation.UpdateAppearances();
+            }, "Opacidade da forma atualizada.", savedDocument =>
+            {
+                var annotation = savedDocument.Pages[pageIndex + 1].Annotations
+                    .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                    .FirstOrDefault(item => string.Equals(
+                        item.Name, selectedName, StringComparison.Ordinal));
+                return annotation != null &&
+                    Math.Abs(annotation.Opacity - requestedOpacity) < 0.01;
+            });
+
+            RestoreVisualElementSelection(pageIndex, selectedName);
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                "Não foi possível aplicar a opacidade. A versão anterior foi preservada. " + ex.Message;
+        }
+    }
+
+    private void RestoreVisualElementSelection(int pageIndex, string selectedName)
+    {
+        if (!_pageSurfaces.TryGetValue(pageIndex, out var surface) ||
+            surface.Image.Tag is not PagePreviewInfo pageInfo)
+            return;
+
+        try
+        {
+            using var document = Document.Open(_workingCopyPath);
+            var annotation = document.Pages[pageIndex + 1].Annotations
+                .OfType<Aspose.Pdf.Annotations.MarkupAnnotation>()
+                .FirstOrDefault(item => string.Equals(
+                    item.Name, selectedName, StringComparison.Ordinal));
+            if (annotation?.Rect is not { } bounds)
+                return;
+
+            VisualElementKind kind =
+                annotation is Aspose.Pdf.Annotations.CircleAnnotation
+                    ? VisualElementKind.Ellipse
+                    : VisualElementKind.Rectangle;
+            SetVisualElementSelection(
+                surface.Image, pageInfo, kind, selectedName, -1, null, 0,
+                (bounds.LLX, bounds.LLY, bounds.URX, bounds.URY),
+                GetAsposeColorHex(annotation.InteriorColor),
+                Math.Clamp(annotation.Opacity, 0.05, 1.0));
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text =
+                "A forma foi atualizada, mas não foi possível manter a seleção. " + ex.Message;
+        }
     }
 
     private void ApplyVisualElementBounds(
@@ -2385,6 +2608,7 @@ public partial class EditorWindow : Window
         }
 
         _selectedPageIndex = null;
+        ShapePropertiesPanel.IsVisible = false;
         SelectedTextLabel.Text = string.Empty;
         SelectedTextLabel.IsVisible = false;
         EditSelectedTextButton.IsVisible = false;
