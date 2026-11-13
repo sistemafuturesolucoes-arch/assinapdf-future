@@ -14,7 +14,11 @@ public partial class EditorWebWindow : Window
     private string? _historyId;
     private bool _initialPdfSent;
 
-    public EditorWebWindow(string? workingCopyPath = null, string? historyId = null)
+    public EditorWebWindow() : this(null, null)
+    {
+    }
+
+    public EditorWebWindow(string? workingCopyPath, string? historyId)
     {
         InitializeComponent();
         _workingCopyPath = workingCopyPath;
@@ -67,6 +71,9 @@ public partial class EditorWebWindow : Window
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(e.Body))
+                return;
+
             using var message = JsonDocument.Parse(e.Body);
             var root = message.RootElement;
             if (!root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String)
