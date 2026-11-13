@@ -44,6 +44,12 @@ internal static class FontDownloadService
         if (string.IsNullOrWhiteSpace(family))
             return false;
 
+        // The three Typecraft editor families are PDF Standard-14 fonts.
+        // They are resolved by their built-in PDF faces and do not need
+        // a separately installed/downloaded system font.
+        if (IsStandard14Family(family))
+            return true;
+
         try
         {
             _ = FontRepository.FindFont(family, FontStyles.Regular, true);
@@ -178,6 +184,18 @@ internal static class FontDownloadService
 
         FontRepository.LoadFonts();
         return IsAvailable(family);
+    }
+
+    private static bool IsStandard14Family(string family)
+    {
+        string normalized = new string(family
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+
+        return normalized is "helvetica" or "times" or "timesroman" or
+            "timesnewroman" or "courier" or "couriernew" or
+            "symbol" or "zapfdingbats";
     }
 
     private static bool IsPdfResourceIdentifier(string value)
