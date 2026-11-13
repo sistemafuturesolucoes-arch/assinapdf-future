@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";\nimport { stripText } from "./strip";
+import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { stripText } from "./strip";
 import { Download, FilePlus2, FileUp, ImagePlus, MousePointer2, Redo2, Square, Type, Undo2, ZoomIn, ZoomOut, Trash2 } from "lucide-react";
-GlobalWorkerOptions.workerSrc = workerUrl;\ndeclare global { interface Window { invokeCSharpAction?: (message: string) => void; receivePdfFromHost?: (base64: string, fileName: string) => void } }\nconst encodeBase64 = (bytes: Uint8Array) => { let binary = ""; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); };
+GlobalWorkerOptions.workerSrc = workerUrl;
+declare global { interface Window { invokeCSharpAction?: (message: string) => void; receivePdfFromHost?: (base64: string, fileName: string) => void } }
+const encodeBase64 = (bytes: Uint8Array) => { let binary = ""; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); };
 
 type Font = "Helvetica" | "Times" | "Courier";
 type TextEl = { id:string; type:"text"; page:number; x:number; y:number; text:string; fontSize:number; fontFamily:Font; bold:boolean; italic:boolean; color:string; modified:boolean; origin?:{x:number;y:number;width:number;height:number} };
