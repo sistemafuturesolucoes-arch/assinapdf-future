@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 
 namespace AssinaPDF.MacPrototype;
@@ -21,6 +22,26 @@ public partial class EditorWebWindow : Window
     public EditorWebWindow(string? workingCopyPath, string? historyId)
     {
         InitializeComponent();
+
+        // O WebView2 precisa de uma pasta de dados gravável pelo usuário.
+        // Nunca usar AppContext.BaseDirectory, pois o aplicativo pode estar em Program Files.
+        if (OperatingSystem.IsWindows())
+        {
+            var webViewData = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FutureSolucoes",
+                "AssinaPDF",
+                "WebView2");
+
+            Directory.CreateDirectory(webViewData);
+
+            EditorWebView.EnvironmentRequested += (_, args) =>
+            {
+                if (args is WindowsWebView2EnvironmentRequestedEventArgs webView2)
+                    webView2.UserDataFolder = webViewData;
+            };
+        }
+
         _workingCopyPath = workingCopyPath;
         _historyId = historyId;
         Opened += async (_, _) => await StartEditorAsync();
