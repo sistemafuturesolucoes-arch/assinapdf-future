@@ -8,17 +8,22 @@ namespace AssinaPDF.MacPrototype;
 
 public partial class EditorWebWindow : Window
 {
+    private readonly EditorHistoryService _history = new();
     private EditorWebServer? _server;
-    private readonly string? _workingCopyPath;
+    private string? _workingCopyPath;
+    private string? _historyId;
     private bool _initialPdfSent;
 
-    public EditorWebWindow(string? workingCopyPath = null)
+    public EditorWebWindow(string? workingCopyPath = null, string? historyId = null)
     {
         InitializeComponent();
         _workingCopyPath = workingCopyPath;
+        _historyId = historyId;
         Opened += async (_, _) => await StartEditorAsync();
         Closed += async (_, _) =>
         {
+            if (!string.IsNullOrWhiteSpace(_historyId))
+                _history.Touch(_historyId);
             if (_server is not null)
             {
                 await _server.DisposeAsync();
@@ -60,9 +65,14 @@ public partial class EditorWebWindow : Window
             return;
 
         _initialPdfSent = true;
-        var bytes = await File.ReadAllBytesAsync(_workingCopyPath);
+        await SendPdfToWebAsync(_workingCopyPath);
+    }
+
+    private async System.Threading.Tasks.Task SendPdfToWebAsync(string path)
+    {
+        var bytes = await File.ReadAllBytesAsync(path);
         var base64 = Convert.ToBase64String(bytes);
-        var fileName = Path.GetFileName(_workingCopyPath);
+        var fileName = Path.GetFileName(path);
         await EditorWebView.InvokeScript(
             $"window.receivePdfFromHost && window.receivePdfFromHost({JsonSerializer.Serialize(base64)}, {JsonSerializer.Serialize(fileName)})");
     }
@@ -73,9 +83,18 @@ public partial class EditorWebWindow : Window
         {
             using var message = JsonDocument.Parse(e.Body);
             var root = message.RootElement;
-            if (!root.TryGetProperty("type", out var type) || type.GetString() != "savePdf")
+            if (!root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String)
                 return;
-            if (!root.TryGetProperty("base64", out var payload) || payload.ValueKind != JsonValueKind.String)
+
+            if (type.GetString() == "openPdf")
+            {
+                await OpenPdfAsync();
+                return;
+            }
+
+            if (type.GetString() != "savePdf" ||
+                !root.TryGetProperty("base64", out var payload) ||
+                payload.ValueKind != JsonValueKind.String)
                 return;
 
             var base64 = payload.GetString();
@@ -85,15 +104,6 @@ public partial class EditorWebWindow : Window
             var bytes = Convert.FromBase64String(base64);
             if (bytes.Length == 0 || bytes.Length > 150 * 1024 * 1024)
                 throw new InvalidDataException("O PDF exportado está vazio ou excede o limite de 150 MB.");
-
-            if (!string.IsNullOrWhiteSpace(_workingCopyPath))
-            {
-                var directory = Path.GetDirectoryName(_workingCopyPath);
-                if (!string.IsNullOrWhiteSpace(directory))
-                    Directory.CreateDirectory(directory);
-                await File.WriteAllBytesAsync(_workingCopyPath, bytes);
-                return;
-            }
 
             var suggestedName = root.TryGetProperty("fileName", out var fileName)
                 ? Path.GetFileName(fileName.GetString() ?? "documento-editado.pdf")
@@ -112,15 +122,50 @@ public partial class EditorWebWindow : Window
             if (target is null)
                 return;
 
-            await using var output = await target.OpenWriteAsync();
-            await output.WriteAsync(bytes);
+            var targetPath = target.Path.LocalPath;
+            await using (var output = await target.OpenWriteAsync())
+                await output.WriteAsync(bytes);
+
+            if (string.IsNullOrWhiteSpace(_workingCopyPath))
+            {
+                var entry = _history.CreateWorkingCopy(targetPath);
+                _workingCopyPath = entry.WorkingCopyPath;
+                _historyId = entry.Id;
+            }
+            else
+            {
+                await File.WriteAllBytesAsync(_workingCopyPath, bytes);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_historyId))
+                _history.Touch(_historyId);
         }
         catch (Exception ex)
         {
-            LoadingTitle.Text = "Falha ao salvar o PDF";
+            LoadingTitle.Text = "Falha ao processar o documento";
             LoadingDetails.Text = ex.Message;
             LoadingOverlay.IsVisible = true;
         }
+    }
+
+    private async System.Threading.Tasks.Task OpenPdfAsync()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Selecionar documento PDF",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Documentos PDF") { Patterns = new[] { "*.pdf", "*.PDF" } }
+            }
+        });
+        if (files.Count == 0)
+            return;
+
+        var entry = _history.CreateWorkingCopy(files[0].Path.LocalPath);
+        _workingCopyPath = entry.WorkingCopyPath;
+        _historyId = entry.Id;
+        await SendPdfToWebAsync(_workingCopyPath);
     }
 
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
