@@ -87,6 +87,7 @@ public partial class EditorWindow : Window
         Directory.CreateDirectory(_sessionDirectory);
         InitializeComponent();
         InitializeFormattingToolbar();
+        KeyDown += EditorWindow_KeyDown;
         Closed += (_, _) => DisposeResources();
         EditorStatusText.Text = "Clique em “Abrir PDF” para começar. O documento original será preservado.";
     }
@@ -95,6 +96,7 @@ public partial class EditorWindow : Window
     {
         InitializeComponent();
         InitializeFormattingToolbar();
+        KeyDown += EditorWindow_KeyDown;
 
         _workingCopyPath = workingCopyPath;
         _originalPath = originalPath;
@@ -150,6 +152,81 @@ public partial class EditorWindow : Window
             ToolbarLevel = RichToolbarLevel.Normal
         };
         EditorFormattingToolbarHost.Content = _formattingToolbar;
+    }
+
+    private void EditorWindow_KeyDown(object? sender, KeyEventArgs e)
+    {
+        // Do not steal keystrokes from the rich-text editor or property inputs.
+        if (EditorInlineEditorHost.IsVisible || e.Source is TextBox or ComboBox)
+        {
+            if (e.Key == Key.Escape && EditorInlineEditorHost.IsVisible)
+                return;
+            return;
+        }
+
+        bool command = e.KeyModifiers.HasFlag(KeyModifiers.Control) ||
+                       e.KeyModifiers.HasFlag(KeyModifiers.Meta);
+        if (command && e.Key == Key.Z)
+        {
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                Redo_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+            else
+                Undo_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (command && e.Key == Key.Y)
+        {
+            Redo_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key is Key.Delete or Key.Back)
+        {
+            if (_selectedVisualKind != VisualElementKind.None)
+                DeleteSelectedVisualElement();
+            else if (!string.IsNullOrWhiteSpace(_selectedText))
+                DeleteSelectedText_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            ClearTextSelection();
+            _toolMode = EditorToolMode.Select;
+            EditorStatusText.Text = "Seleção limpa.";
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter && !string.IsNullOrWhiteSpace(_selectedText))
+        {
+            _ = EditSelectedText_ClickAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (command)
+            return;
+
+        switch (e.Key)
+        {
+            case Key.V:
+                SelectMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+                e.Handled = true;
+                break;
+            case Key.T:
+                AddTextMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+                e.Handled = true;
+                break;
+            case Key.R:
+                RectangleMode_Click(this, new Avalonia.Interactivity.RoutedEventArgs());
+                e.Handled = true;
+                break;
+        }
     }
 
     private void TextTool_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
