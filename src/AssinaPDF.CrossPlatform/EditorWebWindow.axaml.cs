@@ -86,7 +86,7 @@ public partial class EditorWebWindow : Window
             if (!root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String)
                 return;
 
-            if (type.GetString() == "openPdf")
+            if (type.GetString() == "editorReady")\n            {\n                if (!_initialPdfSent && !string.IsNullOrWhiteSpace(_workingCopyPath) && File.Exists(_workingCopyPath))\n                {\n                    _initialPdfSent = true;\n                    await SendPdfToWebAsync(_workingCopyPath);\n                }\n                return;\n            }\n\n            if (type.GetString() == "openPdf")
             {
                 await OpenPdfAsync();
                 return;
