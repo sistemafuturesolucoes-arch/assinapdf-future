@@ -856,11 +856,13 @@ public partial class EditorWindow : Window
                     surface.Overlay.Children.Remove(marker);
             }
         }
-        if (_isDrawingRectangle && ReferenceEquals(sender, _activeSelectionImage) &&
+        if (_isDrawingRectangle &&
+            _activeSelectionImage is AvaloniaImage drawingImage &&
+            ReferenceEquals(sender, drawingImage) &&
             _activeSelectionPage is PagePreviewInfo drawingPage)
         {
-            _selectionEnd = e.GetPosition(_activeSelectionImage);
-            UpdateRectanglePreview(_activeSelectionImage, drawingPage, _selectionStart, _selectionEnd);
+            _selectionEnd = e.GetPosition(drawingImage);
+            UpdateRectanglePreview(drawingImage, drawingPage, _selectionStart, _selectionEnd);
         }
 
         if (_isDraggingSelection && ReferenceEquals(sender, _activeSelectionImage))
@@ -1647,8 +1649,8 @@ public partial class EditorWindow : Window
                 Background = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.FromArgb(35, 109, 75, 195)),
                 CornerRadius = _toolMode == EditorToolMode.DrawEllipse
-                    ? new CornerRadius(999)
-                    : new CornerRadius(0),
+                    ? new Avalonia.CornerRadius(999)
+                    : new Avalonia.CornerRadius(0),
                 IsHitTestVisible = false
             };
             surface.Overlay.Children.Add(_rectanglePreview);
