@@ -11,6 +11,7 @@ on:
       - 'tests/AssinaPDF.CrossPlatform.Tests/**'
       - 'installer-crossplatform/**'
       - 'scripts/generate_windows_icon.py'
+      - 'scripts/generate_installer_bitmaps.py'
       - '.github/workflows/assinapdf-crossplatform-build.yml'
   pull_request:
     branches:
@@ -65,6 +66,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check Pillow
           python scripts/generate_windows_icon.py
+          python scripts/generate_installer_bitmaps.py
 
       - name: Publicar aplicação autocontida
         shell: pwsh
