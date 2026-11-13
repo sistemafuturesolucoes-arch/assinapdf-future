@@ -43,3 +43,13 @@
  .props{padding-top:10px;padding-bottom:10px}
  .stack{padding-top:10px;padding-bottom:10px;gap:14px}
 }
+
+.shape-tool{position:relative;display:flex;align-items:center;justify-content:center}
+.shape-palette{position:absolute;z-index:20;left:48px;top:0;min-width:132px;padding:6px;background:#fff;border:1px solid #d9dce4;border-radius:9px;box-shadow:0 8px 24px #11182730;display:flex;flex-direction:column;gap:3px}
+.shape-palette button{width:100%;height:30px;padding:4px 8px;text-align:left;border:0;border-radius:5px;background:#fff;color:#303746;font-size:11px;cursor:pointer}
+.shape-palette button:hover,.shape-palette button.chosen{background:#eee9f8;color:#5832a8}
+.resize-handle{position:absolute;z-index:8;width:9px;height:9px;border:1px solid #fff;border-radius:2px;background:#6847b2;box-shadow:0 0 0 1px #6847b2;touch-action:none}
+.resize-handle.nw{left:-5px;top:-5px;cursor:nwse-resize}.resize-handle.n{left:calc(50% - 4px);top:-5px;cursor:ns-resize}.resize-handle.ne{right:-5px;top:-5px;cursor:nesw-resize}
+.resize-handle.e{right:-5px;top:calc(50% - 4px);cursor:ew-resize}.resize-handle.se{right:-5px;bottom:-5px;cursor:nwse-resize}.resize-handle.s{left:calc(50% - 4px);bottom:-5px;cursor:ns-resize}
+.resize-handle.sw{left:-5px;bottom:-5px;cursor:nesw-resize}.resize-handle.w{left:-5px;top:calc(50% - 4px);cursor:ew-resize}
+.element.selected{outline:1px solid #7654c5;outline-offset:0}
