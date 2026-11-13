@@ -89,6 +89,8 @@ public partial class EditorWindow : Window
         InitializeFormattingToolbar();
         KeyDown += EditorWindow_KeyDown;
         Closed += (_, _) => DisposeResources();
+        AddPageButton.IsEnabled = false;
+        ExportPdfButton.IsEnabled = false;
         EditorStatusText.Text = "Clique em “Abrir PDF” para começar. O documento original será preservado.";
     }
 
@@ -583,6 +585,8 @@ public partial class EditorWindow : Window
 
     private void LoadDocumentPreview()
     {
+        AddPageButton.IsEnabled = true;
+        ExportPdfButton.IsEnabled = true;
         _document?.Dispose();
         _document = null;
 
