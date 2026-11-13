@@ -147,7 +147,7 @@ public partial class EditorCenterWindow : Window
         {
             // A central de edição abre diretamente o editor; a escolha do PDF
             // acontece pelo botão Abrir PDF na faixa de ferramentas.
-            var editor = new EditorWindow();
+            var editor = new EditorWebWindow();
             CenterStatusText.Text = "Editor iniciado. Use “Abrir PDF” para escolher um documento.";
             await editor.ShowDialog(this);
             RefreshRecentDocuments();
@@ -173,10 +173,7 @@ public partial class EditorCenterWindow : Window
             string documentDirectory = Path.GetDirectoryName(entry.WorkingCopyPath)
                 ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
 
-            var editor = new EditorWindow(
-                entry.WorkingCopyPath,
-                entry.OriginalPath,
-                documentDirectory);
+            var editor = new EditorWebWindow(entry.WorkingCopyPath, entry.Id);
 
             CenterStatusText.Text = $"Abrindo {entry.OriginalFileName}...";
             await editor.ShowDialog(this);
