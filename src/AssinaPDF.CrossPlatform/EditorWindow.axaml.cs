@@ -2975,7 +2975,7 @@ public partial class EditorWindow : Window
             Aspose.Pdf.Rectangle? originalBounds = null;
             string? originalFontName = null;
             bool originalFontEmbedded = false;
-            double originalFontSize = 12;
+            double originalFontSize = 14;
             bool originalBold = false;
             bool originalItalic = false;
             bool originalFontIsUnidentifiedCid = false;
