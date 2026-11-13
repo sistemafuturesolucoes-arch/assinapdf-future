@@ -280,20 +280,12 @@ public partial class MainWindow : Window
                 string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
                     ?? throw new InvalidOperationException("Não foi possível localizar a pasta do documento.");
 
-                try
-                {
-                    var editor = new EditorWindow(
-                        entry.WorkingCopyPath,
-                        entry.OriginalPath,
-                        documentDirectory);
-                    await editor.ShowDialog(viewer!);
-                    _editorHistory.Touch(entry.Id);
-                    return entry.WorkingCopyPath;
-                }
-                catch
-                {
-                    throw;
-                }
+                var editor = new EditorWebWindow(
+                    entry.WorkingCopyPath,
+                    entry.Id);
+                await editor.ShowDialog(viewer!);
+                _editorHistory.Touch(entry.Id);
+                return entry.WorkingCopyPath;
             });
 
             await viewer.ShowDialog(this);
