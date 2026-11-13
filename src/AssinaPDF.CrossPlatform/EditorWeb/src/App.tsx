@@ -55,8 +55,8 @@ async function readPdfResourceFonts(bytes: Uint8Array): Promise<DetectedPdfFont[
     try {
      const font = fontResources.lookup(resourceKey, PDFDict);
      const baseFont = font.lookup(PDFName.of("BaseFont"), PDFName);
-     const rawName = baseFont.toString().replace(/^\\//, "").replace(/#2B/gi, "+");
-     const clean = rawName.replace(/^[A-Z]{6}\\+/, "").trim();
+     const rawName = baseFont.toString().replace(/^\//, "").replace(/#2B/gi, "+");
+     const clean = rawName.replace(/^[A-Z]{6}\+/, "").trim();
      const bold = /bold|demi|semibold|black|heavy/i.test(clean);
      const italic = /italic|oblique/i.test(clean);
      const base = clean.replace(/[-_ ]?(bold|demi|semibold|black|heavy|italic|oblique|regular|medium|light|book|mt)$/ig, "").replace(/[-_ ]?(bold|italic|oblique)$/ig, "");
