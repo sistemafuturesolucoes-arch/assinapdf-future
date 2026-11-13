@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.EditorWebWindow"
         Title="AssinaPDF | Editor Future"
-        Width="1440" Height="920"
-        MinWidth="980" MinHeight="680"
+        Width="1080" Height="680"
+        MinWidth="860" MinHeight="560"
         WindowStartupLocation="CenterOwner"
         Background="#F3F4F6">
   <Grid RowDefinitions="Auto,*">
