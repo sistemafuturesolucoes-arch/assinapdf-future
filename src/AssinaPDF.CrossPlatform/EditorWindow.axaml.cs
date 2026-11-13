@@ -1944,6 +1944,51 @@ public partial class EditorWindow : Window
         await EditTextAtPointAsync(pageInfo.PageIndex, pdfX, pdfY);
     }
 
+    private async void NewBlankPdf_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            string sourceDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FutureSolucoes", "AssinaPDF", "BlankSources");
+            Directory.CreateDirectory(sourceDirectory);
+            string sourcePath = Path.Combine(
+                sourceDirectory, $"Documento-em-branco-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.pdf");
+
+            using (var blankDocument = new Document())
+            {
+                var page = blankDocument.Pages.Add();
+                page.SetPageSize(595.28, 841.89);
+                blankDocument.Save(sourcePath);
+            }
+
+            var entry = _history.CreateWorkingCopy(sourcePath);
+            _document?.Dispose();
+            _document = null;
+            _workingCopyPath = entry.WorkingCopyPath;
+            _originalPath = entry.OriginalPath;
+            _sessionDirectory = Path.GetDirectoryName(entry.WorkingCopyPath)
+                ?? throw new InvalidOperationException("Não foi possível localizar a pasta de trabalho.");
+            _historyEntryId = entry.Id;
+            _hasExistingSignatures = false;
+            _fontSubstitutions.Clear();
+            ClearHistoryStack(_undoStack);
+            ClearHistoryStack(_redoStack);
+            DocumentNameText.Text = "Documento em branco.pdf";
+            Title = "AssinaPDF | Editor - Documento em branco";
+            LoadDocumentPreview();
+            await AuditDocumentSignaturesAsync();
+            EditorStatusText.Text =
+                "Documento A4 em branco criado. Adicione texto, formas ou imagens e exporte o PDF.";
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText.Text = "Não foi possível criar um documento em branco. " + ex.Message;
+        }
+    }
+
     private async void OpenPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         try
