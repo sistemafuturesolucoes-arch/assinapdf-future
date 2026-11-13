@@ -11,7 +11,7 @@
     <!-- Barra superior inspirada no Typecraft: documento, histórico, zoom e ações. -->
     <Border Grid.Row="0" Background="#171C25" BorderBrush="#343C49"
             BorderThickness="0,0,0,1" Padding="22,0">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
         <StackPanel VerticalAlignment="Center" Spacing="3">
           <TextBlock Text="FUTURE  /  ASSINAPDF STUDIO" FontSize="10"
                      FontWeight="Bold" Foreground="#A78BFA" />
@@ -40,7 +40,10 @@
         <Button Grid.Column="4" Content="Abrir PDF" Click="OpenPdf_Click"
                 Padding="16,9" Background="#252D39" Foreground="#F4F5F7"
                 BorderBrush="#3B4554" />
-        <Button Grid.Column="5" Content="Exportar PDF" Click="SaveAs_Click"
+        <Button Grid.Column="5" Content="Página +" Click="AddPage_Click"
+                Padding="10,9" Background="#252D39" Foreground="#E7EAF0"
+                BorderBrush="#3B4554" ToolTip.Tip="Adicionar página em branco"/>
+        <Button Grid.Column="6" Content="Exportar PDF" Click="SaveAs_Click"
                 Padding="18,9" Background="#6D4BC3" Foreground="White"
                 BorderThickness="0" FontWeight="SemiBold"/>
       </Grid>
