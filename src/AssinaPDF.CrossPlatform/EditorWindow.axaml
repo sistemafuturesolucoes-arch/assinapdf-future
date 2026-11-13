@@ -43,10 +43,10 @@
         <Button Grid.Column="5" Content="Abrir PDF" Click="OpenPdf_Click"
                 Padding="16,9" Background="#252D39" Foreground="#F4F5F7"
                 BorderBrush="#3B4554" />
-        <Button Grid.Column="6" Content="Página +" Click="AddPage_Click"
+        <Button x:Name="AddPageButton" Grid.Column="6" Content="Página +" Click="AddPage_Click" IsEnabled="False"
                 Padding="10,9" Background="#252D39" Foreground="#E7EAF0"
                 BorderBrush="#3B4554" ToolTip.Tip="Adicionar página em branco"/>
-        <Button Grid.Column="7" Content="Exportar PDF" Click="SaveAs_Click"
+        <Button x:Name="ExportPdfButton" Grid.Column="7" Content="Exportar PDF" Click="SaveAs_Click" IsEnabled="False"
                 Padding="18,9" Background="#6D4BC3" Foreground="White"
                 BorderThickness="0" FontWeight="SemiBold"/>
       </Grid>
