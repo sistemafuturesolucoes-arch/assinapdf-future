@@ -54,15 +54,15 @@ public sealed class PdfiumPageRenderingTests
         {
             using (var document = new Document())
             {
-                var first = document.Pages.Add();
-                first.SetPageSize(612, 792);
+                var firstPage = document.Pages.Add();
+                firstPage.SetPageSize(612, 792);
 
-                var second = document.Pages.Add();
-                second.SetPageSize(300, 500);
-                second.RotateDegrees = 270;
+                var secondPage = document.Pages.Add();
+                secondPage.SetPageSize(300, 500);
+                secondPage.RotateDegrees = 270;
 
-                var third = document.Pages.Add();
-                third.SetPageSize(842, 595);
+                var thirdPage = document.Pages.Add();
+                thirdPage.SetPageSize(842, 595);
 
                 document.Save(path);
             }
@@ -70,26 +70,26 @@ public sealed class PdfiumPageRenderingTests
             using var pdfium = new PdfiumDocument(path);
             Assert.Equal(3, pdfium.PageCount);
 
-            var first = pdfium.RenderPage(0, 0.25f);
-            var second = pdfium.RenderPage(1, 0.25f);
-            var third = pdfium.RenderPage(2, 0.25f);
+            var firstRendered = pdfium.RenderPage(0, 0.25f);
+            var secondRendered = pdfium.RenderPage(1, 0.25f);
+            var thirdRendered = pdfium.RenderPage(2, 0.25f);
 
-            Assert.Equal(0, first.PageRotation);
-            Assert.Equal(3, second.PageRotation);
-            Assert.Equal(0, third.PageRotation);
+            Assert.Equal(0, firstRendered.PageRotation);
+            Assert.Equal(3, secondRendered.PageRotation);
+            Assert.Equal(0, thirdRendered.PageRotation);
 
-            Assert.True(first.Height > first.Width);
-            Assert.True(second.Width > second.Height);
-            Assert.True(third.Width > third.Height);
+            Assert.True(firstRendered.Height > firstRendered.Width);
+            Assert.True(secondRendered.Width > secondRendered.Height);
+            Assert.True(thirdRendered.Width > thirdRendered.Height);
 
-            Assert.Equal(612, first.OriginalPageWidthPoints, 1);
-            Assert.Equal(792, first.OriginalPageHeightPoints, 1);
-            Assert.Equal(500, second.PageWidthPoints, 1);
-            Assert.Equal(300, second.PageHeightPoints, 1);
-            Assert.Equal(300, second.OriginalPageWidthPoints, 1);
-            Assert.Equal(500, second.OriginalPageHeightPoints, 1);
-            Assert.Equal(842, third.OriginalPageWidthPoints, 1);
-            Assert.Equal(595, third.OriginalPageHeightPoints, 1);
+            Assert.Equal(612, firstRendered.OriginalPageWidthPoints, 1);
+            Assert.Equal(792, firstRendered.OriginalPageHeightPoints, 1);
+            Assert.Equal(500, secondRendered.PageWidthPoints, 1);
+            Assert.Equal(300, secondRendered.PageHeightPoints, 1);
+            Assert.Equal(300, secondRendered.OriginalPageWidthPoints, 1);
+            Assert.Equal(500, secondRendered.OriginalPageHeightPoints, 1);
+            Assert.Equal(842, thirdRendered.OriginalPageWidthPoints, 1);
+            Assert.Equal(595, thirdRendered.OriginalPageHeightPoints, 1);
         }
         finally
         {
