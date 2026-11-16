@@ -84,6 +84,22 @@ public class MdfeXmlReaderTests
         Assert.Contains("dígito verificador", exception.Message);
     }
 
+
+    [Fact]
+    public void Parse_AlphanumericCnpjAccessKey_UsesAsciiMinus48ForCheckDigit()
+    {
+        const string alphanumericKey = "43261112ABC34501DE35580010000000011000000000";
+        const string alphanumericCnpj = "12ABC34501DE35";
+        var xml = AuthorizedXml()
+            .Replace(AccessKey, alphanumericKey, StringComparison.Ordinal)
+            .Replace("12345678000123", alphanumericCnpj, StringComparison.Ordinal);
+
+        var result = MdfeXmlReader.Parse(xml, "mdfe-cnpj-alfa.xml");
+
+        Assert.Equal(alphanumericKey, result.AccessKey);
+        Assert.Equal(alphanumericCnpj, result.IssuerDocument);
+    }
+
     [Fact]
     public void Parse_Dtd_IsRejected()
     {
