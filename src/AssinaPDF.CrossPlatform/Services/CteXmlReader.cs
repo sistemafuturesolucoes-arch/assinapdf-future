@@ -27,7 +27,8 @@ public sealed record CteDocumentSummary(
     string ProtocolNumber,
     string AuthorizationDate,
     string AuthorizationReason,
-    string Environment);
+    string Environment,
+    string Model = "57");
 
 /// <summary>
 /// Leitor estrito de CT-e processado, modelo 57, versão 4.00.
