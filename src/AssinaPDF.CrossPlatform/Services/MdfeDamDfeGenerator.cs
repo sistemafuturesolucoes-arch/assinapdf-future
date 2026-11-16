@@ -7,57 +7,70 @@ using PdfSharp.Pdf;
 namespace AssinaPDF.MacPrototype.Services;
 
 /// <summary>
-/// Gera uma representação PDF do DAMDFE a partir do XML processado e autorizado.
-/// O XML é revalidado antes da emissão e nunca é alterado.
+/// Gera o DAMDFE a partir do XML processado e autorizado.
+/// O XML original é validado novamente e nunca é alterado.
 /// </summary>
 public static class MdfeDamDfeGenerator
 {
     private static readonly XNamespace Ns = "http://www.portalfiscal.inf.br/mdfe";
-    // Liberation Serif is provided by the embedded PDFsharp fallback resolver,
-    // registered after DanfeSharp.Next's primary resolver during application startup.
-    // No operating-system font installation is required.
+    private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
+    private const double Left = 28, Right = 567, Width = Right - Left;
+    private const double Bottom = 805;
+
     private static XFont TitleFont => new("Liberation Serif", 15, XFontStyleEx.Bold);
     private static XFont SectionFont => new("Liberation Serif", 9, XFontStyleEx.Bold);
-    private static XFont LabelFont => new("Liberation Serif", 7, XFontStyleEx.Bold);
-    private static XFont ValueFont => new("Liberation Serif", 8, XFontStyleEx.Regular);
+    private static XFont LabelFont => new("Liberation Serif", 6.5, XFontStyleEx.Bold);
+    private static XFont ValueFont => new("Liberation Serif", 7.5, XFontStyleEx.Regular);
     private static XFont SmallFont => new("Liberation Serif", 6.5, XFontStyleEx.Regular);
 
     public static void Generate(MdfeDocumentSummary summary, string outputPath)
     {
         ArgumentNullException.ThrowIfNull(summary);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
-
-        // PDFsharp uses a process-wide resolver initialized by the app bootstrap.
         NfcePdfFontResolverBootstrap.EnsureConfigured();
-        if (!File.Exists(summary.SourcePath)) throw new FileNotFoundException("XML original do MDF-e não encontrado.", summary.SourcePath);
+        if (!File.Exists(summary.SourcePath))
+            throw new FileNotFoundException("XML original do MDF-e não encontrado.", summary.SourcePath);
+
         var verified = MdfeXmlReader.ReadFile(summary.SourcePath);
         if (!string.Equals(verified.AccessKey, summary.AccessKey, StringComparison.Ordinal))
             throw new InvalidDataException("A chave do XML não corresponde ao MDF-e selecionado.");
-        string source = Path.GetFullPath(summary.SourcePath), target = Path.GetFullPath(outputPath);
+
+        string source = Path.GetFullPath(summary.SourcePath);
+        string target = Path.GetFullPath(outputPath);
         if (string.Equals(source, target, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             throw new InvalidOperationException("O PDF não pode substituir o XML original.");
 
-        var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 20_000_000 };
+        var settings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = 20_000_000
+        };
         XDocument doc;
         using (var stream = File.OpenRead(source))
-        using (var reader = XmlReader.Create(stream, settings)) doc = XDocument.Load(reader);
-        var info = doc.Root?.Element(Ns + "MDFe")?.Element(Ns + "infMDFe")
+        using (var reader = XmlReader.Create(stream, settings))
+            doc = XDocument.Load(reader);
+
+        var root = doc.Root ?? throw new InvalidDataException("Raiz do XML não encontrada.");
+        var info = root.Element(Ns + "MDFe")?.Element(Ns + "infMDFe")
             ?? throw new InvalidDataException("Estrutura infMDFe não encontrada.");
         string? folder = Path.GetDirectoryName(target);
-        if (string.IsNullOrWhiteSpace(folder)) throw new InvalidOperationException("Pasta de destino inválida.");
+        if (string.IsNullOrWhiteSpace(folder))
+            throw new InvalidOperationException("Pasta de destino inválida.");
         Directory.CreateDirectory(folder);
         string temp = Path.Combine(folder, "." + Path.GetFileNameWithoutExtension(target) + "-" + Guid.NewGuid().ToString("N") + ".tmp.pdf");
+
         try
         {
             using (var pdf = new PdfDocument())
             {
                 pdf.Info.Title = $"DAMDFE {summary.DocumentNumber}";
                 pdf.Info.Subject = "Documento Auxiliar do Manifesto Eletrônico de Documentos Fiscais";
-                var page = pdf.AddPage(); page.Size = PdfSharp.PageSize.A4;
-                using var g = XGraphics.FromPdfPage(page);
-                DrawPage(g, info, doc.Root!, summary);
+                DrawFirstPage(pdf, info, root, summary);
+                DrawDocumentPages(pdf, info, summary);
                 pdf.Save(temp);
             }
+
             using (var check = File.OpenRead(temp))
             {
                 Span<byte> signature = stackalloc byte[5];
@@ -66,110 +79,246 @@ public static class MdfeDamDfeGenerator
             }
             File.Move(temp, target, true);
         }
-        finally { try { if (File.Exists(temp)) File.Delete(temp); } catch { } }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+        }
     }
 
-    private static void DrawPage(XGraphics g, XElement info, XElement root, MdfeDocumentSummary s)
+    private static void DrawFirstPage(PdfDocument pdf, XElement info, XElement root, MdfeDocumentSummary s)
     {
-        const double left = 25, right = 570, width = right - left;
-        double y = 22;
-        g.DrawRectangle(XPens.Black, left, y, width, 52);
-        g.DrawString("DAMDFE", TitleFont, XBrushes.Black, new XRect(left + 10, y + 6, 180, 22), XStringFormats.TopLeft);
-        g.DrawString("DOCUMENTO AUXILIAR DO MANIFESTO ELETRÔNICO DE DOCUMENTOS FISCAIS", SmallFont, XBrushes.Black, new XRect(left + 10, y + 29, 330, 12), XStringFormats.TopLeft);
-        g.DrawString($"MDF-e Nº {s.DocumentNumber}   SÉRIE {s.Series}", SectionFont, XBrushes.Black, new XRect(left + 350, y + 9, 190, 18), XStringFormats.TopRight);
-        g.DrawString(s.Environment == "Homologação" ? "EMITIDO EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL" : "DOCUMENTO AUXILIAR DO MDF-e", SmallFont, XBrushes.Black, new XRect(left + 250, y + 31, 290, 12), XStringFormats.TopRight);
+        var page = NewPage(pdf);
+        using var g = XGraphics.FromPdfPage(page);
+        double y = DrawHeader(g, s, 1, 1);
+
+        var emit = info.Element(Ns + "emit");
+        var ide = info.Element(Ns + "ide");
+        Section(g, "IDENTIFICAÇÃO DO EMITENTE", ref y);
+        Box(g, y, 44);
+        Field(g, "RAZÃO SOCIAL", V(emit, "xNome"), Left + 5, y + 3, 315);
+        Field(g, "CNPJ / CPF", s.IssuerDocument, Left + 325, y + 3, 105);
+        Field(g, "INSCRIÇÃO ESTADUAL", V(emit, "IE"), Left + 435, y + 3, 99);
+        Field(g, "ENDEREÇO", Join(emit?.Element(Ns + "enderEmit"), "xLgr", "nro", "xCpl", "xBairro", "xMun", "UF", "CEP"), Left + 5, y + 23, 529);
+        y += 48;
+
+        Section(g, "DADOS DO MDF-e", ref y);
+        Box(g, y, 54);
+        Field(g, "CHAVE DE ACESSO", s.AccessKey, Left + 5, y + 3, 365);
+        Field(g, "MODELO", "58", Left + 375, y + 3, 45);
+        Field(g, "SÉRIE / NÚMERO", $"{s.Series} / {s.DocumentNumber}", Left + 425, y + 3, 109);
+        Field(g, "DATA E HORA DE EMISSÃO", s.IssueDate, Left + 5, y + 27, 190);
+        Field(g, "MODAL", ModalName(s.Modal), Left + 200, y + 27, 115);
+        Field(g, "TIPO EMITENTE", V(ide, "tpEmit"), Left + 320, y + 27, 95);
+        Field(g, "UF INÍCIO / FIM", $"{s.OriginState} / {s.DestinationState}", Left + 420, y + 27, 114);
         y += 58;
 
-        var ide = info.Element(Ns + "ide");
-        var emit = info.Element(Ns + "emit");
-        Section(g, "IDENTIFICAÇÃO DO EMITENTE", left, ref y, width);
-        Box(g, left, y, width, 43);
-        Text(g, "RAZÃO SOCIAL", emit?.Element(Ns + "xNome")?.Value, left + 5, y + 3, 320, 17);
-        Text(g, "CNPJ / CPF", s.IssuerDocument, left + 335, y + 3, 105, 17);
-        Text(g, "INSCRIÇÃO ESTADUAL", V(emit, "IE"), left + 445, y + 3, 95, 17);
-        Text(g, "ENDEREÇO", Join(emit?.Element(Ns + "enderEmit"), "xLgr", "nro", "xCpl", "xBairro", "xMun", "UF", "CEP"), left + 5, y + 22, 535, 17);
-        y += 47;
+        Section(g, "PERCURSO", ref y);
+        Box(g, y, 34);
+        Field(g, "UF DE CARREGAMENTO", s.OriginState, Left + 5, y + 5, 165);
+        Field(g, "UF DE DESCARREGAMENTO", s.DestinationState, Left + 180, y + 5, 165);
+        Field(g, "UF(s) DO PERCURSO", RouteStates(ide), Left + 355, y + 5, 179);
+        y += 38;
 
-        Section(g, "DADOS DO MDF-e", left, ref y, width);
-        Box(g, left, y, width, 48);
-        Text(g, "CHAVE DE ACESSO", s.AccessKey, left + 5, y + 3, 365, 18);
-        Text(g, "MODELO", "58", left + 375, y + 3, 45, 18);
-        Text(g, "SÉRIE / NÚMERO", $"{s.Series} / {s.DocumentNumber}", left + 425, y + 3, 115, 18);
-        Text(g, "DATA E HORA DE EMISSÃO", s.IssueDate, left + 5, y + 25, 190, 18);
-        Text(g, "MODAL", ModalName(s.Modal), left + 200, y + 25, 130, 18);
-        Text(g, "TIPO EMITENTE", V(ide, "tpEmit"), left + 335, y + 25, 95, 18);
-        Text(g, "UF INÍCIO / FIM", $"{s.OriginState} / {s.DestinationState}", left + 435, y + 25, 105, 18);
-        y += 52;
+        DrawModalSection(g, info, s, ref y);
 
-        Section(g, "PERCURSO", left, ref y, width);
-        Box(g, left, y, width, 30);
-        Text(g, "UF DE CARREGAMENTO", s.OriginState, left + 5, y + 4, 170, 20);
-        Text(g, "UF DE DESCARREGAMENTO", s.DestinationState, left + 185, y + 4, 170, 20);
-        Text(g, "PERCURSO / ESTADOS", RouteStates(ide), left + 365, y + 4, 175, 20);
-        y += 34;
-
-        Section(g, "VEÍCULO, TRAÇÃO E CONDUTOR", left, ref y, width);
-        Box(g, left, y, width, 48);
-        var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
-        var vehicle = road?.Element(Ns + "veicTracao");
-        Text(g, "PLACA", V(vehicle, "placa"), left + 5, y + 3, 90, 18);
-        Text(g, "RENAVAM", V(vehicle, "RENAVAM"), left + 100, y + 3, 120, 18);
-        Text(g, "UF", V(vehicle, "UF"), left + 225, y + 3, 55, 18);
-        Text(g, "RNTRC", V(road, "RNTRC"), left + 285, y + 3, 100, 18);
-        Text(g, "TIPO RODADO / CARROCERIA", $"{V(vehicle, "tpRod")} / {V(vehicle, "tpCar")}", left + 390, y + 3, 150, 18);
-        var drivers = road?.Elements(Ns + "condutor").Select(d => $"{V(d, "xNome")} - {First(d, "CPF", "CNPJ")}").ToArray() ?? Array.Empty<string>();
-        Text(g, "CONDUTOR(ES)", drivers.Length == 0 ? "Não informado" : string.Join("; ", drivers), left + 5, y + 25, 535, 18);
-        y += 52;
-
-        Section(g, "INFORMAÇÕES DA CARGA", left, ref y, width);
+        Section(g, "INFORMAÇÕES DA CARGA", ref y);
         var totals = info.Element(Ns + "tot");
-        Box(g, left, y, width, 35);
-        Text(g, "VALOR TOTAL DA CARGA", s.CargoValue.ToString("N2", Pt), left + 5, y + 4, 175, 22);
-        Text(g, "QUANTIDADE", s.CargoQuantity.ToString("N4", Pt), left + 190, y + 4, 135, 22);
-        Text(g, "UNIDADE", UnitName(s.CargoUnit), left + 335, y + 4, 100, 22);
-        Text(g, "PRODUTO PREDOMINANTE", V(totals, "xProd"), left + 440, y + 4, 100, 22);
-        y += 39;
+        var prod = info.Element(Ns + "prodPred");
+        Box(g, y, 44);
+        Field(g, "VALOR TOTAL DA CARGA", s.CargoValue.ToString("N2", Pt), Left + 5, y + 4, 145);
+        Field(g, "QUANTIDADE TOTAL", s.CargoQuantity.ToString("N4", Pt), Left + 160, y + 4, 130);
+        Field(g, "UNIDADE", UnitName(s.CargoUnit), Left + 300, y + 4, 75);
+        Field(g, "TIPO DE CARGA", V(prod, "tpCarga"), Left + 385, y + 4, 65);
+        Field(g, "PRODUTO PREDOMINANTE", V(prod, "xProd"), Left + 5, y + 24, 529);
+        y += 48;
 
-        Section(g, "DOCUMENTOS FISCAIS VINCULADOS", left, ref y, width);
-        var groups = info.Element(Ns + "infDoc")?.Elements(Ns + "infMunDescarga").ToArray() ?? Array.Empty<XElement>();
-        int docs = 0;
+        Section(g, "RESUMO DOS DOCUMENTOS FISCAIS VINCULADOS", ref y);
+        Box(g, y, 31);
+        Field(g, "CT-e", s.CteCount.ToString(Pt), Left + 5, y + 5, 110);
+        Field(g, "NF-e", s.NfeCount.ToString(Pt), Left + 125, y + 5, 110);
+        Field(g, "TOTAL DE DOCUMENTOS", (s.CteCount + s.NfeCount).ToString(Pt), Left + 245, y + 5, 180);
+        y += 35;
+
+        Section(g, "PROTOCOLO DE AUTORIZAÇÃO", ref y);
+        var protocol = root.Element(Ns + "protMDFe")?.Element(Ns + "infProt");
+        Box(g, y, 37);
+        Field(g, "PROTOCOLO", V(protocol, "nProt"), Left + 5, y + 4, 170);
+        Field(g, "DATA / HORA", V(protocol, "dhRecbto"), Left + 185, y + 4, 180);
+        Field(g, "STATUS", $"{V(protocol, "cStat")} - {V(protocol, "xMotivo")}", Left + 375, y + 4, 159);
+        y += 41;
+
+        var observation = V(info.Element(Ns + "infAdic"), "infCpl");
+        if (!string.IsNullOrWhiteSpace(observation) && y < Bottom - 30)
+        {
+            Section(g, "OBSERVAÇÕES", ref y);
+            DrawWrapped(g, observation, Left + 4, y, Width - 8, Math.Min(55, Bottom - y - 20), ValueFont);
+        }
+        DrawFooter(g, s, 1, 1);
+    }
+
+    private static void DrawModalSection(XGraphics g, XElement info, MdfeDocumentSummary s, ref double y)
+    {
+        string modal = s.Modal;
+        if (modal == "1")
+        {
+            Section(g, "VEÍCULO, TRAÇÃO E CONDUTOR — MODAL RODOVIÁRIO", ref y);
+            var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
+            var vehicle = road?.Element(Ns + "veicTracao");
+            Box(g, y, 53);
+            Field(g, "PLACA", V(vehicle, "placa"), Left + 5, y + 3, 82);
+            Field(g, "RENAVAM", V(vehicle, "RENAVAM"), Left + 94, y + 3, 100);
+            Field(g, "UF", V(vehicle, "UF"), Left + 200, y + 3, 45);
+            Field(g, "RNTRC", V(road, "RNTRC"), Left + 250, y + 3, 100);
+            Field(g, "TIPO RODADO / CARROCERIA", $"{V(vehicle, "tpRod")} / {V(vehicle, "tpCar")}", Left + 355, y + 3, 179);
+            string drivers = string.Join("; ", road?.Elements(Ns + "condutor").Select(d => $"{V(d, "xNome")} — {First(d, "CPF", "CNPJ")}") ?? Enumerable.Empty<string>());
+            Field(g, "CONDUTOR(ES)", drivers, Left + 5, y + 28, 529);
+            y += 57;
+        }
+        else
+        {
+            Section(g, $"DADOS DO MODAL — {ModalName(modal).ToUpperInvariant()}", ref y);
+            var modalData = info.Element(Ns + "infModal");
+            Box(g, y, 42);
+            Field(g, "INFORMAÇÕES DO MODAL", ModalDescription(modalData), Left + 5, y + 4, 529);
+            y += 46;
+        }
+    }
+
+    private static void DrawDocumentPages(PdfDocument pdf, XElement info, MdfeDocumentSummary s)
+    {
+        var rows = new List<string>();
+        var groups = info.Element(Ns + "infDoc")?.Elements(Ns + "infMunDescarga") ?? Enumerable.Empty<XElement>();
         foreach (var city in groups)
         {
-            string cityName = $"{V(city, "xMunDescarga")} / {V(city, "UF")}";
-            var ctes = city.Elements(Ns + "infCTe").ToArray();
-            var nfes = city.Elements(Ns + "infNFe").ToArray();
-            foreach (var item in ctes) { if (y > 710) { g.DrawString("Demais documentos vinculados constam no XML autorizado.", SmallFont, XBrushes.Black, new XPoint(left + 5, y)); y += 10; break; } g.DrawString($"CT-e · {cityName} · {V(item, "chCTe")}", SmallFont, XBrushes.Black, new XPoint(left + 5, y)); y += 10; docs++; }
-            foreach (var item in nfes) { if (y > 710) { g.DrawString("Demais documentos vinculados constam no XML autorizado.", SmallFont, XBrushes.Black, new XPoint(left + 5, y)); y += 10; break; } g.DrawString($"NF-e · {cityName} · {V(item, "chNFe")}", SmallFont, XBrushes.Black, new XPoint(left + 5, y)); y += 10; docs++; }
+            string destination = Join(city, "xMunDescarga", "UF");
+            foreach (var item in city.Elements(Ns + "infCTe"))
+                rows.Add($"CT-e     {destination}     {V(item, "chCTe")}");
+            foreach (var item in city.Elements(Ns + "infNFe"))
+                rows.Add($"NF-e     {destination}     {V(item, "chNFe")}");
+            foreach (var item in city.Elements(Ns + "infMDFe"))
+                rows.Add($"MDF-e    {destination}     {V(item, "chMDFe")}");
         }
-        if (docs == 0) { g.DrawString("Nenhum documento individual listado no grupo infDoc.", ValueFont, XBrushes.Black, new XPoint(left + 5, y)); y += 13; }
-        y += 4;
+        if (rows.Count == 0) return;
 
-        if (y > 745) y = 745;
-        Section(g, "PROTOCOLO DE AUTORIZAÇÃO", left, ref y, width);
-        var protocol = root.Element(Ns + "protMDFe")?.Element(Ns + "infProt");
-        Box(g, left, y, width, 35);
-        Text(g, "PROTOCOLO", V(protocol, "nProt"), left + 5, y + 3, 180, 22);
-        Text(g, "DATA / HORA", V(protocol, "dhRecbto"), left + 190, y + 3, 180, 22);
-        Text(g, "STATUS", V(protocol, "cStat") + " - " + V(protocol, "xMotivo"), left + 375, y + 3, 165, 22);
-        g.DrawString("Documento gerado localmente a partir do XML autorizado. Confira o leiaute e os dados antes de utilizar.", SmallFont, XBrushes.Gray, new XPoint(left, 825));
-        g.DrawString("Chave de acesso: " + s.AccessKey, SmallFont, XBrushes.Black, new XPoint(left, 837));
+        const int rowsPerPage = 48;
+        int pageCount = (int)Math.Ceiling(rows.Count / (double)rowsPerPage) + 1;
+        for (int offset = 0; offset < rows.Count; offset += rowsPerPage)
+        {
+            int pageNumber = pdf.PageCount + 1;
+            var page = NewPage(pdf);
+            using var g = XGraphics.FromPdfPage(page);
+            double y = DrawHeader(g, s, pageNumber, pageCount);
+            Section(g, "RELAÇÃO COMPLETA DOS DOCUMENTOS FISCAIS VINCULADOS", ref y);
+            Box(g, y, 20);
+            g.DrawString("TIPO       MUNICÍPIO DE DESCARREGAMENTO / UF       CHAVE DE ACESSO", LabelFont, XBrushes.Black,
+                new XRect(Left + 5, y + 5, Width - 10, 12), XStringFormats.TopLeft);
+            y += 22;
+            foreach (string row in rows.Skip(offset).Take(rowsPerPage))
+            {
+                g.DrawLine(XPens.LightGray, Left, y + 11, Right, y + 11);
+                g.DrawString(row, SmallFont, XBrushes.Black,
+                    new XRect(Left + 5, y, Width - 10, 12), XStringFormats.TopLeft);
+                y += 15;
+            }
+            DrawFooter(g, s, pageNumber, pageCount);
+        }
     }
 
-    private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
-    private static void Section(XGraphics g, string title, double x, ref double y, double w)
-    { g.DrawString(title, SectionFont, XBrushes.Black, new XPoint(x, y + 8)); y += 12; }
-    private static void Box(XGraphics g, double x, double y, double w, double h) => g.DrawRectangle(XPens.Black, x, y, w, h);
-    private static void Text(XGraphics g, string label, string? value, double x, double y, double w, double h)
+    private static PdfPage NewPage(PdfDocument pdf)
     {
-        g.DrawString(label, LabelFont, XBrushes.Gray, new XRect(x, y, w, 8), XStringFormats.TopLeft);
-        string clean = string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
-        if (clean.Length > Math.Max(12, (int)(w / 4.1))) clean = clean[..Math.Max(12, (int)(w / 4.1) - 1)] + "…";
-        g.DrawString(clean, ValueFont, XBrushes.Black, new XRect(x, y + 8, w, h - 8), XStringFormats.TopLeft);
+        var page = pdf.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+        page.Orientation = PdfSharp.PageOrientation.Portrait;
+        return page;
     }
+
+    private static double DrawHeader(XGraphics g, MdfeDocumentSummary s, int page, int total)
+    {
+        g.DrawRectangle(XPens.Black, Left, 22, Width, 54);
+        g.DrawString("DAMDFE", TitleFont, XBrushes.Black, new XRect(Left + 8, 27, 150, 23), XStringFormats.TopLeft);
+        g.DrawString("DOCUMENTO AUXILIAR DO MANIFESTO ELETRÔNICO DE DOCUMENTOS FISCAIS",
+            SmallFont, XBrushes.Black, new XRect(Left + 8, 53, 350, 12), XStringFormats.TopLeft);
+        g.DrawString($"MDF-e Nº {s.DocumentNumber}   SÉRIE {s.Series}",
+            SectionFont, XBrushes.Black, new XRect(Left + 350, 31, 180, 18), XStringFormats.TopRight);
+        g.DrawString($"PÁGINA {page} DE {total}", SmallFont, XBrushes.Black,
+            new XRect(Left + 350, 54, 180, 12), XStringFormats.TopRight);
+        if (s.Environment == "Homologação")
+            g.DrawString("EMITIDO EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL",
+                SectionFont, XBrushes.Black, new XRect(Left, 82, Width, 13), XStringFormats.Center);
+        return s.Environment == "Homologação" ? 103 : 88;
+    }
+
+    private static void DrawFooter(XGraphics g, MdfeDocumentSummary s, int page, int total)
+    {
+        g.DrawLine(XPens.Black, Left, 814, Right, 814);
+        g.DrawString($"Chave de acesso: {s.AccessKey}", SmallFont, XBrushes.Black, new XPoint(Left, 825));
+        g.DrawString($"Página {page}/{total}", SmallFont, XBrushes.Black, new XRect(Left, 825, Width, 10), XStringFormats.TopRight);
+    }
+
+    private static void Section(XGraphics g, string title, ref double y)
+    {
+        g.DrawString(title, SectionFont, XBrushes.Black, new XPoint(Left, y + 8));
+        y += 13;
+    }
+
+    private static void Box(XGraphics g, double y, double height) =>
+        g.DrawRectangle(XPens.Black, Left, y, Width, height);
+
+    private static void Field(XGraphics g, string label, string? value, double x, double y, double width)
+    {
+        g.DrawString(label, LabelFont, XBrushes.Gray,
+            new XRect(x, y, width, 8), XStringFormats.TopLeft);
+        string clean = string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
+        g.DrawString(clean, ValueFont, XBrushes.Black,
+            new XRect(x, y + 8, width, 12), XStringFormats.TopLeft);
+    }
+
+    private static void DrawWrapped(XGraphics g, string text, double x, double y, double width, double maxHeight, XFont font)
+    {
+        double lineHeight = 10;
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        string line = "";
+        foreach (string word in words)
+        {
+            string candidate = line.Length == 0 ? word : line + " " + word;
+            if (g.MeasureString(candidate, font).Width > width && line.Length > 0)
+            {
+                if (y + lineHeight > Bottom) return;
+                g.DrawString(line, font, XBrushes.Black, new XPoint(x, y));
+                y += lineHeight;
+                line = word;
+                if (y > Bottom) return;
+            }
+            else line = candidate;
+        }
+        if (line.Length > 0 && y <= Bottom)
+            g.DrawString(line, font, XBrushes.Black, new XPoint(x, y));
+    }
+
     private static string V(XElement? e, string n) => e?.Element(Ns + n)?.Value.Trim() ?? "";
-    private static string First(XElement? e, params string[] names) { foreach (var n in names) { var v = V(e, n); if (v.Length > 0) return v; } return ""; }
-    private static string Join(XElement? e, params string[] names) => string.Join(", ", names.Select(n => V(e, n)).Where(v => v.Length > 0));
-    private static string RouteStates(XElement? ide) => string.Join(" · ", ide?.Element(Ns + "infPercurso")?.Elements(Ns + "UFPer").Select(x => x.Value) ?? Enumerable.Empty<string>());
-    private static string ModalName(string v) => v switch { "1" => "Rodoviário", "2" => "Aéreo", "3" => "Aquaviário", "4" => "Ferroviário", _ => v };
-    private static string UnitName(string v) => v switch { "01" => "KG", "02" => "TON", "03" => "UNIDADE", "04" => "LITROS", "05" => "M³", _ => v };
+    private static string First(XElement? e, params string[] names)
+    {
+        foreach (var name in names) { var value = V(e, name); if (value.Length > 0) return value; }
+        return "";
+    }
+    private static string Join(XElement? e, params string[] names) =>
+        string.Join(", ", names.Select(n => V(e, n)).Where(v => v.Length > 0));
+    private static string RouteStates(XElement? ide) =>
+        string.Join(" · ", ide?.Element(Ns + "infPercurso")?.Elements(Ns + "UFPer").Select(x => x.Value) ?? Enumerable.Empty<string>());
+    private static string ModalName(string v) => v switch
+    {
+        "1" => "Rodoviário", "2" => "Aéreo", "3" => "Aquaviário", "4" => "Ferroviário", _ => "Não identificado"
+    };
+    private static string ModalDescription(XElement? modal)
+    {
+        if (modal is null) return "Dados específicos do modal não encontrados no XML.";
+        return string.Join(" · ", modal.Descendants().Where(x => !x.HasElements)
+            .Select(x => $"{x.Name.LocalName}: {x.Value.Trim()}")
+            .Where(x => !x.EndsWith(": ", StringComparison.Ordinal))
+            .Take(8));
+    }
+    private static string UnitName(string v) => v switch
+    {
+        "01" => "KG", "02" => "TON", "03" => "UNIDADE", "04" => "LITROS", "05" => "M³", _ => v
+    };
 }
