@@ -329,9 +329,7 @@ public partial class EditorWebWindow : Window
             if (!string.IsNullOrWhiteSpace(_historyId))
                 _history.Touch(_historyId);
             await SendPdfToWebAsync(_workingCopyPath);
-            LoadingOverlay.IsVisible = true;
-            LoadingTitle.Text = "PDF assinado com sucesso";
-            LoadingDetails.Text = "O arquivo assinado foi salvo e recarregado no editor. Alterações posteriores podem invalidar a assinatura digital.";
+            // O editor recarrega o PDF assinado; não mantenha a camada de carregamento sobre a tela.
         }
         finally
         {
