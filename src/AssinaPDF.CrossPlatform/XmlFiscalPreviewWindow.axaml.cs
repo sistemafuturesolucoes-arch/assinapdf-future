@@ -13,6 +13,11 @@ public partial class XmlFiscalPreviewWindow : Window
     private readonly bool _isNfce;
     private readonly ObservableCollection<string> _fields = new();
 
+    // Construtor público sem parâmetros exigido pelo carregador XAML do Avalonia.
+    public XmlFiscalPreviewWindow() : this(false)
+    {
+    }
+
     public XmlFiscalPreviewWindow(bool isNfce)
     {
         _isNfce = isNfce;
