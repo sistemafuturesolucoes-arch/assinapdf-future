@@ -1,13 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AssinaPDF.MacPrototype.CteImportWindow"
-        Title="AssinaPDF | Central CT-e"
+        Title="AssinaPDF | Central CT-e / CT-e OS"
         Width="1400" Height="850" MinWidth="1050" MinHeight="650"
         WindowStartupLocation="CenterOwner" Background="#F3F4F6">
   <Grid RowDefinitions="Auto,*,Auto" Margin="14">
     <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,10">
-      <TextBlock Text="Central CT-e · DACTE em lote" FontSize="22" FontWeight="SemiBold" Foreground="#252A34"/>
-      <TextBlock Text="Importe vários XMLs autorizados de CT-e, inclusive de emitentes diferentes. Gere, visualize e exporte DACTEs em PDF A4. Os XMLs originais permanecem intactos."
+      <TextBlock Text="Central CT-e e CT-e OS · DACTE em lote" FontSize="22" FontWeight="SemiBold" Foreground="#252A34"/>
+      <TextBlock Text="Importe XMLs autorizados de CT-e modelo 57 e CT-e OS modelo 67, inclusive de emitentes diferentes. Gere, visualize e exporte DACTEs em PDF. Os XMLs originais permanecem intactos."
                  FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
     </StackPanel>
     <Grid Grid.Row="1" ColumnDefinitions="245,175,*" ColumnSpacing="9">
@@ -66,6 +66,6 @@
         </Grid>
       </Border>
     </Grid>
-    <TextBlock x:Name="StatusText" Grid.Row="2" Margin="0,9,0,0" Text="Aguardando XML de CT-e." FontSize="10" Foreground="#666D78" TextWrapping="Wrap"/>
+    <TextBlock x:Name="StatusText" Grid.Row="2" Margin="0,9,0,0" Text="Aguardando XML de CT-e ou CT-e OS." FontSize="10" Foreground="#666D78" TextWrapping="Wrap"/>
   </Grid>
 </Window>
