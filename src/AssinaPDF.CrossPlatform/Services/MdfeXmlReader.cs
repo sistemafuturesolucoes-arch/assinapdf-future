@@ -163,14 +163,19 @@ public static class MdfeXmlReader
 
     private static void ValidateAccessKey(string key)
     {
-        if (key.Length != 44 || key.Any(c => c is < '0' or > '9'))
-            throw new InvalidDataException("A chave de acesso do MDF-e deve conter 44 dígitos.");
+        if (key.Length != 44 ||
+            key.Take(6).Any(c => c is < '0' or > '9') ||
+            key.Skip(6).Take(12).Any(c => !IsUpperAlphaNumeric(c)) ||
+            key.Skip(18).Any(c => c is < '0' or > '9'))
+            throw new InvalidDataException("A chave de acesso do MDF-e deve conter 44 posições, com CNPJ alfanumérico somente nas posições previstas.");
         if (key.Substring(20, 2) != "58")
             throw new InvalidDataException("A chave de acesso não identifica o modelo MDF-e 58.");
         int sum = 0, weight = 2;
         for (int i = 42; i >= 0; i--)
         {
-            sum += (key[i] - '0') * weight;
+            // NT Conjunta 2025.001: converter cada caractere por ASCII - 48
+            // antes do cálculo do módulo 11 (A=17, B=18, ...).
+            sum += (key[i] - 48) * weight;
             weight = weight == 9 ? 2 : weight + 1;
         }
         int digit = 11 - sum % 11;
@@ -183,7 +188,7 @@ public static class MdfeXmlReader
     {
         if (key.Substring(2, 4) != date.ToString("yyMM", CultureInfo.InvariantCulture))
             throw new InvalidDataException("A data de emissão não corresponde à chave de acesso do MDF-e.");
-        if (key.Substring(6, 14) != document.PadLeft(14, '0'))
+        if (!string.Equals(key.Substring(6, 14), document.PadLeft(14, '0'), StringComparison.Ordinal))
             throw new InvalidDataException("O documento do emitente não corresponde à chave de acesso do MDF-e.");
         if (int.Parse(key.Substring(22, 3), CultureInfo.InvariantCulture) != series ||
             int.Parse(key.Substring(25, 9), CultureInfo.InvariantCulture) != number)
@@ -192,9 +197,19 @@ public static class MdfeXmlReader
 
     private static void ValidateDocument(string value)
     {
-        if (value.Length is not (11 or 14) || value.Any(c => c is < '0' or > '9'))
-            throw new InvalidDataException("Documento do emitente inválido no XML do MDF-e.");
+        if (value.Length == 11 && value.All(c => c is >= '0' and <= '9'))
+            return;
+
+        if (value.Length == 14 &&
+            value.Take(12).All(IsUpperAlphaNumeric) &&
+            value.Skip(12).All(c => c is >= '0' and <= '9'))
+            return;
+
+        throw new InvalidDataException("Documento do emitente inválido no XML do MDF-e. CNPJ deve aceitar letras maiúsculas nas 12 primeiras posições e manter os dois DVs numéricos.");
     }
+
+    private static bool IsUpperAlphaNumeric(char value) =>
+        value is >= '0' and <= '9' or >= 'A' and <= 'Z';
 
     private static XElement Required(XElement parent, string name) =>
         parent.Element(Ns + name) ?? throw new InvalidDataException($"O XML do MDF-e não contém {name}.");
