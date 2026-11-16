@@ -231,14 +231,46 @@ public partial class EditorWebWindow : Window
             var picker = new Window
             {
                 Title = "Escolher certificado digital",
-                Width = 520,
-                Height = 390,
+                Width = 620,
+                Height = 560,
+                MinWidth = 520,
+                MinHeight = 460,
+                CanResize = true,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = new SolidColorBrush(Color.FromRgb(248, 249, 251))
             };
-            var list = new ListBox { ItemsSource = available, SelectedIndex = 0, MinHeight = 120 };
-            var reason = new TextBox { Text = "Assinatura digital do documento", MinHeight = 36 };
-            var details = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 75 };
+
+            // Layout em linhas: conteúdo rolável no centro e ações sempre visíveis no rodapé.
+            var pickerLayout = new Grid
+            {
+                Margin = new Avalonia.Thickness(20),
+                RowDefinitions =
+                {
+                    new RowDefinition { Height = GridLength.Auto },
+                    new RowDefinition { Height = new GridLength(1, GridUnitType.Star) },
+                    new RowDefinition { Height = GridLength.Auto }
+                }
+            };
+
+            var list = new ListBox
+            {
+                ItemsSource = available,
+                SelectedIndex = 0,
+                Height = 190,
+                MinHeight = 130,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
+            };
+            var reason = new TextBox
+            {
+                Text = "Assinatura digital do documento",
+                MinHeight = 38,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
+            };
+            var details = new TextBlock
+            {
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                MinHeight = 70
+            };
             void RefreshDetails()
             {
                 details.Text = (list.SelectedItem as CertificateInfo)?.Details ?? "Selecione um certificado.";
@@ -246,11 +278,12 @@ public partial class EditorWebWindow : Window
             list.SelectionChanged += (_, _) => RefreshDetails();
             RefreshDetails();
 
-            var cancel = new Button { Content = "Cancelar", Padding = new Avalonia.Thickness(14, 8) };
+            var cancel = new Button { Content = "Cancelar", Padding = new Avalonia.Thickness(16, 9), MinWidth = 100 };
             var sign = new Button
             {
                 Content = "Assinar documento",
-                Padding = new Avalonia.Thickness(14, 8),
+                Padding = new Avalonia.Thickness(18, 9),
+                MinWidth = 160,
                 Background = new SolidColorBrush(Color.FromRgb(109, 75, 195)),
                 Foreground = Brushes.White
             };
@@ -263,27 +296,57 @@ public partial class EditorWebWindow : Window
                     picker.Close();
                 }
             };
-            picker.Content = new StackPanel
+
+            var heading = new StackPanel
             {
-                Margin = new Avalonia.Thickness(20),
-                Spacing = 10,
+                Spacing = 7,
                 Children =
                 {
-                    new TextBlock { Text = "Selecione o certificado", FontSize = 18, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = placements.Count + " campo(s) de assinatura selecionado(s). A chave privada permanece neste computador.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
-                    list,
-                    details,
-                    new TextBlock { Text = "Motivo da assinatura" },
-                    reason,
-                    new StackPanel
+                    new TextBlock { Text = "Selecione o certificado", FontSize = 19, FontWeight = FontWeight.SemiBold },
+                    new TextBlock
                     {
-                        Orientation = Avalonia.Layout.Orientation.Horizontal,
-                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                        Spacing = 8,
-                        Children = { cancel, sign }
+                        Text = placements.Count + " campo(s) de assinatura selecionado(s). A chave privada permanece neste computador.",
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap
                     }
                 }
             };
+            Grid.SetRow(heading, 0);
+            pickerLayout.Children.Add(heading);
+
+            var formContent = new StackPanel
+            {
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = "Certificados disponíveis", FontWeight = FontWeight.SemiBold, Margin = new Avalonia.Thickness(0, 4, 0, 0) },
+                    list,
+                    new TextBlock { Text = "Detalhes do certificado", FontWeight = FontWeight.SemiBold },
+                    details,
+                    new TextBlock { Text = "Motivo da assinatura", FontWeight = FontWeight.SemiBold },
+                    reason
+                }
+            };
+            var contentScroll = new ScrollViewer
+            {
+                Content = formContent,
+                VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            };
+            Grid.SetRow(contentScroll, 1);
+            pickerLayout.Children.Add(contentScroll);
+
+            var actions = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                Spacing = 10,
+                Margin = new Avalonia.Thickness(0, 14, 0, 0),
+                Children = { cancel, sign }
+            };
+            Grid.SetRow(actions, 2);
+            pickerLayout.Children.Add(actions);
+
+            picker.Content = pickerLayout;
             await picker.ShowDialog(this);
             if (picker.Tag is not true || list.SelectedItem is not CertificateInfo selected)
                 return;
