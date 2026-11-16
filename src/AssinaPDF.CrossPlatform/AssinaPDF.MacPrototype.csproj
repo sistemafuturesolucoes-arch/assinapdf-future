@@ -30,7 +30,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="logo-future.png" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="ThirdPartyLicenses\\DanfeSharp.Next-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="ThirdPartyLicenses/DanfeSharp.Next-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="EditorWeb/dist/**/*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
