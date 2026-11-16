@@ -24,9 +24,12 @@ public static class CteDacteGenerator
         if (string.Equals(sourcePath, fullPath, comparison))
             throw new InvalidOperationException("O DACTE não pode substituir o XML original.");
 
-        var validated = CteXmlReader.ReadFile(sourcePath);
-        if (!string.Equals(validated.AccessKey, document.AccessKey, StringComparison.Ordinal))
-            throw new InvalidDataException("A chave do XML original não corresponde ao CT-e selecionado.");
+        var validated = document.Model == "67"
+            ? CteOsXmlReader.ReadFile(sourcePath)
+            : CteXmlReader.ReadFile(sourcePath);
+        if (!string.Equals(validated.AccessKey, document.AccessKey, StringComparison.Ordinal) ||
+            !string.Equals(validated.Model, document.Model, StringComparison.Ordinal))
+            throw new InvalidDataException("A chave ou o modelo do XML original não corresponde ao documento selecionado.");
 
         string? directory = Path.GetDirectoryName(fullPath);
         if (string.IsNullOrWhiteSpace(directory))
@@ -39,7 +42,13 @@ public static class CteDacteGenerator
         try
         {
             string xml = File.ReadAllText(sourcePath);
-            byte[] pdfBytes = GeradorPdf.GerarDactePdfDeXml(xml, ModeloDacte.Cte57);
+            var model = document.Model switch
+            {
+                "57" => ModeloDacte.Cte57,
+                "67" => ModeloDacte.CteOs67,
+                _ => throw new InvalidDataException($"Modelo de CT-e não suportado: {document.Model}.")
+            };
+            byte[] pdfBytes = GeradorPdf.GerarDactePdfDeXml(xml, model);
             if (pdfBytes is null || pdfBytes.Length < 5)
                 throw new InvalidDataException("A biblioteca não produziu um PDF válido.");
 
