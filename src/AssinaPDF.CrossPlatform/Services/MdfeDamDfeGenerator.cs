@@ -13,16 +13,21 @@ namespace AssinaPDF.MacPrototype.Services;
 public static class MdfeDamDfeGenerator
 {
     private static readonly XNamespace Ns = "http://www.portalfiscal.inf.br/mdfe";
-    private static readonly XFont TitleFont = new("Helvetica", 15, XFontStyleEx.Bold);
-    private static readonly XFont SectionFont = new("Helvetica", 9, XFontStyleEx.Bold);
-    private static readonly XFont LabelFont = new("Helvetica", 7, XFontStyleEx.Bold);
-    private static readonly XFont ValueFont = new("Helvetica", 8, XFontStyleEx.Regular);
-    private static readonly XFont SmallFont = new("Helvetica", 6.5, XFontStyleEx.Regular);
+    // Lazy properties avoid creating PDFsharp fonts during type initialization,
+    // before the application's shared font resolver has been configured.
+    private static XFont TitleFont => new("Lato", 15, XFontStyleEx.Bold);
+    private static XFont SectionFont => new("Lato", 9, XFontStyleEx.Bold);
+    private static XFont LabelFont => new("Lato", 7, XFontStyleEx.Bold);
+    private static XFont ValueFont => new("Lato", 8, XFontStyleEx.Regular);
+    private static XFont SmallFont => new("Lato", 6.5, XFontStyleEx.Regular);
 
     public static void Generate(MdfeDocumentSummary summary, string outputPath)
     {
         ArgumentNullException.ThrowIfNull(summary);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+
+        // PDFsharp uses a process-wide resolver initialized by the app bootstrap.
+        NfcePdfFontResolverBootstrap.EnsureConfigured();
         if (!File.Exists(summary.SourcePath)) throw new FileNotFoundException("XML original do MDF-e não encontrado.", summary.SourcePath);
         var verified = MdfeXmlReader.ReadFile(summary.SourcePath);
         if (!string.Equals(verified.AccessKey, summary.AccessKey, StringComparison.Ordinal))
