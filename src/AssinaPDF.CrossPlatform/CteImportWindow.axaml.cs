@@ -67,7 +67,7 @@ public partial class CteImportWindow : Window
                 var itemPages = new List<CteBatchPage>();
                 try
                 {
-                    summary = CteXmlReader.ReadFile(path);
+                    summary = CteDocumentReader.ReadFile(path);
                     if (_documents.Any(d => d.Summary != null && d.Summary.AccessKey == summary.AccessKey))
                     {
                         duplicates++;
@@ -128,7 +128,7 @@ public partial class CteImportWindow : Window
         if (item.Error != null) { StatusText.Text = item.IsDuplicate ? "CT-e duplicado: " + item.DuplicateReason : "Falha: " + item.Error; return; }
         var page = _pages.FirstOrDefault(p => string.Equals(p.SourcePath, item.PdfPath, StringComparison.OrdinalIgnoreCase));
         if (page != null) NavigateToPage(page);
-        StatusText.Text = $"CT-e {item.Summary?.DocumentNumber} · {item.Summary?.IssuerName}";
+        StatusText.Text = $"CT-e modelo {item.Summary?.Model} · {item.Summary?.DocumentNumber} · {item.Summary?.IssuerName}";
     }
 
     private void RemoveSelected_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -201,7 +201,7 @@ public partial class CteImportWindow : Window
         try
         {
             var dest = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
-                Title = "Exportar DACTE individual", SuggestedFileName = $"DACTE-CTe-{item.Summary?.DocumentNumber ?? "documento"}.pdf",
+                Title = "Exportar DACTE individual", SuggestedFileName = $"DACTE-CTe{item.Summary?.Model ?? "57"}-{item.Summary?.DocumentNumber ?? "documento"}.pdf",
                 DefaultExtension = "pdf", FileTypeChoices = new[] { new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } } } });
             if (dest == null) return;
             EnsureNotSource(Path.GetFullPath(dest.Path.LocalPath), item.SourcePath);
@@ -332,7 +332,7 @@ public partial class CteImportWindow : Window
         public string? DuplicateReason { get; }
         public string DisplayName => IsDuplicate ? $"↻ {Path.GetFileName(SourcePath)} · DUPLICADO" :
             Error != null ? $"⚠ {Path.GetFileName(SourcePath)} · ERRO: {Error}" :
-            $"CT-e {Summary?.DocumentNumber} · {Summary?.IssuerName} · {Summary?.SenderName} → {Summary?.RecipientName}";
+            $"CT-e {Summary?.Model} · {Summary?.DocumentNumber} · {Summary?.IssuerName} · {Summary?.SenderName} → {Summary?.RecipientName}";
         public CteBatchItem(string path, CteDocumentSummary? summary, string? pdf, string? error, bool duplicate = false, string? reason = null)
         { SourcePath = path; Summary = summary; PdfPath = pdf; Error = error; IsDuplicate = duplicate; DuplicateReason = reason; }
     }
