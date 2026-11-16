@@ -34,6 +34,8 @@ public static class MdfeDamDfeGenerator
             throw new FileNotFoundException("XML original do MDF-e não encontrado.", summary.SourcePath);
 
         var verified = MdfeXmlReader.ReadFile(summary.SourcePath);
+        if (verified.Modal != "1")
+            throw new NotSupportedException("Este gerador foi validado para o modelo oficial rodoviário. Os modelos aéreo, aquaviário e ferroviário não serão emitidos com um leiaute genérico.");
         if (!string.Equals(verified.AccessKey, summary.AccessKey, StringComparison.Ordinal))
             throw new InvalidDataException("A chave do XML não corresponde ao MDF-e selecionado.");
 
@@ -57,6 +59,8 @@ public static class MdfeDamDfeGenerator
         var mdfe = root.Element(Ns + "MDFe") ?? throw new InvalidDataException("Elemento MDFe não encontrado.");
         var info = mdfe.Element(Ns + "infMDFe") ?? throw new InvalidDataException("Elemento infMDFe não encontrado.");
         string? qrPayload = V(mdfe.Element(Ns + "infMDFeSupl"), "qrCodMDFe");
+        if (string.IsNullOrWhiteSpace(qrPayload))
+            throw new InvalidDataException("O XML autorizado não contém infMDFeSupl/qrCodMDFe; o DAMDFE oficial não pode ser gerado sem o QR Code.");
         string? folder = Path.GetDirectoryName(target);
         if (string.IsNullOrWhiteSpace(folder))
             throw new InvalidOperationException("Pasta de destino inválida.");
@@ -103,6 +107,7 @@ public static class MdfeDamDfeGenerator
         var page = NewPage(pdf);
         using var g = XGraphics.FromPdfPage(page);
         DrawIssuerHeader(g, info, qrPayload);
+        DrawHomologationNotice(g, s.Environment);
 
         g.DrawString("DAMDFE - Documento Auxiliar do Manifesto de Documentos Fiscais Eletrônicos",
             Small, XBrushes.Black, new XPoint(Left, 91));
@@ -148,7 +153,6 @@ public static class MdfeDamDfeGenerator
         DrawRoadVehicleAndDriver(g, info, s, bodyY);
         DrawTollInfo(g, info, bodyY + 83);
         DrawObservations(g, info, bodyY + 148);
-        DrawHomologationNotice(g, s.Environment);
         DrawFooter(g, s, 1, totalPages);
     }
 
@@ -290,7 +294,7 @@ public static class MdfeDamDfeGenerator
     {
         if (!string.Equals(environment, "Homologação", StringComparison.OrdinalIgnoreCase)) return;
         g.DrawString("EMITIDO EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL",
-            Section, XBrushes.Black, new XRect(Left, 786, Width, 12), XStringFormats.Center);
+            Section, XBrushes.Black, new XRect(Left, 76, Width, 12), XStringFormats.Center);
     }
 
     private static void DrawBarcode(XGraphics g, string key, double x, double y, double availableWidth)
