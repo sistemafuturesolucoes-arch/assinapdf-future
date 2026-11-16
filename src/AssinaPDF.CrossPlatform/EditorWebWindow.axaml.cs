@@ -14,12 +14,13 @@ public partial class EditorWebWindow : Window
     private string? _workingCopyPath;
     private string? _historyId;
     private bool _initialPdfSent;
+    private readonly bool _startBlankDocument;
 
-    public EditorWebWindow() : this(null, null)
+    public EditorWebWindow() : this(null, null, true)
     {
     }
 
-    public EditorWebWindow(string? workingCopyPath, string? historyId)
+    public EditorWebWindow(string? workingCopyPath, string? historyId, bool startBlankDocument = false)
     {
         InitializeComponent();
 
@@ -44,6 +45,7 @@ public partial class EditorWebWindow : Window
 
         _workingCopyPath = workingCopyPath;
         _historyId = historyId;
+        _startBlankDocument = startBlankDocument;
         Opened += async (_, _) => await StartEditorAsync();
         Closed += async (_, _) =>
         {
@@ -109,6 +111,11 @@ public partial class EditorWebWindow : Window
                 {
                     _initialPdfSent = true;
                     await SendPdfToWebAsync(_workingCopyPath);
+                }
+                else if (_startBlankDocument)
+                {
+                    _initialPdfSent = true;
+                    await EditorWebView.InvokeScript("window.startBlankDocument && window.startBlankDocument()");
                 }
                 return;
             }
