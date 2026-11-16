@@ -160,9 +160,13 @@ public static class NfceXmlReader
             environmentCode == "2" ? "Homologação" :
             throw new InvalidDataException($"Ambiente da NFC-e inválido: {environmentCode}.");
 
-        string recipientName = Value(Required(info, "dest"), "xNome");
-        string recipientDocument = FirstValue(Required(info, "dest"), "CNPJ", "CPF");
+        // NFC-e pode não identificar o consumidor; nesse caso o grupo dest é legalmente omitido.
+        var recipient = info.Element(NfeNamespace + "dest");
+        string recipientName = recipient is null ? "" : Value(recipient, "xNome");
+        string recipientDocument = recipient is null ? "" : FirstValue(recipient, "CNPJ", "CPF");
         string qrCodeUrl = Value(Required(nfe, "infNFeSupl"), "qrCode");
+        if (string.IsNullOrWhiteSpace(qrCodeUrl))
+            throw new InvalidDataException("O XML da NFC-e não contém a URL do QR Code.");
 
         return new NfceDocumentSummary(
             sourcePath, accessKey, invoiceNumber, series,
