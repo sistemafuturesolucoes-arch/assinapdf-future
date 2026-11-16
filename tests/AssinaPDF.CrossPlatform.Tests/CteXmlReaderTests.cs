@@ -5,7 +5,7 @@ namespace AssinaPDF.CrossPlatform.Tests;
 
 public class CteXmlReaderTests
 {
-    private const string AccessKey = "4226106793428300011057001000000004100088882";
+    private const string AccessKey = "42261067934283000110570010000000041000888801";
 
     private static string AuthorizedXml() => $$"""
         <?xml version="1.0" encoding="UTF-8"?>
