@@ -1,27 +1,9 @@
 name: AssinaPDF Windows x64 Build
 
+# Build/empacotamento não será executado automaticamente durante a migração.
+# O próximo ciclo de validação será feito localmente pelo responsável pelo projeto.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - integracao-assinapdf-crossplatform
-      - feature/documento-pdf-editavel
-    paths:
-      - 'src/AssinaPDF.CrossPlatform/**'
-      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
-      - 'installer-crossplatform/**'
-      - 'scripts/generate_windows_icon.py'
-      - 'scripts/generate_installer_bitmaps.py'
-      - '.github/workflows/assinapdf-crossplatform-build.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'src/AssinaPDF.CrossPlatform/**'
-      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
-      - 'installer-crossplatform/**'
-      - 'scripts/generate_windows_icon.py'
-      - '.github/workflows/assinapdf-crossplatform-build.yml'
 
 permissions:
   contents: read
