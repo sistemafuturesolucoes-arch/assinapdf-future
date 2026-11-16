@@ -8,7 +8,7 @@ namespace Danfe.NFe.Core.Graphics
     /// do PDFsharp uma única vez. Como fallback, ele só é consultado quando o
     /// <see cref="GlobalFontSettings.FontResolver"/> do consumidor (se houver) não resolve a fonte.
     /// </summary>
-    internal static class DanfeFontResolverSetup
+    public static class DanfeFontResolverSetup
     {
         private static readonly object _Lock = new object();
         private static volatile bool _Initialized;
