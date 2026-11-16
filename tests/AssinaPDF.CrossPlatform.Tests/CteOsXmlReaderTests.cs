@@ -18,15 +18,15 @@ public class CteOsXmlReaderTests
               </ide>
               <emit><CNPJ>67934283000110</CNPJ><xNome>TRANSPORTADORA TESTE LTDA</xNome></emit>
               <vPrest><vTPrest>350.00</vTPrest></vPrest>
-              <infServico><xDescServ>Transporte de passageiros</xDescServ></infServico>
+              <infCTeNorm><infServico><xDescServ>Transporte de passageiros</xDescServ></infServico></infCTeNorm>
             </infCte>
           </CTeOS>
-          <protCTeOS versao="4.00">
+          <protCTe versao="4.00">
             <infProt><chCTe>{{AccessKey}}</chCTe><nProt>142260000123456</nProt>
               <dhRecbto>2026-10-22T15:11:10-03:00</dhRecbto><cStat>100</cStat>
               <xMotivo>Autorizado o uso do CT-e OS</xMotivo>
             </infProt>
-          </protCTeOS>
+          </protCTe>
         </cteOSProc>
         """;
 
@@ -48,7 +48,7 @@ public class CteOsXmlReaderTests
     public void Parse_Cte57Root_IsRejected()
     {
         var exception = Assert.Throws<InvalidDataException>(() => CteOsXmlReader.Parse(
-            AuthorizedXml().Replace("cteOSProc", "cteProc").Replace("CTeOS", "CTe").Replace("protCTeOS", "protCTe")));
+            AuthorizedXml().Replace("cteOSProc", "cteProc").Replace("CTeOS", "CTe")));
         Assert.Contains("cteOSProc", exception.Message);
     }
 
