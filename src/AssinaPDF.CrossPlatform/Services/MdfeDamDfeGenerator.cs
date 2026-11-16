@@ -294,7 +294,7 @@ public static class MdfeDamDfeGenerator
     {
         if (!string.Equals(environment, "Homologação", StringComparison.OrdinalIgnoreCase)) return;
         g.DrawString("EMITIDO EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL",
-            Section, XBrushes.Black, new XRect(Left, 76, Width, 12), XStringFormats.Center);
+            Section, XBrushes.Black, new XRect(Left, 138, Width, 12), XStringFormats.Center);
     }
 
     private static void DrawBarcode(XGraphics g, string key, double x, double y, double availableWidth)
