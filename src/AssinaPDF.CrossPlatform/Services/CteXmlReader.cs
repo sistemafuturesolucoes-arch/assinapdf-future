@@ -31,7 +31,7 @@ public sealed record CteDocumentSummary(
 
 /// <summary>
 /// Leitor estrito de CT-e processado, modelo 57, versão 4.00.
-/// Não gera DACTE: apenas valida e extrai os dados fiscais necessários à etapa de renderização.
+/// Valida a autorização, a chave e os dados fiscais antes da geração do DACTE.
 /// </summary>
 public static class CteXmlReader
 {
