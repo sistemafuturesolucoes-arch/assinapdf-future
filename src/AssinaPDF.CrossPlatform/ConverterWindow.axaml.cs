@@ -19,9 +19,9 @@ public partial class ConverterWindow : Window
 
     private async void NfceImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var window = new XmlFiscalPreviewWindow(isNfce: true);
+        var window = new NfceImportWindow();
         await window.ShowDialog(this);
-        NfceStatusText.Text = "Importador de NFC-e fechado.";
+        NfceStatusText.Text = "Central de NFC-e fechada.";
         StatusText.Text = "Você pode iniciar outra conversão.";
     }
 
