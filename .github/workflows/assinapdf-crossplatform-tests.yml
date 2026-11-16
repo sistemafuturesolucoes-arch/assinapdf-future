@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - integracao-assinapdf-crossplatform
+      - feature/conversoes-fiscais-e-documentos-2026-11-16
     paths:
       - 'src/AssinaPDF.CrossPlatform/**'
       - 'tests/AssinaPDF.CrossPlatform.Tests/**'
