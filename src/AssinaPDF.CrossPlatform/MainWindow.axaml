@@ -54,7 +54,9 @@
                 ColumnSpacing="16" RowSpacing="16">
             <Button Grid.Row="0" Grid.Column="0" Click="DashboardSign_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
-                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="✍" FontSize="29" Foreground="#6741B8"/>
                 <TextBlock Text="Assinar PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
@@ -65,7 +67,9 @@
 
             <Button Grid.Row="0" Grid.Column="1" Click="OpenValidationCenter_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
-                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="✓" FontSize="30" Foreground="#27865A"/>
                 <TextBlock Text="Validar assinatura" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
@@ -76,7 +80,9 @@
 
             <Button Grid.Row="0" Grid.Column="2" Click="DashboardOpen_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
-                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="▣" FontSize="29" Foreground="#3475B9"/>
                 <TextBlock Text="Abrir PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
@@ -87,19 +93,22 @@
 
             <Button Grid.Row="1" Grid.Column="0" Click="DashboardEdit_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
-                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="✎" FontSize="29" Foreground="#C47A25"/>
                 <TextBlock Text="Editar PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
                 <TextBlock Text="Ferramentas de edição de documentos."
                            FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
-                <TextBlock Text="Em desenvolvimento" FontSize="10" Foreground="#9A7A4E"/>
               </StackPanel>
             </Button>
 
             <Button Grid.Row="1" Grid.Column="1" Click="DashboardOrganize_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
-                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="☷" FontSize="29" Foreground="#32888A"/>
                 <TextBlock Text="Combinar e organizar PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
@@ -111,7 +120,9 @@
 
             <Button Grid.Row="1" Grid.Column="2" Click="DashboardConvert_Click"
                     Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
-                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch">
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
               <StackPanel VerticalAlignment="Center" Spacing="10">
                 <TextBlock Text="⇄" FontSize="29" Foreground="#7751A8"/>
                 <TextBlock Text="Converter arquivos" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
