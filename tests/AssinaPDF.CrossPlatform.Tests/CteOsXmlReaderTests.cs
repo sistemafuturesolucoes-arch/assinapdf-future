@@ -45,6 +45,24 @@ public class CteOsXmlReaderTests
     }
 
     [Fact]
+    public void ReadFile_CteOsXml_DispatchesToModel67Reader()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "cteos-" + Guid.NewGuid().ToString("N") + ".xml");
+        try
+        {
+            File.WriteAllText(path, AuthorizedXml());
+            var result = CteDocumentReader.ReadFile(path);
+            Assert.Equal("67", result.Model);
+            Assert.Equal(AccessKey, result.AccessKey);
+            Assert.Equal(Path.GetFullPath(path), result.SourcePath);
+        }
+        finally
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch { }
+        }
+    }
+
+    [Fact]
     public void Parse_Cte57Root_IsRejected()
     {
         var exception = Assert.Throws<InvalidDataException>(() => CteOsXmlReader.Parse(
