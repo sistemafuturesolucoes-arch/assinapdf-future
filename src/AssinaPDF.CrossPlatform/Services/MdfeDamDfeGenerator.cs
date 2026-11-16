@@ -161,16 +161,16 @@ public static class MdfeDamDfeGenerator
         g.DrawString("EMPRESA", Small, XBrushes.Gray, new XRect(Left, 50, 68, 10), XStringFormats.Center);
 
         double x = Left + 75;
-        g.DrawString(V(issuer, "xNome"), Section, XBrushes.Black, new XPoint(x, 34));
+        DrawTextFit(g, V(issuer, "xNome"), Section, x, 26, 380, 11);
         string street = Join(address, "xLgr", "nro", "xCpl", "xBairro");
         string city = Join(address, "xMun", "UF", "CEP");
-        g.DrawString(street, Small, XBrushes.Black, new XPoint(x, 45));
-        g.DrawString(city, Small, XBrushes.Black, new XPoint(x, 55));
+        DrawTextFit(g, street, Small, x, 39, 380, 9);
+        DrawTextFit(g, city, Small, x, 50, 380, 9);
         string registration = $"CNPJ/CPF: {First(issuer, "CNPJ", "CPF")}   IE: {V(issuer, "IE")}";
         var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
         string rntrc = V(road?.Element(Ns + "infANTT"), "RNTRC");
         if (rntrc.Length > 0) registration += "   RNTRC: " + rntrc;
-        g.DrawString(registration, Small, XBrushes.Black, new XPoint(x, 65));
+        DrawTextFit(g, registration, Small, x, 61, 380, 9);
 
         if (!string.IsNullOrWhiteSpace(qrPayload))
             DrawQrCode(g, qrPayload, Right - 75, 21, 72);
@@ -279,9 +279,10 @@ public static class MdfeDamDfeGenerator
     {
         g.DrawString("Observações", Section, XBrushes.Black, new XPoint(Left, y));
         g.DrawLine(XPens.Gray, Left, y + 5, Right, y + 5);
-        string observation = V(info.Element(Ns + "infAdic"), "infCpl");
+        var additional = info.Element(Ns + "infAdic");
+        string observation = Join(additional, "infAdFisco", "infCpl");
         if (observation.Length == 0) return;
-        DrawWrapped(g, observation, Left, y + 17, Width, 75, Small);
+        DrawWrapped(g, observation, Left, y + 17, Width, FooterY - y - 32, Small);
     }
 
     private static void DrawHomologationNotice(XGraphics g, string environment)
