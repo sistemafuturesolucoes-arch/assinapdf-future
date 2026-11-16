@@ -3,7 +3,7 @@ using Zion.NFe.Danfe;
 namespace AssinaPDF.MacPrototype.Services;
 
 /// <summary>
-/// Gera o DACTE do CT-e modelo 57 a partir do XML autorizado.
+/// Gera DACTE do CT-e modelo 57 ou DACTE OS do modelo 67 a partir do XML autorizado.
 /// A validação estrita do AssinaPDF é executada antes da biblioteca de renderização.
 /// </summary>
 public static class CteDacteGenerator
