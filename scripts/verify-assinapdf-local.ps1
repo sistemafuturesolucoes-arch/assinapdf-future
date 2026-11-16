@@ -1,8 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$ProjectPath = "src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj",
-    [string]$TestsPath = "tests/AssinaPDF.CrossPlatform.Tests/AssinaPDF.CrossPlatform.Tests.csproj",
-    [switch]$RequireNoImageSharp
+    [string]$TestsPath = "tests/AssinaPDF.CrossPlatform.Tests/AssinaPDF.CrossPlatform.Tests.csproj"
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,22 +22,32 @@ Write-Host "== 1/4 Restaurar dependencias =="
 Invoke-DotNet @("restore", $ProjectPath)
 
 Write-Host ""
-Write-Host "== 2/4 Auditoria de pacotes vulneraveis =="
+Write-Host "== 2/4 Auditoria da arvore de dependencias =="
+
+$packageGraph = & dotnet list $ProjectPath package --include-transitive 2>&1
+$graphExitCode = $LASTEXITCODE
+$packageGraph | ForEach-Object { Write-Host $_ }
+if ($graphExitCode -ne 0) {
+    throw "A leitura da arvore de pacotes falhou (exit code $graphExitCode)."
+}
+
+$legacyPackages = ($packageGraph | Out-String) -match "(?i)Econet\.DanfeDacte|PdfSharpCore|SixLabors\.ImageSharp|SixLabors\.Fonts"
+if ($legacyPackages) {
+    throw "Gate reprovado: a arvore ainda contem Econet.DanfeDacte/PdfSharpCore/SixLabors. Verifique o submodulo e as referencias do projeto."
+}
+
+Write-Host "Arvore limpa: Econet.DanfeDacte, PdfSharpCore e SixLabors nao aparecem." -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Auditoria de avisos de seguranca =="
 $vulnerabilityReport = & dotnet list $ProjectPath package --vulnerable --include-transitive 2>&1
 $vulnerabilityExitCode = $LASTEXITCODE
 $vulnerabilityReport | ForEach-Object { Write-Host $_ }
 if ($vulnerabilityExitCode -ne 0) {
-    throw "A auditoria de pacotes falhou (exit code $vulnerabilityExitCode)."
+    throw "A auditoria de vulnerabilidades falhou (exit code $vulnerabilityExitCode)."
 }
-
-$imageSharpFound = ($vulnerabilityReport | Out-String) -match "(?i)SixLabors\.ImageSharp"
-if ($imageSharpFound) {
-    Write-Warning "SixLabors.ImageSharp ainda aparece na arvore de dependencias. A migracao DACTE ainda nao pode ser considerada concluida."
-    if ($RequireNoImageSharp) {
-        throw "Gate de seguranca reprovado: ImageSharp ainda esta presente."
-    }
-} else {
-    Write-Host "ImageSharp nao apareceu no relatorio de vulnerabilidades." -ForegroundColor Green
+if (($vulnerabilityReport | Out-String) -match "(?i)SixLabors\.ImageSharp") {
+    throw "Gate de seguranca reprovado: ImageSharp ainda aparece no relatorio de vulnerabilidades."
 }
 
 Write-Host ""
@@ -50,4 +59,4 @@ Write-Host "== 4/4 Executar testes automatizados =="
 Invoke-DotNet @("test", $TestsPath, "--configuration", "Release")
 
 Write-Host ""
-Write-Host "Verificacao local concluida. A ausencia de ImageSharp deve ser confirmada com -RequireNoImageSharp." -ForegroundColor Green
+Write-Host "Verificacao local concluida: arvore sem a cadeia antiga, build Release e testes aprovados." -ForegroundColor Green
