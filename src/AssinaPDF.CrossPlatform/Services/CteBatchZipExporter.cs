@@ -56,7 +56,7 @@ public static class CteBatchZipExporter
                         var item = entry.Document; var s = item.Summary!;
                         string id = Safe(s.DocumentNumber + "-" + s.AccessKey);
                         AddFile(archive, item.SourcePath, $"{root}/XML_ORIGINAIS/{Path.GetFileName(item.SourcePath)}", used);
-                        AddFile(archive, item.PdfPath!, $"{root}/DACTE/DACTE-CTe-{id}.pdf", used);
+                        AddFile(archive, item.PdfPath!, $"{root}/DACTE/DACTE-CTe{s.Model}-{id}.pdf", used);
                     }
                     AddMerged(archive, group.ToList(), $"{root}/DACTE-CONSOLIDADO.pdf", used);
                 }
@@ -66,12 +66,12 @@ public static class CteBatchZipExporter
                 using (var stream = report.Open())
                 using (var writer = new StreamWriter(stream, new UTF8Encoding(true)))
                 {
-                    writer.WriteLine("Status;Motivo;Chave;CNPJ/CPF emitente;Emitente;Número CT-e;Emissão;Valor serviço;XML;PDF");
-                    foreach (var x in valid) { var s=x.Document.Summary!; Row(writer,"PROCESSADO","",s.AccessKey,s.IssuerDocument,s.IssuerName,s.DocumentNumber,s.IssueDate,s.ServiceValue.ToString("0.00",System.Globalization.CultureInfo.InvariantCulture),Path.GetFileName(x.Document.SourcePath),Path.GetFileName(x.Document.PdfPath)); }
-                    foreach (var x in invalid) { var s=x.Summary; Row(writer,"ERRO",x.Error,s?.AccessKey,s?.IssuerDocument,s?.IssuerName,s?.DocumentNumber,s?.IssueDate,s?.ServiceValue.ToString("0.00"),Path.GetFileName(x.SourcePath),""); }
-                    foreach (var x in duplicates) { var s=x.Summary; Row(writer,"DUPLICADO",x.DuplicateReason,s?.AccessKey,s?.IssuerDocument,s?.IssuerName,s?.DocumentNumber,s?.IssueDate,s?.ServiceValue.ToString("0.00"),Path.GetFileName(x.SourcePath),""); }
+                    writer.WriteLine("Status;Motivo;Chave;CNPJ/CPF emitente;Emitente;Modelo;Número CT-e;Emissão;Valor serviço;XML;PDF");
+                    foreach (var x in valid) { var s=x.Document.Summary!; Row(writer,"PROCESSADO","",s.AccessKey,s.IssuerDocument,s.IssuerName,s.Model,s.DocumentNumber,s.IssueDate,s.ServiceValue.ToString("0.00",System.Globalization.CultureInfo.InvariantCulture),Path.GetFileName(x.Document.SourcePath),Path.GetFileName(x.Document.PdfPath)); }
+                    foreach (var x in invalid) { var s=x.Summary; Row(writer,"ERRO",x.Error,s?.AccessKey,s?.IssuerDocument,s?.IssuerName,s?.Model,s?.DocumentNumber,s?.IssueDate,s?.ServiceValue.ToString("0.00"),Path.GetFileName(x.SourcePath),""); }
+                    foreach (var x in duplicates) { var s=x.Summary; Row(writer,"DUPLICADO",x.DuplicateReason,s?.AccessKey,s?.IssuerDocument,s?.IssuerName,s?.Model,s?.DocumentNumber,s?.IssueDate,s?.ServiceValue.ToString("0.00"),Path.GetFileName(x.SourcePath),""); }
                 }
-                WriteText(archive,"LEIA-ME.txt",$"ASSINAPDF FUTURE - CENTRAL CT-e\r\n\r\nEmpresas: {valid.Select(x=>x.Folder).Distinct().Count()}\r\nDACTEs gerados: {valid.Count}\r\nXMLs com erro: {invalid.Count}\r\nDuplicados: {duplicates.Count}\r\n\r\nXMLs originais preservados. PDFs individuais e consolidados organizados por emitente.\r\n",used);
+                WriteText(archive,"LEIA-ME.txt",$"ASSINAPDF FUTURE - CENTRAL CT-e\r\n\r\nEmpresas: {valid.Select(x=>x.Folder).Distinct().Count()}\r\nDACTEs / DACTE OS gerados: {valid.Count}\r\nXMLs com erro: {invalid.Count}\r\nDuplicados: {duplicates.Count}\r\n\r\nXMLs originais preservados. PDFs individuais e consolidados organizados por emitente.\r\n",used);
             }
             File.Move(temp, output, true);
         }
