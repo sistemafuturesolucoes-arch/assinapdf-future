@@ -19,8 +19,9 @@ public class MdfeXmlReaderTests
               </ide>
               <emit><CNPJ>12345678000123</CNPJ><xNome>TRANSPORTADORA TESTE LTDA</xNome></emit>
               <infModal versaoModal="3.00">
-                <rodo><veicTracao><cInt>01</cInt><placa>ABC1D23</placa><RENAVAM>12345678901</RENAVAM><UF>RS</UF></veicTracao>
-                  <condutor><xNome>Motorista Teste</xNome><CPF>12345678901</CPF></condutor>
+                <rodo><veicTracao><cInt>01</cInt><placa>ABC1D23</placa><RENAVAM>12345678901</RENAVAM><UF>RS</UF>
+                    <condutor><xNome>Motorista Teste</xNome><CPF>12345678901</CPF></condutor>
+                  </veicTracao>
                 </rodo>
               </infModal>
               <tot><qCTe>2</qCTe><qNFe>1</qNFe><vCarga>12500.50</vCarga><cUnid>01</cUnid><qCarga>850.0000</qCarga></tot>
