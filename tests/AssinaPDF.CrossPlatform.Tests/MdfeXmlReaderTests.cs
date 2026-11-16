@@ -100,6 +100,38 @@ public class MdfeXmlReaderTests
         Assert.Equal(alphanumericCnpj, result.IssuerDocument);
     }
 
+
+    [Fact]
+    public void Generate_ProducesReadablePdfWithOfficialBarcodeAndQrAreas()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "AssinaPDF-Mdfe-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string xmlPath = Path.Combine(directory, "mdfe.xml");
+        string pdfPath = Path.Combine(directory, "damdfe.pdf");
+        try
+        {
+            string xml = AuthorizedXml().Replace(
+                "</MDFe>",
+                "<infMDFeSupl><qrCodMDFe>https://dfe-portal.svrs.rs.gov.br/MDFe/Consulta</qrCodMDFe></infMDFeSupl></MDFe>",
+                StringComparison.Ordinal);
+            File.WriteAllText(xmlPath, xml);
+            var summary = MdfeXmlReader.ReadFile(xmlPath);
+
+            MdfeDamDfeGenerator.Generate(summary, pdfPath);
+
+            Assert.True(File.Exists(pdfPath));
+            Assert.True(new FileInfo(pdfPath).Length > 1_000);
+            using var stream = File.OpenRead(pdfPath);
+            Span<byte> header = stackalloc byte[5];
+            Assert.Equal(5, stream.Read(header));
+            Assert.Equal("%PDF-", System.Text.Encoding.ASCII.GetString(header));
+        }
+        finally
+        {
+            try { Directory.Delete(directory, true); } catch { }
+        }
+    }
+
     [Fact]
     public void Parse_Dtd_IsRejected()
     {
