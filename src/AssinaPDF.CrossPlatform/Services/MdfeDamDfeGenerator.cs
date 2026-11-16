@@ -13,9 +13,9 @@ namespace AssinaPDF.MacPrototype.Services;
 public static class MdfeDamDfeGenerator
 {
     private static readonly XNamespace Ns = "http://www.portalfiscal.inf.br/mdfe";
-    // Use Liberation Serif: the app's DANFE PDFsharp fallback resolver explicitly
-    // supports this family and embeds its TTF files, with system-font lookup first.
-    // This keeps MDF-e generation independent from fonts installed on the machine.
+    // Liberation Serif is provided by the embedded PDFsharp fallback resolver,
+    // registered after DanfeSharp.Next's primary resolver during application startup.
+    // No operating-system font installation is required.
     private static XFont TitleFont => new("Liberation Serif", 15, XFontStyleEx.Bold);
     private static XFont SectionFont => new("Liberation Serif", 9, XFontStyleEx.Bold);
     private static XFont LabelFont => new("Liberation Serif", 7, XFontStyleEx.Bold);
