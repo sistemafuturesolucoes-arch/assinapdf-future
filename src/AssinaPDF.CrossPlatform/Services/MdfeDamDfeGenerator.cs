@@ -167,7 +167,8 @@ public static class MdfeDamDfeGenerator
         g.DrawString(street, Small, XBrushes.Black, new XPoint(x, 45));
         g.DrawString(city, Small, XBrushes.Black, new XPoint(x, 55));
         string registration = $"CNPJ/CPF: {First(issuer, "CNPJ", "CPF")}   IE: {V(issuer, "IE")}";
-        string rntrc = V(info.Element(Ns + "infModal")?.Element(Ns + "rodo"), "RNTRC");
+        var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
+        string rntrc = V(road?.Element(Ns + "infANTT"), "RNTRC");
         if (rntrc.Length > 0) registration += "   RNTRC: " + rntrc;
         g.DrawString(registration, Small, XBrushes.Black, new XPoint(x, 65));
 
@@ -213,7 +214,7 @@ public static class MdfeDamDfeGenerator
         foreach (var vehicle in vehicles.Take(4))
         {
             g.DrawString(V(vehicle, "placa"), Value, XBrushes.Black, new XPoint(Left, rowY));
-            g.DrawString(V(road, "RNTRC"), Value, XBrushes.Black, new XPoint(Left + 75, rowY));
+            g.DrawString(V(road?.Element(Ns + "infANTT"), "RNTRC"), Value, XBrushes.Black, new XPoint(Left + 75, rowY));
             rowY += 15;
         }
         if (vehicles.Count == 0)
@@ -222,7 +223,7 @@ public static class MdfeDamDfeGenerator
         g.DrawString("CPF", Label, XBrushes.Black, new XPoint(Left + 244, y + 17));
         g.DrawString("Nome", Label, XBrushes.Black, new XPoint(Left + 325, y + 17));
         double driverY = y + 29;
-        var drivers = road?.Elements(Ns + "condutor") ?? Enumerable.Empty<XElement>();
+        var drivers = vehicle?.Elements(Ns + "condutor") ?? Enumerable.Empty<XElement>();
         foreach (var driver in drivers.Take(6))
         {
             DrawTextFit(g, First(driver, "CPF", "CNPJ"), Value, Left + 244, driverY, 75, 11);
@@ -255,7 +256,8 @@ public static class MdfeDamDfeGenerator
 
     private static void DrawTollInfo(XGraphics g, XElement info, double y)
     {
-        var tolls = info.Element(Ns + "infModal")?.Descendants(Ns + "valePed").ToList() ?? new List<XElement>();
+        var tollGroups = info.Element(Ns + "infModal")?.Descendants(Ns + "valePed") ?? Enumerable.Empty<XElement>();
+        var tolls = tollGroups.SelectMany(group => group.Elements(Ns + "disp")).ToList();
         if (tolls.Count == 0) return;
 
         g.DrawString("Vale Pedágio", Section, XBrushes.Black, new XPoint(Left, y));
