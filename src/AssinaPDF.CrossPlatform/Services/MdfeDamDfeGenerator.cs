@@ -135,7 +135,7 @@ public static class MdfeDamDfeGenerator
         double controlX = Left + 213;
         g.DrawString("CONTROLE DO FISCO", Label, XBrushes.Black,
             new XRect(controlX, y + 1, Width - 244, 10), XStringFormats.TopCenter);
-        DrawBarcode(g, s.AccessKey, controlX, totalsY - 1, Width - 244, 42);
+        DrawBarcode(g, s.AccessKey, controlX, totalsY - 1, Width - 244);
 
         double protocolY = 233;
         g.DrawString("Protocolo de autorização", Section, XBrushes.Black, new XPoint(Left, protocolY));
