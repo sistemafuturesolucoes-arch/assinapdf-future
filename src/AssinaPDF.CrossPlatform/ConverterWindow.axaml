@@ -44,9 +44,9 @@
         <Border Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="10" Padding="18">
           <StackPanel Spacing="9">
             <TextBlock Text="XML de NFC-e para DANFCE" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
-            <TextBlock Text="Importe NFC-e modelo 65 autorizada, valide a chave, protocolo, emitente, itens, totais e QR Code e confira os dados extraídos." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+            <TextBlock Text="Importe vários XMLs de NFC-e de empresas diferentes, gere os DANFCEs em PDF com QR Code e visualize, organize e exporte em lote." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
             <Button Content="Importar XML de NFC-e" Click="NfceImport_Click" HorizontalAlignment="Left" Background="#6741B8" Foreground="White" Padding="16,9"/>
-            <TextBlock x:Name="NfceStatusText" Text="Leitor de NFC-e pronto. Geração oficial do DANFCE será habilitada após a etapa de renderização." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
+            <TextBlock x:Name="NfceStatusText" Text="Central de NFC-e com geração e pré-visualização de DANFCE em PDF." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
         <Border Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="10" Padding="18">
