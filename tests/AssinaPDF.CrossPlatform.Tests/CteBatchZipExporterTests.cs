@@ -56,8 +56,8 @@ public class CteBatchZipExporterTests
             Assert.Contains(names, x => x.EndsWith("/DACTE-CONSOLIDADO.pdf", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(names, x => x.StartsWith("DUPLICADOS/", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(names, x => x.StartsWith("XML_COM_ERRO/", StringComparison.OrdinalIgnoreCase));
-            Assert.Contains(names, "relatorio.csv");
-            Assert.Contains(names, "LEIA-ME.txt");
+            Assert.Contains("relatorio.csv", names);
+            Assert.Contains("LEIA-ME.txt", names);
             Assert.Equal(original, File.ReadAllBytes(xmlPath));
         }
         finally
