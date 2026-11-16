@@ -66,7 +66,7 @@ public static class CteOsXmlReader
         if (!DateTimeOffset.TryParse(issueText, CultureInfo.InvariantCulture, DateTimeStyles.None, out var issueDate))
             throw new InvalidDataException("A data de emissão do CT-e OS é inválida.");
 
-        var protocol = Required(Required(root, "protCTeOS"), "infProt");
+        var protocol = Required(Required(root, "protCTe"), "infProt");
         if (!string.Equals(key, RequiredValue(protocol, "chCTe"), StringComparison.Ordinal))
             throw new InvalidDataException("A chave do protocolo não corresponde à chave do CT-e OS.");
         string status = RequiredValue(protocol, "cStat");
@@ -78,7 +78,7 @@ public static class CteOsXmlReader
         ValidateDocument(issuerDocument, "emitente");
         ValidateKeyMatchesDocument(key, issueDate, issuerDocument, number, series);
 
-        var service = info.Element(Ns + "infServico");
+        var service = info.Element(Ns + "infCTeNorm")?.Element(Ns + "infServico");
         var values = Required(info, "vPrest");
         decimal serviceValue = Decimal(RequiredValue(values, "vTPrest"), "vTPrest");
         if (serviceValue < 0)
