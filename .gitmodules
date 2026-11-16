@@ -1,0 +1,3 @@
+[submodule "src/AssinaPDF.CrossPlatform/ThirdParty/Econet.DanfeDacte.Source"]
+	path = src/AssinaPDF.CrossPlatform/ThirdParty/Econet.DanfeDacte.Source
+	url = https://github.com/AlejandroPietry/Econet.DanfeDacte.git
