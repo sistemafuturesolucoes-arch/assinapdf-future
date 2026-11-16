@@ -17,7 +17,7 @@ public sealed record NfceZipDocument(
 
 public static class NfceBatchZipExporter
 {
-    private sealed record ValidEntry(NfceZipDocument Document, string Folder);
+    private sealed record ValidEntry(NfceZipDocument Document, string CompanyKey, string Folder);
 
     public static void Create(string outputZipPath, IEnumerable<NfceZipDocument> documents)
     {
@@ -67,12 +67,12 @@ public static class NfceBatchZipExporter
                         document = "SEM-CNPJ-" + hash;
                     }
                     string folder = Safe(document + "-" + item.Summary.IssuerName);
-                    valid.Add(new ValidEntry(item, folder));
+                    valid.Add(new ValidEntry(item, document, folder));
                 }
 
-                foreach (var group in valid.GroupBy(x => x.Folder, StringComparer.OrdinalIgnoreCase))
+                foreach (var group in valid.GroupBy(x => x.CompanyKey, StringComparer.OrdinalIgnoreCase))
                 {
-                    string root = "EMPRESAS/" + group.Key;
+                    string root = "EMPRESAS/" + group.First().Folder;
                     foreach (var entry in group)
                     {
                         var item = entry.Document;
