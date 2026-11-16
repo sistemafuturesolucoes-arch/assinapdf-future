@@ -110,7 +110,6 @@ public static class CteXmlReader
 
         var sender = info.Element(Ns + "rem");
         var recipient = info.Element(Ns + "dest");
-        var route = Required(ide, "enderReme");
         // enderReme/enderDest are not children of ide in the CT-e schema; use the party address nodes.
         var senderAddress = sender?.Element(Ns + "enderReme");
         var recipientAddress = recipient?.Element(Ns + "enderDest");
