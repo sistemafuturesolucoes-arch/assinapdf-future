@@ -26,14 +26,30 @@ public partial class PdfViewerWindow : Window
     private float _renderScale = 1.5f;
     private bool _loading;
 
+    // Construtor público sem parâmetros exigido pelo carregador XAML do Avalonia.
+    // O fluxo normal continua usando o construtor com o caminho do PDF.
+    public PdfViewerWindow()
+        : this(string.Empty, () => Task.FromResult<string?>(null))
+    {
+    }
+
     public PdfViewerWindow(string pdfPath, Func<Task<string?>> editAction)
     {
-        _originalPath = Path.GetFullPath(pdfPath);
+        _originalPath = string.IsNullOrWhiteSpace(pdfPath) ? string.Empty : Path.GetFullPath(pdfPath);
         _editAction = editAction;
         InitializeComponent();
-        DocumentNameText.Text = Path.GetFileName(_originalPath);
-        Title = $"AssinaPDF | {Path.GetFileName(_originalPath)}";
-        Opened += (_, _) => LoadDocument(_originalPath);
+        DocumentNameText.Text = string.IsNullOrEmpty(_originalPath)
+            ? "Nenhum documento selecionado"
+            : Path.GetFileName(_originalPath);
+        if (!string.IsNullOrEmpty(_originalPath))
+            Title = $"AssinaPDF | {Path.GetFileName(_originalPath)}";
+        Opened += (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(_originalPath))
+                LoadDocument(_originalPath);
+            else
+                ViewerStatusText.Text = "Nenhum PDF selecionado. Abra esta janela pelo fluxo de visualização de documentos.";
+        };
         PageScrollViewer.ScrollChanged += PageScrollViewer_ScrollChanged;
         Closed += (_, _) => DisposeResources();
         PageScrollViewer.AddHandler(
