@@ -23,7 +23,7 @@
                      NavigationCompleted="EditorWebView_NavigationCompleted"
                      WebMessageReceived="EditorWebView_WebMessageReceived"/>
       <Border x:Name="LoadingOverlay" Background="#F3F4F6"
-              IsVisible="True" Padding="28">
+              IsVisible="False" Padding="28">
         <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Center" Spacing="10">
           <TextBlock x:Name="LoadingTitle" Text="Preparando editor…"
