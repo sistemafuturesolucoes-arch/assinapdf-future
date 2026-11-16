@@ -1,22 +1,8 @@
 name: AssinaPDF CrossPlatform - Build e Testes
 
+# Validação manual/local solicitada pelo projeto. Não executar automaticamente
+# em pushes ou pull requests durante a migração das dependências.
 on:
-  push:
-    branches:
-      - integracao-assinapdf-crossplatform
-      - feature/conversoes-fiscais-e-documentos-2026-11-16
-      - teste/assinatura-integrada-editor-2026-11-16
-    paths:
-      - 'src/AssinaPDF.CrossPlatform/**'
-      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
-      - '.github/workflows/assinapdf-crossplatform-tests.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'src/AssinaPDF.CrossPlatform/**'
-      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
-      - '.github/workflows/assinapdf-crossplatform-tests.yml'
   workflow_dispatch:
 
 permissions:
