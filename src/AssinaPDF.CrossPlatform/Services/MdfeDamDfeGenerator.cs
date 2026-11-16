@@ -200,7 +200,7 @@ public static class MdfeDamDfeGenerator
         }
         if (rows.Count == 0) return;
 
-        const int rowsPerPage = 48;
+        const int rowsPerPage = 42;
         int pageCount = (int)Math.Ceiling(rows.Count / (double)rowsPerPage) + 1;
         for (int offset = 0; offset < rows.Count; offset += rowsPerPage)
         {
