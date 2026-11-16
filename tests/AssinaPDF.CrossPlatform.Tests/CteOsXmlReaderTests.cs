@@ -14,7 +14,7 @@ public class CteOsXmlReaderTests
             <infCte Id="CTe{{AccessKey}}" versao="4.00">
               <ide>
                 <mod>67</mod><nCT>4</nCT><serie>1</serie>
-                <dhEmi>2026-10-22T15:11:09-03:00</dhEmi><tpAmb>1</tpAmb><tpServ>6</tpServ>
+                <dhEmi>2026-10-22T15:11:09-03:00</dhEmi><tpServ>6</tpServ>
               </ide>
               <emit><CNPJ>67934283000110</CNPJ><xNome>TRANSPORTADORA TESTE LTDA</xNome></emit>
               <vPrest><vTPrest>350.00</vTPrest></vPrest>
@@ -22,7 +22,7 @@ public class CteOsXmlReaderTests
             </infCte>
           </CTeOS>
           <protCTe versao="4.00">
-            <infProt><chCTe>{{AccessKey}}</chCTe><nProt>142260000123456</nProt>
+            <infProt><tpAmb>1</tpAmb><chCTe>{{AccessKey}}</chCTe><nProt>142260000123456</nProt>
               <dhRecbto>2026-10-22T15:11:10-03:00</dhRecbto><cStat>100</cStat>
               <xMotivo>Autorizado o uso do CT-e OS</xMotivo>
             </infProt>
