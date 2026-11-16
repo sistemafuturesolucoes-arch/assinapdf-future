@@ -49,18 +49,43 @@ public class NfceXmlReaderTests
         Directory.CreateDirectory(directory);
         string xmlPath = Path.Combine(directory, "nfce.xml");
         string pdfPath = Path.Combine(directory, "danfce.pdf");
+        string secondPdfPath = Path.Combine(directory, "danfce-segundo.pdf");
 
         try
         {
             File.WriteAllText(xmlPath, AuthorizedXml(), System.Text.Encoding.UTF8);
             var summary = NfceXmlReader.ReadFile(xmlPath);
 
-            NfceDanfeGenerator.Generate(summary, pdfPath);
+            // Simula outro recurso do AssinaPDF usando PDFsharp antes da DANFCE.
+            // O resolvedor DanfeSharp deve estar registrado desde o início do processo.
+            using (var baseline = new PdfSharp.Pdf.PdfDocument())
+            {
+                var page = baseline.AddPage();
+                using (var graphics = PdfSharp.Drawing.XGraphics.FromPdfPage(page))
+                {
+                    graphics.DrawString(
+                        "PDFsharp inicializado antes do DANFCE",
+                        new PdfSharp.Drawing.XFont("Times New Roman", 10),
+                        PdfSharp.Drawing.XBrushes.Black,
+                        new PdfSharp.Drawing.XPoint(20, 20));
+                }
+                baseline.Save(Path.Combine(directory, "baseline.pdf"));
+            }
 
-            Assert.True(File.Exists(pdfPath));
-            Assert.True(new FileInfo(pdfPath).Length > 5);
-            using var pdf = PdfSharp.Pdf.IO.PdfReader.Open(pdfPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.ReadOnly);
-            Assert.NotEmpty(pdf.Pages);
+            // Duas gerações consecutivas validam que o resolvedor global não é
+            // redefinido a cada documento e que o serviço permanece reutilizável.
+            NfceDanfeGenerator.Generate(summary, pdfPath);
+            NfceDanfeGenerator.Generate(summary, secondPdfPath);
+
+            foreach (var generatedPath in new[] { pdfPath, secondPdfPath })
+            {
+                Assert.True(File.Exists(generatedPath));
+                Assert.True(new FileInfo(generatedPath).Length > 5);
+                using var pdf = PdfSharp.Pdf.IO.PdfReader.Open(
+                    generatedPath,
+                    PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+                Assert.NotEmpty(pdf.Pages);
+            }
         }
         finally
         {
