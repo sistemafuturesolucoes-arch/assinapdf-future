@@ -291,7 +291,6 @@ namespace org.pdfclown.documents.contents.fonts
             }
         }
     }
-}
 
 namespace org.pdfclown.documents.contents.xObjects
 {
