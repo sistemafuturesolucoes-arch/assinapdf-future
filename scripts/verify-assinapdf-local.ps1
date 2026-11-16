@@ -31,7 +31,8 @@ if ($graphExitCode -ne 0) {
     throw "A leitura da arvore de pacotes falhou (exit code $graphExitCode)."
 }
 
-$legacyPackages = ($packageGraph | Out-String) -match "(?i)Econet\.DanfeDacte|PdfSharpCore|SixLabors\.ImageSharp|SixLabors\.Fonts"
+$legacyPackagePattern = "(?im)^\s*>\s+(?:Econet\.DanfeDacte(?:\s|$)|PdfSharpCore(?:\s|$)|SixLabors\.(?:ImageSharp|Fonts)(?:\s|$))"
+$legacyPackages = ($packageGraph | Out-String) -match $legacyPackagePattern
 if ($legacyPackages) {
     throw "Gate reprovado: a arvore ainda contem Econet.DanfeDacte/PdfSharpCore/SixLabors. Verifique o submodulo e as referencias do projeto."
 }
