@@ -13,14 +13,14 @@ namespace AssinaPDF.MacPrototype.Services;
 public static class MdfeDamDfeGenerator
 {
     private static readonly XNamespace Ns = "http://www.portalfiscal.inf.br/mdfe";
-    // Use Arial, the standard sans-serif family supported by PDFsharp's platform
-    // resolver and the application's DANFE font setup. Lazy creation ensures
-    // the shared resolver is configured before PDFsharp creates any XFont.
-    private static XFont TitleFont => new("Arial", 15, XFontStyleEx.Bold);
-    private static XFont SectionFont => new("Arial", 9, XFontStyleEx.Bold);
-    private static XFont LabelFont => new("Arial", 7, XFontStyleEx.Bold);
-    private static XFont ValueFont => new("Arial", 8, XFontStyleEx.Regular);
-    private static XFont SmallFont => new("Arial", 6.5, XFontStyleEx.Regular);
+    // Use Liberation Serif: the app's DANFE PDFsharp fallback resolver explicitly
+    // supports this family and embeds its TTF files, with system-font lookup first.
+    // This keeps MDF-e generation independent from fonts installed on the machine.
+    private static XFont TitleFont => new("Liberation Serif", 15, XFontStyleEx.Bold);
+    private static XFont SectionFont => new("Liberation Serif", 9, XFontStyleEx.Bold);
+    private static XFont LabelFont => new("Liberation Serif", 7, XFontStyleEx.Bold);
+    private static XFont ValueFont => new("Liberation Serif", 8, XFontStyleEx.Regular);
+    private static XFont SmallFont => new("Liberation Serif", 6.5, XFontStyleEx.Regular);
 
     public static void Generate(MdfeDocumentSummary summary, string outputPath)
     {
