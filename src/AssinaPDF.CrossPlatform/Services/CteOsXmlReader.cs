@@ -84,7 +84,7 @@ public static class CteOsXmlReader
         if (serviceValue < 0)
             throw new InvalidDataException("O valor do serviço do CT-e OS não pode ser negativo.");
 
-        string environment = RequiredValue(ide, "tpAmb") switch
+        string environment = RequiredValue(protocol, "tpAmb") switch
         {
             "1" => "Produção",
             "2" => "Homologação",
