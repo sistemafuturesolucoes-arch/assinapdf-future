@@ -118,7 +118,7 @@ namespace org.pdfclown.documents.contents.fonts
         private static bool _fontResolverConfigured;
 
         private readonly string _fontName;
-        private readonly XFontStyle _fontStyle;
+        private readonly XFontStyleEx _fontStyle;
 
         public enum FamilyEnum
         {
@@ -183,7 +183,7 @@ namespace org.pdfclown.documents.contents.fonts
             }
         }
 
-        private static XFontStyle ResolveStyle(bool bold, bool italic)
+        private static XFontStyleEx ResolveStyle(bool bold, bool italic)
         {
             if (bold && italic)
             {
