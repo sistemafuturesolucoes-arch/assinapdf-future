@@ -123,11 +123,11 @@ public static class MdfeDamDfeGenerator
 
         // Totais à esquerda e controle fiscal à direita, conforme o modelo oficial.
         double totalsY = y + 20;
-        DrawSummaryTile(g, "Qtd. CT-e", s.CteCount.ToString(Pt), Left, totalsY, 66);
-        DrawSummaryTile(g, "Qtd. NF-e", s.NfeCount.ToString(Pt), Left + 69, totalsY, 66);
-        DrawSummaryTile(g, "Peso total (" + UnitName(s.CargoUnit) + ")", s.CargoQuantity.ToString("N3", Pt), Left + 138, totalsY, 94);
+        DrawSummaryTile(g, "Qtd. CT-e", s.CteCount.ToString(Pt), Left, totalsY, 55);
+        DrawSummaryTile(g, "Qtd. NF-e", s.NfeCount.ToString(Pt), Left + 58, totalsY, 55);
+        DrawSummaryTile(g, "Peso total (" + UnitName(s.CargoUnit) + ")", s.CargoQuantity.ToString("N3", Pt), Left + 116, totalsY, 75);
 
-        double controlX = Left + 244;
+        double controlX = Left + 213;
         g.DrawString("CONTROLE DO FISCO", Label, XBrushes.Black,
             new XRect(controlX, y + 1, Width - 244, 10), XStringFormats.TopCenter);
         DrawBarcode(g, s.AccessKey, controlX, totalsY - 1, Width - 244, 42);
@@ -172,7 +172,7 @@ public static class MdfeDamDfeGenerator
         g.DrawString(registration, Small, XBrushes.Black, new XPoint(x, 65));
 
         if (!string.IsNullOrWhiteSpace(qrPayload))
-            DrawQrCode(g, qrPayload, Right - 58, 24, 54);
+            DrawQrCode(g, qrPayload, Right - 75, 21, 72);
     }
 
     private static void DrawBandCell(XGraphics g, string label, string value, double x, double y, double width)
