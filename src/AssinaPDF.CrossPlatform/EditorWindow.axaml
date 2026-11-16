@@ -179,7 +179,7 @@
                 <TextBox x:Name="ShapeFillColorTextBox" Text="#FFFFFF"
                          FontFamily="Consolas" FontSize="11"
                          VerticalContentAlignment="Center"
-                         Watermark="#RRGGBB"
+                         PlaceholderText="#RRGGBB"
                          KeyUp="ShapeFillColorTextBox_KeyUp"/>
                 <Button Grid.Column="1" Content="Aplicar"
                         Click="ApplyShapeFillColor_Click"
