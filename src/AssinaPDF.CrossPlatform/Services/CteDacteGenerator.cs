@@ -39,15 +39,11 @@ public static class CteDacteGenerator
         try
         {
             string xml = File.ReadAllText(sourcePath);
-            var model = DacteViewModelCreator.Criar57DeStringXml(xml);
-            using (var dacte = new Dacte(model))
-            {
-                dacte.Gerar();
-                dacte.Salvar(temporaryPath);
-            }
-
-            if (!File.Exists(temporaryPath) || new FileInfo(temporaryPath).Length < 5)
+            byte[] pdfBytes = GeradorPdf.GerarDactePdfDeXml(xml, ModeloDacte.Cte57);
+            if (pdfBytes is null || pdfBytes.Length < 5)
                 throw new InvalidDataException("A biblioteca não produziu um PDF válido.");
+
+            File.WriteAllBytes(temporaryPath, pdfBytes);
 
             using (var stream = File.OpenRead(temporaryPath))
             {
