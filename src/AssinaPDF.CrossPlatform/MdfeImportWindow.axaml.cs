@@ -27,16 +27,14 @@ public partial class MdfeImportWindow : Window
                 try { path = Path.GetFullPath(file.Path.LocalPath); }
                 catch { rejected++; errors.Add($"{file.Name}: caminho local indisponível."); continue; }
                 if (!File.Exists(path)) { rejected++; errors.Add($"{file.Name}: arquivo não encontrado."); continue; }
-                if (_documents.Any(d => PathEquals(d.SourcePath, path))) {
-                    duplicates++; _documents.Add(new MdfeBatchItem(path, null, "Arquivo já importado nesta sessão.", true)); continue;
-                }
-                try {
+                if (_documents.Any(d => PathEquals(d.SourcePath, path))) { duplicates++; _documents.Add(new MdfeBatchItem(path, null, "Arquivo já importado nesta sessão.", true)); continue; }
+                try
+                {
                     var summary = MdfeXmlReader.ReadFile(path);
-                    if (_documents.Any(d => d.Summary?.AccessKey == summary.AccessKey)) {
-                        duplicates++; _documents.Add(new MdfeBatchItem(path, summary, "Chave de acesso já importada.", true)); continue;
-                    }
+                    if (_documents.Any(d => d.Summary?.AccessKey == summary.AccessKey)) { duplicates++; _documents.Add(new MdfeBatchItem(path, summary, "Chave de acesso já importada.", true)); continue; }
                     _documents.Add(new MdfeBatchItem(path, summary, null)); imported++;
-                } catch (Exception ex) { rejected++; errors.Add($"{file.Name}: {ex.Message}"); _documents.Add(new MdfeBatchItem(path, null, ex.Message)); }
+                }
+                catch (Exception ex) { rejected++; errors.Add($"{file.Name}: {ex.Message}"); _documents.Add(new MdfeBatchItem(path, null, ex.Message)); }
             }
             RefreshList();
             if (_documents.Count > 0) DocumentsList.SelectedIndex = _documents.Count - 1;
@@ -82,38 +80,46 @@ public partial class MdfeImportWindow : Window
     private async void ExportSelected_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (DocumentsList.SelectedItem is not MdfeBatchItem item || item.Summary is null || item.Error != null || item.IsDuplicate) { StatusText.Text = "Selecione um MDF-e válido."; return; }
-        try {
-            var dest = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Exportar XML original do MDF-e",
-                SuggestedFileName = Path.GetFileName(item.SourcePath), DefaultExtension = "xml",
-                FileTypeChoices = new[] { new FilePickerFileType("Arquivo XML") { Patterns = new[] { "*.xml" } } } });
+        try
+        {
+            var dest = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
+                Title = "Exportar XML original do MDF-e", SuggestedFileName = Path.GetFileName(item.SourcePath), DefaultExtension = "xml",
+                FileTypeChoices = new[] { new FilePickerFileType("Arquivo XML") { Patterns = new[] { "*.xml" } } }
+            });
             if (dest is null) return;
             string target = Path.GetFullPath(dest.Path.LocalPath);
             if (PathEquals(target, item.SourcePath)) throw new InvalidOperationException("O destino não pode ser o próprio XML original.");
             File.Copy(item.SourcePath, target, true); StatusText.Text = "XML original exportado sem alterações: " + target;
-        } catch (Exception ex) { StatusText.Text = "Falha ao exportar XML: " + ex.Message; }
+        }
+        catch (Exception ex) { StatusText.Text = "Falha ao exportar XML: " + ex.Message; }
     }
 
     private async void ExportZip_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var valid = _documents.Where(d => d.Summary != null && d.Error == null && !d.IsDuplicate && File.Exists(d.SourcePath)).ToList();
         if (valid.Count == 0) { StatusText.Text = "Não há XMLs válidos para exportar."; return; }
-        try {
-            var dest = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Exportar XMLs MDF-e em ZIP",
-                SuggestedFileName = "MDFe-XMLs-Validados.zip", DefaultExtension = "zip",
-                FileTypeChoices = new[] { new FilePickerFileType("Arquivo ZIP") { Patterns = new[] { "*.zip" } } });
+        try
+        {
+            var dest = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {
+                Title = "Exportar XMLs MDF-e em ZIP", SuggestedFileName = "MDFe-XMLs-Validados.zip", DefaultExtension = "zip",
+                FileTypeChoices = new[] { new FilePickerFileType("Arquivo ZIP") { Patterns = new[] { "*.zip" } } }
+            });
             if (dest is null) return;
             string target = Path.GetFullPath(dest.Path.LocalPath);
             if (valid.Any(d => PathEquals(target, d.SourcePath))) throw new InvalidOperationException("O ZIP não pode substituir um XML original.");
-            using (var archive = ZipFile.Open(target, ZipArchiveMode.Create)) {
+            using (var archive = ZipFile.Open(target, ZipArchiveMode.Create))
+            {
                 var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var item in valid) {
+                foreach (var item in valid)
+                {
                     string name = Path.GetFileName(item.SourcePath), entry = name; int n = 2;
                     while (!names.Add(entry)) entry = $"{Path.GetFileNameWithoutExtension(name)}-{n++}{Path.GetExtension(name)}";
                     archive.CreateEntryFromFile(item.SourcePath, entry, CompressionLevel.Optimal);
                 }
             }
             StatusText.Text = $"{valid.Count} XML(s) original(is) exportado(s) em: {target}";
-        } catch (Exception ex) { StatusText.Text = "Falha ao gerar ZIP: " + ex.Message; }
+        }
+        catch (Exception ex) { StatusText.Text = "Falha ao gerar ZIP: " + ex.Message; }
     }
 
     private void RemoveSelected_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
