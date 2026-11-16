@@ -200,7 +200,8 @@ public static class MdfeDamDfeGenerator
 
         var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
         var vehicles = new List<XElement>();
-        if (road?.Element(Ns + "veicTracao") is XElement traction) vehicles.Add(traction);
+        var traction = road?.Element(Ns + "veicTracao");
+        if (traction is not null) vehicles.Add(traction);
         if (road is not null) vehicles.AddRange(road.Elements(Ns + "veicReboque"));
 
         g.DrawString("Veículo", Section, XBrushes.Black, new XPoint(Left, y));
@@ -223,7 +224,7 @@ public static class MdfeDamDfeGenerator
         g.DrawString("CPF", Label, XBrushes.Black, new XPoint(Left + 244, y + 17));
         g.DrawString("Nome", Label, XBrushes.Black, new XPoint(Left + 325, y + 17));
         double driverY = y + 29;
-        var drivers = vehicle?.Elements(Ns + "condutor") ?? Enumerable.Empty<XElement>();
+        var drivers = traction?.Elements(Ns + "condutor") ?? Enumerable.Empty<XElement>();
         foreach (var driver in drivers.Take(6))
         {
             DrawTextFit(g, First(driver, "CPF", "CNPJ"), Value, Left + 244, driverY, 75, 11);
