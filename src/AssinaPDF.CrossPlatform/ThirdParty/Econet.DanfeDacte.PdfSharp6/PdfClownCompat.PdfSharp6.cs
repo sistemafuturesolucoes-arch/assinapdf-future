@@ -259,36 +259,6 @@ namespace org.pdfclown.documents.contents.fonts
                 return memoryStream.ToArray();
             }
 
-            private static IEnumerable<string> GetCandidates(string familyName)
-            {
-                if (string.Equals(familyName, DefaultFallbackFont, StringComparison.OrdinalIgnoreCase))
-                {
-                    yield break;
-                }
-
-                if (string.Equals(familyName, "Times New Roman", StringComparison.OrdinalIgnoreCase))
-                {
-                    yield return "Times New Roman";
-                    yield return "Liberation Serif";
-                    yield return "Nimbus Roman";
-                    yield return "DejaVu Serif";
-                    yield return "FreeSerif";
-                    yield break;
-                }
-
-                if (string.Equals(familyName, "Courier New", StringComparison.OrdinalIgnoreCase))
-                {
-                    yield return "Courier New";
-                    yield return "Liberation Mono";
-                    yield return "Nimbus Mono PS";
-                    yield return "DejaVu Sans Mono";
-                    yield return "FreeMono";
-                    yield break;
-                }
-
-                yield return familyName;
-                yield return "DejaVu Sans";
-            }
         }
     }
 
