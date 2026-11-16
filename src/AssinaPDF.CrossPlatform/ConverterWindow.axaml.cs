@@ -33,6 +33,14 @@ public partial class ConverterWindow : Window
         StatusText.Text = "Você pode iniciar outra conversão.";
     }
 
+    private async void MdfeImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var window = new MdfeImportWindow();
+        await window.ShowDialog(this);
+        MdfeStatusText.Text = "Central de MDF-e fechada.";
+        StatusText.Text = "Você pode iniciar outra conversão.";
+    }
+
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
     private async void ImagesToPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
