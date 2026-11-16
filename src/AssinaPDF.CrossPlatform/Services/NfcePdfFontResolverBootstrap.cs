@@ -37,6 +37,11 @@ public static class NfcePdfFontResolverBootstrap
             try
             {
                 configure.Invoke(null, null);
+
+                // DanfeSharp.Next installs the primary resolver. Register the embedded
+                // Liberation Serif resolver as PDFsharp fallback so MDF-e and other
+                // PDFsharp consumers can resolve portable fonts on Windows and macOS.
+                Danfe.NFe.Core.Graphics.DanfeFontResolverSetup.EnsureInitialized();
                 _initialized = true;
             }
             catch (TargetInvocationException ex) when (ex.InnerException is not null)
