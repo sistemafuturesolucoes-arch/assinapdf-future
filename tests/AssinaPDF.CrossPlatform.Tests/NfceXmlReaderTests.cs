@@ -43,6 +43,33 @@ public class NfceXmlReaderTests
         """;
 
     [Fact]
+    public void GeneratePdf_AuthorizedNfce_CreatesReadableDanfce()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "AssinaPDF-Nfce-Test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string xmlPath = Path.Combine(directory, "nfce.xml");
+        string pdfPath = Path.Combine(directory, "danfce.pdf");
+
+        try
+        {
+            File.WriteAllText(xmlPath, AuthorizedXml(), System.Text.Encoding.UTF8);
+            var summary = NfceXmlReader.ReadFile(xmlPath);
+
+            NfceDanfeGenerator.Generate(summary, pdfPath);
+
+            Assert.True(File.Exists(pdfPath));
+            Assert.True(new FileInfo(pdfPath).Length > 5);
+            using var pdf = PdfSharp.Pdf.IO.PdfReader.Open(pdfPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.ReadOnly);
+            Assert.NotEmpty(pdf.Pages);
+        }
+        finally
+        {
+            try { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+            catch { }
+        }
+    }
+
+    [Fact]
     public void Parse_AuthorizedNfce_ExtractsFiscalDataAndQrCode()
     {
         string destination = """
