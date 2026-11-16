@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ x:Class="AssinaPDF.MacPrototype.MdfeImportWindow" Title="AssinaPDF | Central MDF-e"
+ Width="1280" Height="800" MinWidth="980" MinHeight="620" WindowStartupLocation="CenterOwner" Background="#F3F4F6">
+ <Grid RowDefinitions="Auto,*,Auto" Margin="14">
+  <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+   <TextBlock Text="Central MDF-e · Importação e conferência em lote" FontSize="22" FontWeight="SemiBold" Foreground="#252A34"/>
+   <TextBlock Text="Importe XMLs processados e autorizados de MDF-e modelo 58 (versão 3.00). O AssinaPDF confere chave, emitente e protocolo. Os XMLs originais permanecem intactos." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+  </StackPanel>
+  <Grid Grid.Row="1" ColumnDefinitions="280,*" ColumnSpacing="10">
+   <Border Grid.Column="0" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="8" Padding="10">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+     <Button Grid.Row="0" Content="＋ Adicionar XMLs MDF-e" Click="AddXml_Click" Padding="10,9" Background="#6741B8" Foreground="White"/>
+     <TextBlock x:Name="CountText" Grid.Row="1" Text="Nenhum MDF-e importado" FontSize="11" Foreground="#737B87" Margin="0,10,0,6"/>
+     <ListBox x:Name="DocumentsList" Grid.Row="2" SelectionChanged="DocumentsList_SelectionChanged">
+      <ListBox.ItemTemplate><DataTemplate x:CompileBindings="False"><TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" FontSize="11" Foreground="#34383E" Margin="3,7"/></DataTemplate></ListBox.ItemTemplate>
+     </ListBox>
+     <StackPanel Grid.Row="3" Spacing="6" Margin="0,8,0,0">
+      <Button Content="Exportar XMLs válidos em ZIP" Click="ExportZip_Click" Padding="8,7" Background="#6741B8" Foreground="White"/>
+      <Button Content="Exportar XML original selecionado" Click="ExportSelected_Click" Padding="8,7" Background="#E7E9ED" Foreground="#34383E"/>
+      <Button Content="Remover selecionado" Click="RemoveSelected_Click" Padding="8,7" Background="#E7E9ED" Foreground="#34383E"/>
+      <Button Content="Limpar lista" Click="ClearList_Click" Padding="8,7" Background="#F4E9E9" Foreground="#8A3D3D"/>
+     </StackPanel>
+    </Grid>
+   </Border>
+   <Border Grid.Column="1" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="8" Padding="18">
+    <ScrollViewer><StackPanel Spacing="12">
+     <TextBlock Text="Dados do MDF-e selecionado" FontSize="17" FontWeight="SemiBold" Foreground="#292D36"/>
+     <TextBlock x:Name="DetailStatus" Text="Selecione um XML válido para conferir os dados." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+     <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="9">
+      <TextBlock Grid.Row="0" Text="Número / Série" Foreground="#737B87"/><TextBlock x:Name="NumberText" Grid.Row="0" Grid.Column="1"/>
+      <TextBlock Grid.Row="1" Text="Chave de acesso" Foreground="#737B87"/><TextBlock x:Name="KeyText" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap"/>
+      <TextBlock Grid.Row="2" Text="Emitente" Foreground="#737B87"/><TextBlock x:Name="IssuerText" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap"/>
+      <TextBlock Grid.Row="3" Text="CNPJ / CPF" Foreground="#737B87"/><TextBlock x:Name="DocumentText" Grid.Row="3" Grid.Column="1"/>
+      <TextBlock Grid.Row="4" Text="Emissão" Foreground="#737B87"/><TextBlock x:Name="IssueText" Grid.Row="4" Grid.Column="1"/>
+      <TextBlock Grid.Row="5" Text="Percurso" Foreground="#737B87"/><TextBlock x:Name="RouteText" Grid.Row="5" Grid.Column="1"/>
+      <TextBlock Grid.Row="6" Text="Modalidade" Foreground="#737B87"/><TextBlock x:Name="ModalText" Grid.Row="6" Grid.Column="1"/>
+      <TextBlock Grid.Row="7" Text="Veículo" Foreground="#737B87"/><TextBlock x:Name="VehicleText" Grid.Row="7" Grid.Column="1"/>
+      <TextBlock Grid.Row="8" Text="Motorista" Foreground="#737B87"/><TextBlock x:Name="DriverText" Grid.Row="8" Grid.Column="1"/>
+      <TextBlock Grid.Row="9" Text="Valor / quantidade" Foreground="#737B87"/><TextBlock x:Name="CargoText" Grid.Row="9" Grid.Column="1"/>
+      <TextBlock Grid.Row="10" Text="Documentos vinculados" Foreground="#737B87"/><TextBlock x:Name="LinkedDocsText" Grid.Row="10" Grid.Column="1"/>
+      <TextBlock Grid.Row="11" Text="Protocolo" Foreground="#737B87"/><TextBlock x:Name="ProtocolText" Grid.Row="11" Grid.Column="1"/>
+     </Grid>
+     <Border Background="#FFF7E8" BorderBrush="#F0D7A8" BorderThickness="1" CornerRadius="6" Padding="12">
+      <TextBlock Text="Atenção: esta central importa, valida e organiza os XMLs autorizados. A geração do DAMDFE oficial ainda não está habilitada; este painel não substitui o documento auxiliar fiscal." FontSize="11" Foreground="#76551C" TextWrapping="Wrap"/>
+     </Border>
+    </StackPanel></ScrollViewer>
+   </Border>
+  </Grid>
+  <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+   <TextBlock x:Name="StatusText" Text="Aguardando XML de MDF-e." FontSize="10" Foreground="#666D78" VerticalAlignment="Center" TextWrapping="Wrap"/>
+   <Button Grid.Column="1" Content="Fechar" Click="Close_Click" Padding="14,7" Background="#E2E5EA" Foreground="#34383E"/>
+  </Grid>
+ </Grid>
+</Window>

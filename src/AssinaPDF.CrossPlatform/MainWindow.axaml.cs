@@ -360,6 +360,20 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OpenMdfeImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var importer = new MdfeImportWindow();
+            await importer.ShowDialog(this);
+            DashboardStatusText.Text = "Central de importação MDF-e fechada.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir a central MDF-e: {ex.Message}";
+        }
+    }
+
     private async void DashboardConvert_Click(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)

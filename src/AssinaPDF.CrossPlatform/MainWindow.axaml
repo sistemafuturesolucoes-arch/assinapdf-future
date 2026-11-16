@@ -133,6 +133,14 @@
 
           </Grid>
 
+            <Button Grid.Row="2" Grid.Column="0" Click="OpenMdfeImport_Click" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+              <StackPanel VerticalAlignment="Center" Spacing="10">
+                <TextBlock Text="▤" FontSize="29" Foreground="#6741B8"/>
+                <TextBlock Text="Importar MDF-e" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+                <TextBlock Text="Confira XMLs autorizados e organize vários MDF-e em lote." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Button>
+
           <Border Background="#ECEEF2" CornerRadius="8" Padding="16,12">
             <StackPanel Spacing="3">
               <TextBlock Text="Seus documentos permanecem no seu computador."
