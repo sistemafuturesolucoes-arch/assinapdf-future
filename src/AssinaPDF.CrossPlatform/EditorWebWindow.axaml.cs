@@ -65,6 +65,7 @@ public partial class EditorWebWindow : Window
             _server = new EditorWebServer(root);
             _server.Start();
             EditorWebView.Navigate(new Uri(_server.BaseUri, "index.html"));
+            LoadingOverlay.IsVisible = false;
             LoadingTitle.Text = "Carregando editor Future…";
             LoadingDetails.Text = "Os arquivos são servidos somente pelo endereço local deste aplicativo.";
         }
@@ -84,6 +85,7 @@ public partial class EditorWebWindow : Window
             return;
         }
 
+        LoadingOverlay.IsVisible = true;
         LoadingTitle.Text = "Não foi possível carregar o editor";
         LoadingDetails.Text = "Verifique se os arquivos da pasta EditorWeb/dist foram incluídos na distribuição.";
     }
