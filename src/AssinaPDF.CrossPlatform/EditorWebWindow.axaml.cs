@@ -4,6 +4,8 @@ using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
+using Avalonia.Media;
+using AssinaPDF.MacPrototype.Services;
 
 namespace AssinaPDF.MacPrototype;
 
@@ -126,6 +128,25 @@ public partial class EditorWebWindow : Window
                 return;
             }
 
+
+            if (messageType == "signPdf")
+            {
+                if (!root.TryGetProperty("base64", out var signPayload) ||
+                    signPayload.ValueKind != JsonValueKind.String)
+                    return;
+                var signBase64 = signPayload.GetString();
+                if (string.IsNullOrWhiteSpace(signBase64))
+                    return;
+                var signBytes = Convert.FromBase64String(signBase64);
+                if (signBytes.Length == 0 || signBytes.Length > 150 * 1024 * 1024)
+                    throw new InvalidDataException("O PDF para assinatura está vazio ou excede 150 MB.");
+                var signName = root.TryGetProperty("fileName", out var signFileName)
+                    ? Path.GetFileName(signFileName.GetString() ?? "documento-editado.pdf")
+                    : "documento-editado.pdf";
+                await SignPdfFromEditorAsync(signBytes, signName);
+                return;
+            }
+
             if (messageType != "savePdf" ||
                 !root.TryGetProperty("base64", out var payload) ||
                 payload.ValueKind != JsonValueKind.String)
@@ -179,6 +200,143 @@ public partial class EditorWebWindow : Window
             LoadingTitle.Text = "Falha ao processar o documento";
             LoadingDetails.Text = ex.Message;
             LoadingOverlay.IsVisible = true;
+        }
+    }
+
+
+    private async System.Threading.Tasks.Task SignPdfFromEditorAsync(byte[] pdfBytes, string suggestedName)
+    {
+        string tempPath = Path.Combine(Path.GetTempPath(), "assinapdf-" + Guid.NewGuid().ToString("N") + ".pdf");
+        var certificates = new List<CertificateInfo>();
+        try
+        {
+            await File.WriteAllBytesAsync(tempPath, pdfBytes);
+            IReadOnlyList<SignaturePlacement> placements;
+            using (var pdfium = new PdfiumDocument(tempPath))
+            {
+                var positionWindow = new SignaturePositioningWindow(pdfium);
+                await positionWindow.ShowDialog(this);
+                placements = positionWindow.SelectedPlacements;
+            }
+            if (placements.Count == 0)
+                return;
+
+            certificates.AddRange(new CertificateStoreService().LoadCertificates());
+            var available = certificates.Where(certificate => certificate.CanAttemptSigning).ToList();
+            if (available.Count == 0)
+                throw new InvalidOperationException("Nenhum certificado válido com chave privada acessível foi encontrado.");
+
+            var picker = new Window
+            {
+                Title = "Escolher certificado digital",
+                Width = 520,
+                Height = 390,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = new SolidColorBrush(Color.FromRgb(248, 249, 251))
+            };
+            var list = new ListBox { ItemsSource = available, SelectedIndex = 0, MinHeight = 120 };
+            var reason = new TextBox { Text = "Assinatura digital do documento", MinHeight = 36 };
+            var details = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 75 };
+            void RefreshDetails()
+            {
+                details.Text = (list.SelectedItem as CertificateInfo)?.Details ?? "Selecione um certificado.";
+            }
+            list.SelectionChanged += (_, _) => RefreshDetails();
+            RefreshDetails();
+
+            var cancel = new Button { Content = "Cancelar", Padding = new Avalonia.Thickness(14, 8) };
+            var sign = new Button
+            {
+                Content = "Assinar documento",
+                Padding = new Avalonia.Thickness(14, 8),
+                Background = new SolidColorBrush(Color.FromRgb(109, 75, 195)),
+                Foreground = Brushes.White
+            };
+            cancel.Click += (_, _) => picker.Close();
+            sign.Click += (_, _) =>
+            {
+                if (list.SelectedItem is CertificateInfo)
+                {
+                    picker.Tag = true;
+                    picker.Close();
+                }
+            };
+            picker.Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = "Selecione o certificado", FontSize = 18, FontWeight = FontWeight.SemiBold },
+                    new TextBlock { Text = placements.Count + " campo(s) de assinatura selecionado(s). A chave privada permanece neste computador.", TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                    list,
+                    details,
+                    new TextBlock { Text = "Motivo da assinatura" },
+                    reason,
+                    new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancel, sign }
+                    }
+                }
+            };
+            await picker.ShowDialog(this);
+            if (picker.Tag is not true || list.SelectedItem is not CertificateInfo selected)
+                return;
+
+            var servicePlacements = new List<AssinaPDF.MacPrototype.Services.SignaturePlacement>();
+            foreach (var placement in placements)
+            {
+                var point = placement.GetPdfOrigin();
+                servicePlacements.Add(new AssinaPDF.MacPrototype.Services.SignaturePlacement(
+                    placement.PageIndex + 1, (float)point.X, (float)point.Y));
+            }
+
+            string signatureReason = string.IsNullOrWhiteSpace(reason.Text)
+                ? "Assinatura digital do documento"
+                : reason.Text.Trim();
+            var signer = new PdfSigningService();
+            byte[] signed = await signer.SignAsync(pdfBytes, selected.Certificate, signatureReason, servicePlacements);
+            if (signed.Length == 0)
+                throw new InvalidDataException("O PDF assinado retornou vazio.");
+
+            var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Salvar PDF assinado",
+                SuggestedFileName = Path.GetFileNameWithoutExtension(suggestedName) + "-assinado.pdf",
+                DefaultExtension = "pdf",
+                FileTypeChoices = new[] { new FilePickerFileType("Documento PDF") { Patterns = new[] { "*.pdf" } } }
+            });
+            if (destination is null)
+                return;
+            await using (var output = await destination.OpenWriteAsync())
+                await output.WriteAsync(signed);
+
+            if (string.IsNullOrWhiteSpace(_workingCopyPath))
+            {
+                var entry = _history.CreateWorkingCopy(destination.Path.LocalPath);
+                _workingCopyPath = entry.WorkingCopyPath;
+                _historyId = entry.Id;
+            }
+            else
+            {
+                await File.WriteAllBytesAsync(_workingCopyPath, signed);
+            }
+            if (!string.IsNullOrWhiteSpace(_historyId))
+                _history.Touch(_historyId);
+            await SendPdfToWebAsync(_workingCopyPath);
+            LoadingOverlay.IsVisible = true;
+            LoadingTitle.Text = "PDF assinado com sucesso";
+            LoadingDetails.Text = "O arquivo assinado foi salvo e recarregado no editor. Alterações posteriores podem invalidar a assinatura digital.";
+        }
+        finally
+        {
+            foreach (var certificate in certificates)
+                certificate.Dispose();
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+            catch { }
         }
     }
 
