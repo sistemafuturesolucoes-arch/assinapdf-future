@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  x:Class="AssinaPDF.MacPrototype.MdfeImportWindow" Title="AssinaPDF | Central MDF-e"
- Width="1280" Height="800" MinWidth="980" MinHeight="620" WindowStartupLocation="CenterOwner" Background="#F3F4F6">
+ Width="1200" Height="720" MinWidth="980" MinHeight="580" WindowStartupLocation="CenterOwner" Background="#F3F4F6">
  <Grid RowDefinitions="Auto,*,Auto" Margin="14">
   <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
    <TextBlock Text="Central MDF-e · Importação e conferência em lote" FontSize="22" FontWeight="SemiBold" Foreground="#252A34"/>
@@ -47,7 +47,7 @@
    </Border>
   </Grid>
   <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
-   <TextBlock x:Name="StatusText" Text="Aguardando XML de MDF-e." FontSize="10" Foreground="#666D78" VerticalAlignment="Center" TextWrapping="Wrap"/>
+   <TextBlock x:Name="StatusText" Text="Aguardando XML de MDF-e." FontSize="10" Foreground="#666D78" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxHeight="28"/>
    <Button Grid.Column="1" Content="Fechar" Click="Close_Click" Padding="14,7" Background="#E2E5EA" Foreground="#34383E"/>
   </Grid>
  </Grid>
