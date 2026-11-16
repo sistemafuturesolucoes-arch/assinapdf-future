@@ -73,7 +73,7 @@ public class MdfeXmlReaderTests
     {
         var exception = Assert.Throws<InvalidDataException>(() => MdfeXmlReader.Parse(
             AuthorizedXml().Replace("<mod>58</mod>", "<mod>57</mod>")));
-        Assert.Contains("modelo MDF-e", exception.Message);
+        Assert.Contains("MDF-e modelo 58", exception.Message);
     }
 
     [Fact]
