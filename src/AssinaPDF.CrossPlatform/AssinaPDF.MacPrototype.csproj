@@ -51,5 +51,7 @@
   -->
   <ItemGroup>
     <Compile Remove="ThirdParty\Danfe.NFe.Core\**\*.cs" />
+    <Compile Remove="ThirdParty\Econet.DanfeDacte.Source\**\*.cs" />
+    <Compile Remove="ThirdParty\Econet.DanfeDacte.PdfSharp6\**\*.cs" />
   </ItemGroup>
 </Project>
