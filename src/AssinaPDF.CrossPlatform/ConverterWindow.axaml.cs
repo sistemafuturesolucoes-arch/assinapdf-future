@@ -27,7 +27,7 @@ public partial class ConverterWindow : Window
 
     private async void CteImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var window = new XmlFiscalPreviewWindow(isNfce: false);
+        var window = new CteImportWindow();
         await window.ShowDialog(this);
         CteStatusText.Text = "Importador de CT-e fechado.";
         StatusText.Text = "Você pode iniciar outra conversão.";
