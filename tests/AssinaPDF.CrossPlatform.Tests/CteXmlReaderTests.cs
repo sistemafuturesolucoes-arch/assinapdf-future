@@ -43,6 +43,7 @@ public class CteXmlReaderTests
     {
         var result = CteXmlReader.Parse(AuthorizedXml(), "cte.xml");
 
+        Assert.Equal("57", result.Model);
         Assert.Equal(AccessKey, result.AccessKey);
         Assert.Equal("4", result.DocumentNumber);
         Assert.Equal("TRANSPORTADORA TESTE LTDA", result.IssuerName);
