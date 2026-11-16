@@ -29,7 +29,7 @@ public partial class ConverterWindow : Window
     {
         var window = new CteImportWindow();
         await window.ShowDialog(this);
-        CteStatusText.Text = "Importador de CT-e fechado.";
+        CteStatusText.Text = "Central de CT-e fechada.";
         StatusText.Text = "Você pode iniciar outra conversão.";
     }
 
