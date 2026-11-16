@@ -17,6 +17,22 @@ public partial class ConverterWindow : Window
         StatusText.Text = "Você pode iniciar outra conversão.";
     }
 
+    private async void NfceImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var window = new XmlFiscalPreviewWindow(isNfce: true);
+        await window.ShowDialog(this);
+        NfceStatusText.Text = "Importador de NFC-e fechado.";
+        StatusText.Text = "Você pode iniciar outra conversão.";
+    }
+
+    private async void CteImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var window = new XmlFiscalPreviewWindow(isNfce: false);
+        await window.ShowDialog(this);
+        CteStatusText.Text = "Importador de CT-e fechado.";
+        StatusText.Text = "Você pode iniciar outra conversão.";
+    }
+
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
     private async void ImagesToPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
