@@ -45,7 +45,7 @@ public partial class EditorCenterWindow : Window
                         },
                         new TextBlock
                         {
-                            Text = "Clique em “Editar novo PDF” para começar. Seus trabalhos ficarão disponíveis aqui.",
+                            Text = "Use “Abrir PDF” para editar um arquivo existente ou “Criar novo documento” para começar do zero.",
                             FontSize = 12,
                             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                             Foreground = new Avalonia.Media.SolidColorBrush(
@@ -176,6 +176,22 @@ public partial class EditorCenterWindow : Window
         catch (Exception ex)
         {
             CenterStatusText.Text = $"Não foi possível iniciar o editor: {ex.Message}";
+        }
+    }
+
+    private async void CreateBlank_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var editor = new EditorWebWindow();
+            CenterStatusText.Text = "Criando um novo documento...";
+            await editor.ShowDialog(this);
+            RefreshRecentDocuments();
+            CenterStatusText.Text = "Central de edição atualizada.";
+        }
+        catch (Exception ex)
+        {
+            CenterStatusText.Text = $"Não foi possível criar um novo documento: {ex.Message}";
         }
     }
 
