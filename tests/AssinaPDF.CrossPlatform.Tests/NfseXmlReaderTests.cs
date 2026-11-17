@@ -19,7 +19,7 @@ public class NfseXmlReaderTests
             <DPS versao="1.00">
               <infDPS Id="DPS123">
                 <tpAmb>1</tpAmb><dhEmi>2026-11-16T14:20:00-03:00</dhEmi>
-                <serie>900</serie><nDPS>123</nDPS><dCompet>2026-11-01</dCompet><tpEmit>1</tpEmit>
+                <serie>900</serie><nDPS>123</nDPS><dCompet>2026-11-01</dCompet><tpEmit>1</tpEmit><finNFSe>0</finNFSe>
                 <prest>
                   <CNPJ>12345678000199</CNPJ><IM>12345</IM><xNome>PRESTADOR TESTE LTDA</xNome>
                   <fone>54999990000</fone><email>fiscal@example.com</email>
@@ -61,6 +61,7 @@ public class NfseXmlReaderTests
         Assert.Equal(5m, result.IbscbsAmount!.Value);
         Assert.Equal("Produção", result.Environment);
         Assert.Equal("NFS-e gerada", result.Status);
+        Assert.Equal("NFS-e regular", result.Purpose);
         Assert.Equal("Sistema próprio do município", result.GeneratingEnvironment);
     }
 
