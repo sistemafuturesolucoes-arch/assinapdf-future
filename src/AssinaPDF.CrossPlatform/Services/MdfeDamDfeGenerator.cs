@@ -149,16 +149,16 @@ public static class MdfeDamDfeGenerator
             Small, XBrushes.Black, new XPoint(controlX, protocolY + 27));
 
         // Veículo e condutor em duas colunas, como no documento de referência.
-        DrawRoadVehicleAndDriver(g, info, s, 267);
+        DrawRoadVehicleAndDriver(g, info, s, 280);
 
         // Dados de carga em faixa própria.
-        DrawCargoInfo(g, info, s, 337);
+        DrawCargoInfo(g, info, s, 350);
 
         // Vale-pedágio e documentos fiscais lado a lado.
-        DrawTollAndDocuments(g, info, documentRows, 405);
+        DrawTollAndDocuments(g, info, documentRows, 418);
 
         // Observações ocupam a largura total abaixo das duas colunas.
-        DrawObservations(g, info, 590);
+        DrawObservations(g, info, 603);
         DrawFooter(g, s, 1, totalPages);
     }
 
@@ -349,7 +349,7 @@ public static class MdfeDamDfeGenerator
     {
         if (!string.Equals(environment, "Homologação", StringComparison.OrdinalIgnoreCase)) return;
         g.DrawString("EMITIDO EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL",
-            Section, XBrushes.Black, new XRect(Left, 138, Width, 12), XStringFormats.Center);
+            Section, XBrushes.Black, new XRect(Left, 255, Width, 9), XStringFormats.Center);
     }
 
     private static void DrawBarcode(XGraphics g, string key, double x, double y, double availableWidth)
