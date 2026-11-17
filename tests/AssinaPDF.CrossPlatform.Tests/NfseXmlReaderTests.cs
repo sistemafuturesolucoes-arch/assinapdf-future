@@ -124,6 +124,16 @@ public class NfseXmlReaderTests
     }
 
     [Fact]
+    public void Parse_SimplesNacionalIbsCbsTotals_AreRead()
+    {
+        string xml = NationalXml().Replace(
+            "</infNFSe>",
+            "<IBSCBS><totCIBS><gTribSN><vIBSSN>4.00</vIBSSN><vCBSSN>2.50</vCBSSN></gTribSN></totCIBS></IBSCBS></infNFSe>");
+        var result = NfseXmlReader.Parse(xml);
+        Assert.Equal(6.50m, result.IbscbsAmount);
+    }
+
+    [Fact]
     public void Parse_AlphanumericCnpj_IsAccepted()
     {
         string xml = NationalXml().Replace("12345678000199", "12ABC34501DE35");
