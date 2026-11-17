@@ -70,6 +70,14 @@ public class NfseXmlReaderTests
     }
 
     [Fact]
+    public void Parse_LegacyNationalNfse_WithoutFinNfse_IsTreatedAsRegular()
+    {
+        string xml = NationalXml().Replace("<finNFSe>0</finNFSe>", "");
+        var result = NfseXmlReader.Parse(xml);
+        Assert.Equal("NFS-e regular", result.Purpose);
+    }
+
+    [Fact]
     public void Parse_DestinationAtInfDpsRoot_IsReadAccordingToNt009()
     {
         string xml = NationalXml().Replace(
