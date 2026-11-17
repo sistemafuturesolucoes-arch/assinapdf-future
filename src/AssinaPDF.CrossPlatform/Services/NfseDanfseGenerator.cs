@@ -223,10 +223,10 @@ public static class NfseDanfseGenerator
             double cx = x + col * cellWidth, cy = y + row * cellHeight;
             var field = fields[i];
             g.DrawString(field.Label, label, XBrushes.Black,
-                new XRect(cx + 3, cy + 1, cellWidth - 6, 7), XStringFormats.TopLeft);
-            var valueRect = new XRect(cx + 3, cy + 8, cellWidth - 6, Math.Max(7, cellHeight - 8));
+                new XRect(cx + 3, cy, cellWidth - 6, 6), XStringFormats.TopLeft);
+            var valueRect = new XRect(cx + 3, cy + 6, cellWidth - 6, Math.Max(7, cellHeight - 6));
             var lines = WrapText(g, field.Value, value, valueRect.Width);
-            double lineHeight = 7;
+            double lineHeight = 6.5;
             if (lines.Count * lineHeight > valueRect.Height + 0.1)
                 throw new InvalidDataException($"O campo '{field.Label}' excede o espaço legível do DANFSe. O PDF não foi gerado para evitar perda de informação.");
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
