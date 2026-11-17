@@ -38,6 +38,8 @@ public sealed record NfseDocumentSummary(
     string NbsCode,
     string ServiceLocation,
     string ServiceDescription,
+    string DestinationDetails,
+    string IntermediaryDetails,
     decimal ServiceAmount,
     decimal UnconditionalDiscount,
     decimal ConditionalDiscount,
@@ -165,10 +167,10 @@ public static class NfseXmlReader
         if (string.IsNullOrWhiteSpace(serviceDescription))
             throw new InvalidDataException("O XML nacional não contém a descrição do serviço.");
 
+        string destinationDetails = PartyDetails(dest, "DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e");
+        string intermediaryDetails = PartyDetails(intermediary, "INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e");
         string additional = string.Join(" · ", new[]
         {
-            dest is null ? "" : $"Destinatário: {First(dest, "xNome", "CNPJ", "CPF", "NIF")}",
-            intermediary is null ? "" : $"Intermediário: {First(intermediary, "xNome", "CNPJ", "CPF", "NIF")}",
             Value(infDps, "xInfComp"),
             Value(serv, "xInfComp"),
             Value(values, "xOutInf")
@@ -185,8 +187,25 @@ public static class NfseXmlReader
             Value(toma, "fone"), Value(toma, "email"), tomaAddress, tomaCity.Name, tomaCity.State,
             Value(cServ, "cTribNac"), Value(cServ, "cTribMun"), Value(cServ, "cNBS"),
             FirstValue(locPrest, "xCidade", "cLocPrestacao") + " " + Value(locPrest, "UF"),
-            serviceDescription, serviceAmount, unconditionalDiscount, conditionalDiscount,
+            serviceDescription, destinationDetails, intermediaryDetails, serviceAmount, unconditionalDiscount, conditionalDiscount,
             netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
+    }
+
+    private static string PartyDetails(XElement? party, string missingText)
+    {
+        if (party is null) return missingText;
+        var address = ReadAddress(OptionalChild(party, "end"));
+        var city = ReadCity(OptionalChild(party, "end"));
+        string details = string.Join(" · ", new[]
+        {
+            First(party, "xNome", "CNPJ", "CPF", "NIF"),
+            First(party, "CNPJ", "CPF", "NIF"),
+            Value(party, "fone"),
+            string.Join(" / ", new[] { city.Name, city.State }.Where(x => !string.IsNullOrWhiteSpace(x))),
+            address,
+            Value(party, "email")
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+        return details.Length == 0 ? missingText : details;
     }
 
     private static void ValidateBrazilianDocument(string document, string role)
