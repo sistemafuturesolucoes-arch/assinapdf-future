@@ -65,11 +65,19 @@
             <TextBlock x:Name="NfseStatusText" Text="Central de NFS-e Nacional com conversão em lote e pré-visualização de DANFSe." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
+        <Border Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="10" Padding="18">
+          <StackPanel Spacing="9">
+            <TextBlock Text="Word e Excel para PDF" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+            <TextBlock Text="Converta arquivos DOC, DOCX, XLS, XLSX e formatos compatíveis em PDF, individualmente ou em lote, com pré-visualização. Requer LibreOffice instalado." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+            <Button Content="Abrir conversor Word/Excel → PDF" Click="OfficeToPdf_Click" HorizontalAlignment="Left" Background="#6741B8" Foreground="White" Padding="16,9"/>
+            <TextBlock x:Name="OfficeToPdfStatusText" Text="Conversão local com preservação de layout pelo LibreOffice." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
         <Border Background="#ECEEF2" CornerRadius="8" Padding="14">
           <StackPanel Spacing="5">
             <TextBlock Text="Em desenvolvimento" FontSize="13" FontWeight="SemiBold" Foreground="#454B55"/>
-            <TextBlock Text="MDF-e → DAMDFE • PDF → Word • Word → PDF • Excel → Word/PDF" FontSize="12" Foreground="#747B86" TextWrapping="Wrap"/>
-            <TextBlock Text="Essas opções serão liberadas após implementação e testes próprios. A interface não simula conversões ainda indisponíveis." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
+            <TextBlock Text="MDF-e → DAMDFE • PDF → Word • Excel → Word/PDF" FontSize="12" Foreground="#747B86" TextWrapping="Wrap"/>
+            <TextBlock Text="A conversão Word/Excel → PDF está disponível na central abaixo. O MDF-e e as demais conversões serão liberados após implementação e validação." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
       </StackPanel>
