@@ -110,7 +110,9 @@ public static class NfseXmlReader
 
         var prest = Child(infDps, "prest");
         var toma = OptionalChild(infDps, "toma");
-        var dest = OptionalChild(infDps, "IBSCBS") is { } ibs ? OptionalChild(ibs, "dest") : null;
+        var ibsBlock = OptionalChild(infDps, "IBSCBS");
+        var dest = OptionalChild(ibsBlock, "dest");
+        var intermediary = OptionalChild(infDps, "interm");
         var serv = Child(infDps, "serv");
         var cServ = Child(serv, "cServ");
         var locPrest = OptionalChild(serv, "locPrest");
@@ -126,6 +128,8 @@ public static class NfseXmlReader
             issuerDocument = First(emit, "CNPJ", "CPF", "NIF");
         if (string.IsNullOrWhiteSpace(issuerDocument))
             throw new InvalidDataException("O XML nacional não identifica o prestador/emitente.");
+        if (string.IsNullOrWhiteSpace(Value(prest, "NIF")))
+            ValidateBrazilianDocument(issuerDocument, "prestador");
 
         string issuerName = First(prest, "xNome");
         if (string.IsNullOrWhiteSpace(issuerName)) issuerName = First(emit, "xNome");
@@ -160,6 +164,8 @@ public static class NfseXmlReader
 
         string additional = string.Join(" · ", new[]
         {
+            dest is null ? "" : $"Destinatário: {First(dest, "xNome", "CNPJ", "CPF", "NIF")}",
+            intermediary is null ? "" : $"Intermediário: {First(intermediary, "xNome", "CNPJ", "CPF", "NIF")}",
             Value(infDps, "xInfComp"),
             Value(serv, "xInfComp"),
             Value(values, "xOutInf")
@@ -178,6 +184,16 @@ public static class NfseXmlReader
             FirstValue(locPrest, "xCidade", "cLocPrestacao") + " " + Value(locPrest, "UF"),
             serviceDescription, serviceAmount, unconditionalDiscount, conditionalDiscount,
             netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
+    }
+
+    private static void ValidateBrazilianDocument(string document, string role)
+    {
+        bool cpf = document.Length == 11 && document.All(char.IsAsciiDigit);
+        bool cnpj = document.Length == 14 &&
+            document.Take(12).All(c => char.IsAsciiLetterOrDigit(c) && !char.IsLower(c)) &&
+            document.Skip(12).All(char.IsAsciiDigit);
+        if (!cpf && !cnpj)
+            throw new InvalidDataException($"O CPF/CNPJ do {role} possui formato inválido no XML nacional.");
     }
 
     private static XElement Child(XElement? parent, string name) =>
