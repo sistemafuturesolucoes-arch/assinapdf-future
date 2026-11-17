@@ -13,7 +13,7 @@ public static class NfseDanfseGenerator
 {
     private const double PageWidth = 595.28;
     private const double PageHeight = 841.89;
-    private const double Margin = 8.5;
+    private const double Margin = 5.67;
     private const string PublicQueryBase = "https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=";
 
     private sealed record Field(string Label, string Value);
