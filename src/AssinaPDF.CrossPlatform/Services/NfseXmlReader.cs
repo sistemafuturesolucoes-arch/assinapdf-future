@@ -123,6 +123,7 @@ public static class NfseXmlReader
         var cServ = Child(serv, "cServ");
         var locPrest = OptionalChild(serv, "locPrest");
         var values = Child(info, "valores");
+        var dpsValues = OptionalChild(infDps, "valores");
         var trib = OptionalChild(values, "trib");
         var tribMun = trib is null ? null : OptionalChild(trib, "tribMun");
         var tribFed = trib is null ? null : OptionalChild(trib, "tribFed");
@@ -158,15 +159,21 @@ public static class NfseXmlReader
         var prestCity = ReadCity(OptionalChild(prest, "end"));
         var tomaCity = ReadCity(OptionalChild(toma, "end"));
 
-        string serviceAmountText = FirstDeepValue(values, "vServ", "vBC");
+        // O valor bruto e os descontos são declarados na DPS; os valores
+        // apurados (retenções e líquido) são retornados em infNFSe/valores.
+        string serviceAmountText = FirstDeepValue(dpsValues, "vServ");
         if (string.IsNullOrWhiteSpace(serviceAmountText))
-            throw new InvalidDataException("O XML nacional não informa o valor da prestação de serviço.");
+            serviceAmountText = FirstDeepValue(values, "vServ");
+        if (string.IsNullOrWhiteSpace(serviceAmountText))
+            throw new InvalidDataException("O XML nacional não informa o valor da prestação de serviço na DPS.");
         string netAmountText = FirstDeepValue(values, "vLiq", "vLiqNFS");
         if (string.IsNullOrWhiteSpace(netAmountText))
             throw new InvalidDataException("O XML nacional não informa o valor líquido da NFS-e.");
         decimal serviceAmount = Decimal(serviceAmountText);
-        decimal? unconditionalDiscount = OptionalDecimal(DeepValue(values, "vDescIncond"));
-        decimal? conditionalDiscount = OptionalDecimal(DeepValue(values, "vDescCond"));
+        decimal? unconditionalDiscount = OptionalDecimal(FirstDeepValue(dpsValues, "vDescIncond"));
+        unconditionalDiscount ??= OptionalDecimal(DeepValue(values, "vDescIncond"));
+        decimal? conditionalDiscount = OptionalDecimal(FirstDeepValue(dpsValues, "vDescCond"));
+        conditionalDiscount ??= OptionalDecimal(DeepValue(values, "vDescCond"));
         decimal netAmount = Decimal(netAmountText);
         decimal? issqnAmount = OptionalDecimal(FirstDeepValue(tribMun, "vISSQN", "vISSQNapur"));
         decimal? federalWithholdings = SumDeepDecimalsOrNull(tribFed, "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS", "vRetCOFINS");
@@ -188,7 +195,7 @@ public static class NfseXmlReader
         if (string.IsNullOrWhiteSpace(purposeCode))
             throw new InvalidDataException("O XML nacional não informa a finalidade da NFS-e (finNFSe).");
         string purpose = PurposeDescription(purposeCode);
-        string taxDetails = ExtractTaxDetails(values, tribMun, tribFed, tribIbs, ibsTotals);
+        string taxDetails = ExtractTaxDetails(dpsValues, values, tribMun, tribFed, tribIbs, ibsTotals);
         string serviceLocationCode = FirstValue(locPrest, "xCidade", "cLocPrestacao");
         string serviceLocation = string.IsNullOrWhiteSpace(serviceLocationCode)
             ? ""
