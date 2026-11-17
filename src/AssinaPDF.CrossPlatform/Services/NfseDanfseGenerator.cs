@@ -128,11 +128,11 @@ public static class NfseDanfseGenerator
         }, 3, label, value, line);
         DrawQr(g, PublicQueryBase + Uri.EscapeDataString(d.AccessKey), 496, 47, 43);
         g.DrawString("A autenticidade desta NFS-e pode ser", small,
-            new XRect(448, 91, 134, 7), XStringFormats.TopCenter);
+            new XRect(448, 95, 134, 6.3), XStringFormats.TopCenter);
         g.DrawString("verificada pelo QR Code ou pela chave de", small,
-            new XRect(448, 99, 134, 7), XStringFormats.TopCenter);
+            new XRect(448, 101.5, 134, 6.3), XStringFormats.TopCenter);
         g.DrawString("acesso no portal nacional da NFS-e", small,
-            new XRect(448, 107, 134, 7), XStringFormats.TopCenter);
+            new XRect(448, 108, 134, 6.3), XStringFormats.TopCenter);
 
         y = 157;
         DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 112,
