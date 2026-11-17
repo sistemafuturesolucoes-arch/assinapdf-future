@@ -41,12 +41,12 @@ public sealed record NfseDocumentSummary(
     string DestinationDetails,
     string IntermediaryDetails,
     decimal ServiceAmount,
-    decimal UnconditionalDiscount,
-    decimal ConditionalDiscount,
+    decimal? UnconditionalDiscount,
+    decimal? ConditionalDiscount,
     decimal NetAmount,
-    decimal IssqnAmount,
-    decimal FederalWithholdings,
-    decimal IbscbsAmount,
+    decimal? IssqnAmount,
+    decimal? FederalWithholdings,
+    decimal? IbscbsAmount,
     string AdditionalInformation)
 {
     public string DisplayName =>
@@ -150,16 +150,22 @@ public static class NfseXmlReader
         var prestCity = ReadCity(OptionalChild(prest, "end"));
         var tomaCity = ReadCity(OptionalChild(toma, "end"));
 
-        decimal serviceAmount = Decimal(FirstDeepValue(values, "vServ", "vBC"));
-        decimal unconditionalDiscount = Decimal(DeepValue(values, "vDescIncond"));
-        decimal conditionalDiscount = Decimal(DeepValue(values, "vDescCond"));
-        decimal netAmount = Decimal(FirstDeepValue(values, "vLiq", "vLiqNFS"));
-        decimal issqnAmount = Decimal(FirstDeepValue(tribMun, "vISSQN", "vISSQNapur"));
-        decimal federalWithholdings = SumDeepDecimals(tribFed, "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS", "vRetCOFINS");
+        string serviceAmountText = FirstDeepValue(values, "vServ", "vBC");
+        if (string.IsNullOrWhiteSpace(serviceAmountText))
+            throw new InvalidDataException("O XML nacional não informa o valor da prestação de serviço.");
+        string netAmountText = FirstDeepValue(values, "vLiq", "vLiqNFS");
+        if (string.IsNullOrWhiteSpace(netAmountText))
+            throw new InvalidDataException("O XML nacional não informa o valor líquido da NFS-e.");
+        decimal serviceAmount = Decimal(serviceAmountText);
+        decimal? unconditionalDiscount = OptionalDecimal(DeepValue(values, "vDescIncond"));
+        decimal? conditionalDiscount = OptionalDecimal(DeepValue(values, "vDescCond"));
+        decimal netAmount = Decimal(netAmountText);
+        decimal? issqnAmount = OptionalDecimal(FirstDeepValue(tribMun, "vISSQN", "vISSQNapur"));
+        decimal? federalWithholdings = SumDeepDecimalsOrNull(tribFed, "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS", "vRetCOFINS");
         string totalIbsCbs = DeepValue(tribIbs, "vTotIBSCBS");
-        decimal ibscbsAmount = totalIbsCbs.Length > 0
+        decimal? ibscbsAmount = totalIbsCbs.Length > 0
             ? Decimal(totalIbsCbs)
-            : SumDeepDecimals(tribIbs, "vIBS", "vCBS");
+            : SumDeepDecimalsOrNull(tribIbs, "vIBS", "vCBS");
 
         string serviceDescription = FirstValue(cServ, "xDescServ");
         if (string.IsNullOrWhiteSpace(serviceDescription))
@@ -265,8 +271,15 @@ public static class NfseXmlReader
             CultureInfo.InvariantCulture, out var result)
             ? result : throw new InvalidDataException($"Valor monetário inválido na NFS-e: {value}.");
     }
-    private static decimal SumDeepDecimals(XElement? parent, params string[] names) =>
-        names.Sum(name => Decimal(DeepValue(parent, name)));
+    private static decimal? OptionalDecimal(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : Decimal(value);
+
+    private static decimal? SumDeepDecimalsOrNull(XElement? parent, params string[] names)
+    {
+        var values = names.Select(name => DeepValue(parent, name))
+            .Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
+        return values.Length == 0 ? null : values.Sum(Decimal);
+    }
 
     private static string DeepValue(XElement? parent, string name) =>
         parent?.DescendantsAndSelf().FirstOrDefault(element => element.Name == Ns + name)?.Value.Trim() ?? "";
