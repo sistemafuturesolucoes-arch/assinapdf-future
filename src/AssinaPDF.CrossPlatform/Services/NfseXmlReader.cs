@@ -49,6 +49,8 @@ public sealed record NfseDocumentSummary(
     decimal? IbscbsAmount,
     string AdditionalInformation)
 {
+    public decimal? TotalRetentions { get; init; }
+
     public string DisplayName =>
         $"NFS-e {Number} · {IssuerName} · {NetAmount.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))}";
 }
@@ -221,7 +223,10 @@ public static class NfseXmlReader
             Value(toma, "fone"), Value(toma, "email"), tomaAddress, tomaCity.Name, tomaCity.State,
             Value(cServ, "cTribNac"), Value(cServ, "cTribMun"), Value(cServ, "cNBS"),
             serviceLocation, serviceDescription, destinationDetails, intermediaryDetails, serviceAmount, unconditionalDiscount, conditionalDiscount,
-            netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
+            netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional)
+        {
+            TotalRetentions = OptionalDecimal(Value(values, "vTotalRet"))
+        };
     }
 
     private static string Labeled(string label, string value) =>
