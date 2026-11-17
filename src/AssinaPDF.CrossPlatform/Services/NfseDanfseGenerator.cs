@@ -84,8 +84,11 @@ public static class NfseDanfseGenerator
 
         // Cabeçalho nacional (NT 008/2026, item 2.4.3).
         g.DrawRectangle(light, Margin + 1, Margin + 1, PageWidth - 2 * Margin - 2, 51);
-        g.DrawString("NFS-e", new XFont("Arial", 17, XFontStyleEx.Bold), black,
-            new XRect(18, 20, 105, 22), XStringFormats.CenterLeft);
+        var logoFont = new XFont("Arial", 17, XFontStyleEx.Bold);
+        g.DrawString("NFS", logoFont, new XSolidBrush(XColor.FromArgb(78, 132, 87)),
+            new XRect(18, 20, 58, 22), XStringFormats.CenterLeft);
+        g.DrawString("e", logoFont, new XSolidBrush(XColor.FromArgb(45, 66, 132)),
+            new XRect(74, 20, 18, 22), XStringFormats.CenterLeft);
         g.DrawString("NOTA FISCAL DE SERVIÇO ELETRÔNICA", small, black,
             new XRect(18, 42, 150, 10), XStringFormats.CenterLeft);
         g.DrawString("DANFSe v2.0", header, black,
