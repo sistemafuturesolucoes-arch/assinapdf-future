@@ -179,7 +179,7 @@ public static class NfseXmlReader
         if (string.IsNullOrWhiteSpace(purposeCode))
             purposeCode = FirstValue(ibsBlock, "finNFSe");
         string purpose = PurposeDescription(purposeCode);
-        string taxDetails = ExtractTaxDetails(tribMun, tribFed, tribIbs);
+        string taxDetails = ExtractTaxDetails(values, tribMun, tribFed, tribIbs);
         string additional = string.Join(" · ", new[]
         {
             $"Número DFSe: {Value(info, "nDFSe")}",
@@ -216,6 +216,7 @@ public static class NfseXmlReader
     {
         var excluded = new HashSet<string>(StringComparer.Ordinal)
         {
+            "vServ", "vBC", "vDescIncond", "vDescCond", "vLiq", "xOutInf",
             "vISSQN", "vISSQNapur", "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS",
             "vRetCOFINS", "vIBS", "vCBS", "vTotIBSCBS"
         };
