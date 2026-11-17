@@ -30,11 +30,11 @@ public class NfseXmlReaderTests
                   <locPrest><cLocPrestacao>4314100</cLocPrestacao><UF>RS</UF></locPrest>
                   <cServ><cTribNac>010701</cTribNac><cTribMun>001</cTribMun><cNBS>123456789</cNBS><xDescServ>Serviços de desenvolvimento e manutenção de sistemas.</xDescServ></cServ>
                 </serv>
-                {{extra}}
                 <valores>
                   <vServPrest><vServ>1500.00</vServ></vServPrest>
                   <vDescCondIncond><vDescIncond>100.00</vDescIncond><vDescCond>0.00</vDescCond></vDescCondIncond>
                 </valores>
+                {{extra}}
               </infDPS>
             </DPS>
             <valores>
