@@ -103,6 +103,16 @@ public class NfseXmlReaderTests
     }
 
     [Fact]
+    public void Parse_OfficialTotalRetentions_AreReadWithoutInferringFromIssqn()
+    {
+        string xml = NationalXml().Replace(
+            "<vLiq>1400.00</vLiq>",
+            "<vTotalRet>45.00</vTotalRet><vLiq>1400.00</vLiq>");
+        var result = NfseXmlReader.Parse(xml);
+        Assert.Equal(45m, result.TotalRetentions);
+    }
+
+    [Fact]
     public void Parse_CurrentNfseIbsCbsTotalizers_AreReadFromInfNfse()
     {
         string xml = NationalXml().Replace(
