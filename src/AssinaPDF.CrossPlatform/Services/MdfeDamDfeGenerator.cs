@@ -76,11 +76,14 @@ public static class MdfeDamDfeGenerator
 
                 var rows = CollectDocumentRows(info);
                 const int rowsPerPage = 32;
-                int continuationPages = (int)Math.Ceiling(rows.Count / (double)rowsPerPage);
+                const int firstPageDocumentRows = 10;
+                int remainingRows = Math.Max(0, rows.Count - firstPageDocumentRows);
+                int continuationPages = (int)Math.Ceiling(remainingRows / (double)rowsPerPage);
                 int totalPages = 1 + continuationPages;
-                DrawOfficialFirstPage(pdf, mdfe, info, root, summary, qrPayload, totalPages);
+                DrawOfficialFirstPage(pdf, mdfe, info, root, summary, qrPayload,
+                    rows.Take(firstPageDocumentRows).ToList(), totalPages);
 
-                for (int offset = 0; offset < rows.Count; offset += rowsPerPage)
+                for (int offset = firstPageDocumentRows; offset < rows.Count; offset += rowsPerPage)
                     DrawDocumentContinuation(pdf, summary, rows.Skip(offset).Take(rowsPerPage).ToList(),
                         pdf.PageCount + 1, totalPages, offset + 1);
 
@@ -102,57 +105,60 @@ public static class MdfeDamDfeGenerator
     }
 
     private static void DrawOfficialFirstPage(PdfDocument pdf, XElement mdfe, XElement info,
-        XElement root, MdfeDocumentSummary s, string? qrPayload, int totalPages)
+        XElement root, MdfeDocumentSummary s, string? qrPayload, IReadOnlyList<string> documentRows, int totalPages)
     {
         var page = NewPage(pdf);
         using var g = XGraphics.FromPdfPage(page);
+
+        // Cabeçalho compacto, próximo à composição do DAMDFE rodoviário do MOC.
         DrawIssuerHeader(g, info, qrPayload);
         DrawHomologationNotice(g, s.Environment);
+        g.DrawString("DAMDFE - Documento Auxiliar do Manifesto Eletrônico de Documentos Fiscais",
+            Small, XBrushes.Black, new XPoint(Left, 94));
 
-        g.DrawString("DAMDFE - Documento Auxiliar do Manifesto de Documentos Fiscais Eletrônicos",
-            Small, XBrushes.Black, new XPoint(Left, 91));
-
-        double bandY = 103;
-        string issue = FormatDate(s.IssueDate);
+        // Faixa de identificação do MDF-e.
+        const double bandY = 108;
         DrawBandCell(g, "Modelo", "58", Left, bandY, 42);
         DrawBandCell(g, "Série", s.Series, Left + 42, bandY, 42);
-        DrawBandCell(g, "Número", s.DocumentNumber, Left + 84, bandY, 48);
-        DrawBandCell(g, "FL", $"1/{totalPages}", Left + 132, bandY, 45);
-        DrawBandCell(g, "Data e hora de Emissão", issue, Left + 177, bandY, 118);
-        DrawBandCell(g, "UF Carreg.", s.OriginState, Left + 295, bandY, 65);
-        DrawBandCell(g, "UF Descarreg.", s.DestinationState, Left + 360, bandY, 75);
+        DrawBandCell(g, "Número", s.DocumentNumber, Left + 84, bandY, 55);
+        DrawBandCell(g, "FL", $"1/{totalPages}", Left + 139, bandY, 40);
+        DrawBandCell(g, "Data e hora de emissão", FormatDate(s.IssueDate), Left + 179, bandY, 145);
+        DrawBandCell(g, "UF carregamento", s.OriginState, Left + 324, bandY, 72);
+        DrawBandCell(g, "UF descarregamento", s.DestinationState, Left + 396, bandY, 143);
 
-        double y = 161;
-        string modalTitle = $"Modelo {ModalName(s.Modal)} de Carga";
-        g.DrawString(modalTitle, Section, XBrushes.Black, new XPoint(Left, y + 10));
-
-        // Totais à esquerda e controle fiscal à direita, conforme o modelo oficial.
-        double totalsY = y + 20;
-        DrawSummaryTile(g, "Qtd. CT-e", s.CteCount.ToString(Pt), Left, totalsY, 55);
-        DrawSummaryTile(g, "Qtd. NF-e", s.NfeCount.ToString(Pt), Left + 58, totalsY, 55);
-        DrawSummaryTile(g, "Peso total (" + UnitName(s.CargoUnit) + ")", s.CargoQuantity.ToString("N3", Pt), Left + 116, totalsY, 75);
+        g.DrawString("Modal Rodoviário de Carga", Section, XBrushes.Black, new XPoint(Left, 163));
+        DrawSummaryTile(g, "Qtd. CT-e", s.CteCount.ToString(Pt), Left, 171, 55);
+        DrawSummaryTile(g, "Qtd. NF-e", s.NfeCount.ToString(Pt), Left + 58, 171, 55);
+        DrawSummaryTile(g, "Peso total (" + UnitName(s.CargoUnit) + ")", s.CargoQuantity.ToString("N3", Pt), Left + 116, 171, 92);
 
         double controlX = Left + 213;
         g.DrawString("CONTROLE DO FISCO", Label, XBrushes.Black,
-            new XRect(controlX, y + 1, Width - 244, 10), XStringFormats.TopCenter);
-        DrawBarcode(g, s.AccessKey, controlX, totalsY - 1, Width - 244);
+            new XRect(controlX, 166, Width - 213, 10), XStringFormats.TopCenter);
+        DrawBarcode(g, s.AccessKey, controlX, 178, Width - 213);
 
-        double protocolY = 233;
+        // Protocolo e chave na mesma faixa, sem competir com o código de barras.
+        double protocolY = 222;
         g.DrawString("Protocolo de autorização", Section, XBrushes.Black, new XPoint(Left, protocolY));
         var protocol = root.Element(Ns + "protMDFe")?.Element(Ns + "infProt");
         string protocolText = string.Join(" - ", new[] { V(protocol, "nProt"), FormatDate(V(protocol, "dhRecbto")) }
             .Where(x => !string.IsNullOrWhiteSpace(x)));
         DrawTextFit(g, protocolText, Value, Left, protocolY + 12, 220, 12);
-
-        g.DrawString("Chave de Acesso", Section, XBrushes.Black, new XPoint(controlX, protocolY));
-        DrawTextFit(g, GroupKey(s.AccessKey), Value, controlX, protocolY + 12, Width - 244, 12);
+        g.DrawString("Chave de acesso", Section, XBrushes.Black, new XPoint(controlX, protocolY));
+        DrawTextFit(g, GroupKey(s.AccessKey), Value, controlX, protocolY + 12, Width - 213, 12);
         g.DrawString("Consulte em https://dfe-portal.svrs.rs.gov.br/MDFe/Consulta",
             Small, XBrushes.Black, new XPoint(controlX, protocolY + 27));
 
-        double bodyY = 282;
-        DrawRoadVehicleAndDriver(g, info, s, bodyY);
-        DrawTollInfo(g, info, bodyY + 83);
-        DrawObservations(g, info, bodyY + 148);
+        // Veículo e condutor em duas colunas, como no documento de referência.
+        DrawRoadVehicleAndDriver(g, info, s, 267);
+
+        // Dados de carga em faixa própria.
+        DrawCargoInfo(g, info, s, 337);
+
+        // Vale-pedágio e documentos fiscais lado a lado.
+        DrawTollAndDocuments(g, info, documentRows, 405);
+
+        // Observações ocupam a largura total abaixo das duas colunas.
+        DrawObservations(g, info, 590);
         DrawFooter(g, s, 1, totalPages);
     }
 
@@ -160,24 +166,20 @@ public static class MdfeDamDfeGenerator
     {
         var issuer = info.Element(Ns + "emit");
         var address = issuer?.Element(Ns + "enderEmit");
-        g.DrawRectangle(XPens.LightGray, Left, 25, 68, 45);
-        g.DrawString("LOGO", Section, XBrushes.Gray, new XRect(Left, 37, 68, 12), XStringFormats.Center);
-        g.DrawString("EMPRESA", Small, XBrushes.Gray, new XRect(Left, 50, 68, 10), XStringFormats.Center);
-
-        double x = Left + 75;
-        DrawTextFit(g, V(issuer, "xNome"), Section, x, 26, 380, 11);
+        double x = Left;
+        DrawTextFit(g, V(issuer, "xNome"), Section, x, 27, 385, 12);
         string street = Join(address, "xLgr", "nro", "xCpl", "xBairro");
         string city = Join(address, "xMun", "UF", "CEP");
-        DrawTextFit(g, street, Small, x, 39, 380, 9);
-        DrawTextFit(g, city, Small, x, 50, 380, 9);
+        DrawTextFit(g, street, Small, x, 41, 385, 9);
+        DrawTextFit(g, city, Small, x, 52, 385, 9);
         string registration = $"CNPJ/CPF: {First(issuer, "CNPJ", "CPF")}   IE: {V(issuer, "IE")}";
         var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
         string rntrc = V(road?.Element(Ns + "infANTT"), "RNTRC");
         if (rntrc.Length > 0) registration += "   RNTRC: " + rntrc;
-        DrawTextFit(g, registration, Small, x, 61, 380, 9);
+        DrawTextFit(g, registration, Small, x, 63, 385, 9);
 
         if (!string.IsNullOrWhiteSpace(qrPayload))
-            DrawQrCode(g, qrPayload, Right - 75, 21, 72);
+            DrawQrCode(g, qrPayload, Right - 75, 20, 72);
     }
 
     private static void DrawBandCell(XGraphics g, string label, string value, double x, double y, double width)
@@ -196,48 +198,100 @@ public static class MdfeDamDfeGenerator
 
     private static void DrawRoadVehicleAndDriver(XGraphics g, XElement info, MdfeDocumentSummary s, double y)
     {
-        if (s.Modal != "1")
-        {
-            DrawOtherModal(g, info, s, y);
-            return;
-        }
-
         var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
-        var vehicles = new List<XElement>();
         var traction = road?.Element(Ns + "veicTracao");
+        var vehicles = new List<XElement>();
         if (traction is not null) vehicles.Add(traction);
         if (road is not null) vehicles.AddRange(road.Elements(Ns + "veicReboque"));
 
         g.DrawString("Veículo", Section, XBrushes.Black, new XPoint(Left, y));
-        g.DrawString("Condutor", Section, XBrushes.Black, new XPoint(Left + 244, y));
-        g.DrawLine(XPens.Gray, Left, y + 5, Left + 220, y + 5);
-        g.DrawLine(XPens.Gray, Left + 244, y + 5, Right, y + 5);
-
+        g.DrawString("Condutor", Section, XBrushes.Black, new XPoint(Left + 270, y));
+        g.DrawLine(XPens.Gray, Left, y + 5, Left + 245, y + 5);
+        g.DrawLine(XPens.Gray, Left + 270, y + 5, Right, y + 5);
         g.DrawString("Placa", Label, XBrushes.Black, new XPoint(Left, y + 17));
-        g.DrawString("RNTRC", Label, XBrushes.Black, new XPoint(Left + 75, y + 17));
+        g.DrawString("RENAVAM", Label, XBrushes.Black, new XPoint(Left + 82, y + 17));
+        g.DrawString("UF", Label, XBrushes.Black, new XPoint(Left + 165, y + 17));
+        g.DrawString("RNTRC", Label, XBrushes.Black, new XPoint(Left + 198, y + 17));
         double rowY = y + 29;
-        foreach (var vehicle in vehicles.Take(4))
+        foreach (var vehicle in vehicles.Take(3))
         {
-            g.DrawString(V(vehicle, "placa"), Value, XBrushes.Black, new XPoint(Left, rowY));
-            g.DrawString(V(road?.Element(Ns + "infANTT"), "RNTRC"), Value, XBrushes.Black, new XPoint(Left + 75, rowY));
-            rowY += 15;
+            DrawTextFit(g, V(vehicle, "placa"), Value, Left, rowY, 76, 11);
+            DrawTextFit(g, V(vehicle, "RENAVAM"), Small, Left + 82, rowY, 76, 11);
+            DrawTextFit(g, V(vehicle, "UF"), Value, Left + 165, rowY, 25, 11);
+            DrawTextFit(g, V(road?.Element(Ns + "infANTT"), "RNTRC"), Small, Left + 198, rowY, 47, 11);
+            rowY += 13;
         }
         if (vehicles.Count == 0)
-            g.DrawString("Dados de veículo não informados no XML.", Small, XBrushes.Black, new XPoint(Left, rowY));
+            g.DrawString("Veículo não informado no XML.", Small, XBrushes.Black, new XPoint(Left, rowY));
 
-        g.DrawString("CPF", Label, XBrushes.Black, new XPoint(Left + 244, y + 17));
-        g.DrawString("Nome", Label, XBrushes.Black, new XPoint(Left + 325, y + 17));
+        g.DrawString("CPF", Label, XBrushes.Black, new XPoint(Left + 270, y + 17));
+        g.DrawString("Nome", Label, XBrushes.Black, new XPoint(Left + 355, y + 17));
         double driverY = y + 29;
         var drivers = traction?.Elements(Ns + "condutor") ?? Enumerable.Empty<XElement>();
-        foreach (var driver in drivers.Take(6))
+        foreach (var driver in drivers.Take(3))
         {
-            DrawTextFit(g, First(driver, "CPF", "CNPJ"), Value, Left + 244, driverY, 75, 11);
-            DrawTextFit(g, V(driver, "xNome"), Value, Left + 325, driverY, 218, 11);
-            g.DrawLine(XPens.LightGray, Left + 244, driverY + 4, Right, driverY + 4);
-            driverY += 15;
+            DrawTextFit(g, First(driver, "CPF", "CNPJ"), Small, Left + 270, driverY, 78, 11);
+            DrawTextFit(g, V(driver, "xNome"), Value, Left + 355, driverY, 184, 11);
+            driverY += 13;
         }
         if (!drivers.Any())
-            g.DrawString("Condutor não informado no XML.", Small, XBrushes.Black, new XPoint(Left + 244, driverY));
+            g.DrawString("Condutor não informado no XML.", Small, XBrushes.Black, new XPoint(Left + 270, driverY));
+    }
+
+    private static void DrawCargoInfo(XGraphics g, XElement info, MdfeDocumentSummary s, double y)
+    {
+        g.DrawString("Informações da carga", Section, XBrushes.Black, new XPoint(Left, y));
+        g.DrawLine(XPens.Gray, Left, y + 5, Right, y + 5);
+        DrawField(g, "Valor total da carga", s.CargoValue.ToString("C2", Pt), Left, y + 13, 120);
+        DrawField(g, "Quantidade total", s.CargoQuantity.ToString("N3", Pt), Left + 140, y + 13, 105);
+        DrawField(g, "Unidade", UnitName(s.CargoUnit), Left + 270, y + 13, 75);
+        var goods = info.Element(Ns + "prodPred");
+        DrawField(g, "Tipo / descrição da carga", Join(goods, "tpCarga", "xProd"), Left + 365, y + 13, 174);
+    }
+
+    private static void DrawField(XGraphics g, string label, string value, double x, double y, double width)
+    {
+        g.DrawString(label, Label, XBrushes.Black, new XPoint(x, y));
+        DrawTextFit(g, value, Value, x, y + 10, width, 11);
+    }
+
+    private static void DrawTollAndDocuments(XGraphics g, XElement info, IReadOnlyList<string> documentRows, double y)
+    {
+        double leftWidth = 245;
+        double rightX = Left + 260;
+        double rightWidth = Right - rightX;
+
+        g.DrawString("Vale Pedágio", Section, XBrushes.Black, new XPoint(Left, y));
+        g.DrawLine(XPens.Gray, Left, y + 5, Left + leftWidth, y + 5);
+        g.DrawString("Responsável / Fornecedor", Label, XBrushes.Black, new XPoint(Left, y + 15));
+        g.DrawString("Comprovante", Label, XBrushes.Black, new XPoint(Left + 175, y + 15));
+        var tollGroups = info.Element(Ns + "infModal")?.Descendants(Ns + "valePed") ?? Enumerable.Empty<XElement>();
+        var tolls = tollGroups.SelectMany(group => group.Elements(Ns + "disp")).ToList();
+        double tollY = y + 27;
+        foreach (var toll in tolls.Take(10))
+        {
+            string parties = $"{First(toll, "CNPJPg", "CPFPg")} / {First(toll, "CNPJForn", "CPFForn")}";
+            DrawTextFit(g, parties, Small, Left, tollY, 168, 10);
+            DrawTextFit(g, V(toll, "nCompra"), Small, Left + 175, tollY, 70, 10);
+            tollY += 12;
+        }
+        if (tolls.Count == 0)
+            g.DrawString("Não informado.", Small, XBrushes.Black, new XPoint(Left, tollY));
+
+        g.DrawString("Documentos fiscais vinculados", Section, XBrushes.Black, new XPoint(rightX, y));
+        g.DrawLine(XPens.Gray, rightX, y + 5, Right, y + 5);
+        g.DrawString("TIPO", Label, XBrushes.Black, new XPoint(rightX, y + 15));
+        g.DrawString("CHAVE DE ACESSO", Label, XBrushes.Black, new XPoint(rightX + 48, y + 15));
+        double docY = y + 27;
+        foreach (string row in documentRows)
+        {
+            string[] parts = row.Split('|');
+            DrawTextFit(g, parts[0], Small, rightX, docY, 43, 10);
+            DrawTextFit(g, parts.Length > 2 ? parts[2] : "", Small, rightX + 48, docY, rightWidth - 48, 10);
+            docY += 12;
+        }
+        if (documentRows.Count == 0)
+            g.DrawString("Nenhum documento vinculado.", Small, XBrushes.Black, new XPoint(rightX, docY));
     }
 
     private static void DrawOtherModal(XGraphics g, XElement info, MdfeDocumentSummary s, double y)
@@ -282,12 +336,13 @@ public static class MdfeDamDfeGenerator
 
     private static void DrawObservations(XGraphics g, XElement info, double y)
     {
-        g.DrawString("Observações", Section, XBrushes.Black, new XPoint(Left, y));
-        g.DrawLine(XPens.Gray, Left, y + 5, Right, y + 5);
         var additional = info.Element(Ns + "infAdic");
         string observation = Join(additional, "infAdFisco", "infCpl");
         if (observation.Length == 0) return;
-        DrawWrapped(g, observation, Left, y + 17, Width, FooterY - y - 32, Small);
+        g.DrawString("Observações", Section, XBrushes.Black, new XPoint(Left, y));
+        g.DrawLine(XPens.Gray, Left, y + 5, Right, y + 5);
+        if (!DrawWrapped(g, observation, Left, y + 17, Width, FooterY - y - 32, Small))
+            throw new InvalidDataException("As observações do MDF-e excedem o espaço disponível no DAMDFE. O PDF não foi exportado para evitar omissão de informações.");
     }
 
     private static void DrawHomologationNotice(XGraphics g, string environment)
@@ -407,7 +462,7 @@ public static class MdfeDamDfeGenerator
         g.DrawString(value, font, XBrushes.Black, new XRect(x, y, width, height), XStringFormats.TopLeft);
     }
 
-    private static void DrawWrapped(XGraphics g, string text, double x, double y, double width, double maxHeight, XFont font)
+    private static bool DrawWrapped(XGraphics g, string text, double x, double y, double width, double maxHeight, XFont font)
     {
         double lineHeight = 9;
         var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -418,15 +473,19 @@ public static class MdfeDamDfeGenerator
             string candidate = line.Length == 0 ? word : line + " " + word;
             if (g.MeasureString(candidate, font).Width > width && line.Length > 0)
             {
-                if (y - startY + lineHeight > maxHeight) return;
+                if (y - startY + lineHeight > maxHeight) return false;
                 g.DrawString(line, font, XBrushes.Black, new XPoint(x, y));
                 y += lineHeight;
                 line = word;
             }
             else line = candidate;
         }
-        if (line.Length > 0 && y - startY <= maxHeight)
+        if (line.Length > 0)
+        {
+            if (y - startY > maxHeight) return false;
             g.DrawString(line, font, XBrushes.Black, new XPoint(x, y));
+        }
+        return true;
     }
 
     private static string V(XElement? element, string name) =>
