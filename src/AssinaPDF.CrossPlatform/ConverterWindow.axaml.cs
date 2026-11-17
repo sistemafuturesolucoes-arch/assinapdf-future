@@ -25,6 +25,14 @@ public partial class ConverterWindow : Window
         StatusText.Text = "Você pode iniciar outra conversão.";
     }
 
+    private async void NfseImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var window = new NfseImportWindow();
+        await window.ShowDialog(this);
+        NfseStatusText.Text = "Central de NFS-e Nacional fechada.";
+        StatusText.Text = "Você pode iniciar outra conversão.";
+    }
+
     private async void CteImport_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         var window = new CteImportWindow();
