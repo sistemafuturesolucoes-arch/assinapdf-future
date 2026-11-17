@@ -119,7 +119,8 @@ public static class MdfeXmlReader
         var totals = Required(info, "tot");
         var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
         var vehicle = road?.Element(Ns + "veicTracao");
-        var driver = road?.Elements(Ns + "condutor").FirstOrDefault();
+        var driver = vehicle?.Elements(Ns + "condutor").FirstOrDefault()
+            ?? road?.Elements(Ns + "condutor").FirstOrDefault();
         var cargoValue = Decimal(Value(totals, "vCarga"), "vCarga");
         var cargoQuantity = Decimal(Value(totals, "qCarga"), "qCarga");
         if (cargoValue < 0 || cargoQuantity < 0)
