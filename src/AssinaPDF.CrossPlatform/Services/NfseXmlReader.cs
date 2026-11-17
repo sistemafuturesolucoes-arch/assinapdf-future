@@ -179,8 +179,8 @@ public static class NfseXmlReader
         return new NfseDocumentSummary(
             sourcePath, accessKey, number, competence, processedAt,
             dpsNumber, dpsSeries, dpsIssuedAt, Value(infDps, "tpEmit"),
-            Value(info, "cStat"), FirstValue(OptionalChild(infDps, "IBSCBS"), "finNFSe"),
-            environment, Value(info, "ambGer"),
+            StatusDescription(Required(info, "cStat")), FirstValue(OptionalChild(infDps, "IBSCBS"), "finNFSe"),
+            environment, GeneratingEnvironment(Value(info, "ambGer")),
             issuerName, issuerDocument, Value(prest, "IM"), Value(prest, "fone"),
             Value(prest, "email"), prestAddress, prestCity.Name, prestCity.State,
             FirstValue(toma, "xNome"), First(toma, "CNPJ", "CPF", "NIF"),
@@ -190,6 +190,25 @@ public static class NfseXmlReader
             serviceDescription, destinationDetails, intermediaryDetails, serviceAmount, unconditionalDiscount, conditionalDiscount,
             netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
     }
+
+    private static string StatusDescription(string code) => code switch
+    {
+        "100" => "NFS-e gerada",
+        "101" => "NFS-e de substituição gerada",
+        "102" => "NFS-e de decisão judicial",
+        "103" => "NFS-e avulsa",
+        "107" => "NFS-e MEI",
+        "108" => "Nota de crédito",
+        "109" => "Nota de débito",
+        _ => "Situação " + code
+    };
+
+    private static string GeneratingEnvironment(string code) => code switch
+    {
+        "1" => "Sistema próprio do município",
+        "2" => "SEFIN Nacional NFS-e",
+        _ => code
+    };
 
     private static string PartyDetails(XElement? party, string missingText)
     {
