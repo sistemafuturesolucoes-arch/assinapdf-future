@@ -244,9 +244,9 @@ public static class NfseXmlReader
     {
         var excluded = new HashSet<string>(StringComparer.Ordinal)
         {
-            "vServ", "vBC", "vDescIncond", "vDescCond", "vLiq", "xOutInf",
+            "vServ", "vBC", "vDescIncond", "vDescCond", "vLiq", "vLiqNFS", "vTotalRet", "xOutInf",
             "vISSQN", "vISSQNapur", "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS",
-            "vRetCOFINS", "vIBS", "vCBS", "vTotIBSCBS"
+            "vRetCOFINS", "vIBS", "vCBS", "vIBSTot", "vIBSSN", "vCBSSN", "vTotIBSCBS"
         };
         var details = groups
             .Where(group => group is not null)
