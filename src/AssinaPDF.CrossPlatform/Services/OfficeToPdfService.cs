@@ -9,9 +9,9 @@ namespace AssinaPDF.MacPrototype.Services;
 public sealed class OfficeToPdfService
 {
     private static readonly HashSet<string> WordExtensions = new(StringComparer.OrdinalIgnoreCase)
-        { ".doc", ".docx", ".odt", ".rtf" };
+        { ".doc", ".docx", ".docm", ".dot", ".dotx", ".dotm", ".odt", ".rtf" };
     private static readonly HashSet<string> ExcelExtensions = new(StringComparer.OrdinalIgnoreCase)
-        { ".xls", ".xlsx", ".xlsm", ".ods", ".csv" };
+        { ".xls", ".xlsx", ".xlsm", ".xlsb", ".xlt", ".xltx", ".xltm", ".ods", ".csv" };
 
     public static bool IsSupported(string path) =>
         WordExtensions.Contains(Path.GetExtension(path)) ||
