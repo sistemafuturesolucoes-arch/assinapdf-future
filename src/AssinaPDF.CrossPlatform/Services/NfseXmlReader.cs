@@ -175,11 +175,13 @@ public static class NfseXmlReader
 
         string destinationDetails = PartyDetails(dest, "DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e");
         string intermediaryDetails = PartyDetails(intermediary, "INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e");
+        string taxDetails = ExtractTaxDetails(tribMun, tribFed, tribIbs);
         string additional = string.Join(" · ", new[]
         {
             Value(infDps, "xInfComp"),
             Value(serv, "xInfComp"),
-            Value(values, "xOutInf")
+            Value(values, "xOutInf"),
+            taxDetails
         }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
         string recipientName = FirstValue(toma, "xNome");
@@ -199,6 +201,24 @@ public static class NfseXmlReader
             FirstValue(locPrest, "xCidade", "cLocPrestacao") + " " + Value(locPrest, "UF"),
             serviceDescription, destinationDetails, intermediaryDetails, serviceAmount, unconditionalDiscount, conditionalDiscount,
             netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
+    }
+
+    private static string ExtractTaxDetails(params XElement?[] groups)
+    {
+        var excluded = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "vISSQN", "vISSQNapur", "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS",
+            "vRetCOFINS", "vIBS", "vCBS", "vTotIBSCBS"
+        };
+        var details = groups
+            .Where(group => group is not null)
+            .SelectMany(group => group!.Descendants())
+            .Where(element => !element.HasElements && !excluded.Contains(element.Name.LocalName))
+            .Select(element => $"{element.Name.LocalName}: {element.Value.Trim()}")
+            .Where(value => !value.EndsWith(": ", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return details.Length == 0 ? "" : "Detalhamento tributário do XML: " + string.Join("; ", details);
     }
 
     private static string StatusDescription(string code) => code switch
