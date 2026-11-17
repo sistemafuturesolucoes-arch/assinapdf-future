@@ -195,10 +195,7 @@ public static class NfseDanfseGenerator
                 new Field("VALOR DO SERVIÇO / OPERAÇÃO", Money(d.ServiceAmount)),
                 new Field("DESCONTO INCONDICIONADO", Money(d.UnconditionalDiscount)),
                 new Field("DESCONTO CONDICIONADO", Money(d.ConditionalDiscount)),
-                new Field("TOTAL RETENÇÕES (ISSQN / FEDERAIS)",
-                    Money(d.IssqnAmount.HasValue || d.FederalWithholdings.HasValue
-                        ? (d.IssqnAmount ?? 0m) + (d.FederalWithholdings ?? 0m)
-                        : null)),
+                new Field("TOTAL RETENÇÕES", Money(d.TotalRetentions)),
                 new Field("VALOR LÍQUIDO DA NFS-e", Money(d.NetAmount)),
                 new Field("TOTAL IBS / CBS", Money(d.IbscbsAmount))
             }, title, label, value, light, line);
