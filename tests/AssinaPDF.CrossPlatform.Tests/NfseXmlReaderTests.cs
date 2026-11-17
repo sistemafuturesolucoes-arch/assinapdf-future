@@ -66,6 +66,26 @@ public class NfseXmlReaderTests
     }
 
     [Fact]
+    public void Parse_DestinationAtInfDpsRoot_IsReadAccordingToNt009()
+    {
+        string xml = NationalXml().Replace(
+            "</toma>",
+            "</toma><indDest>1</indDest><dest><CNPJ>12345678000199</CNPJ><xNome>DESTINATARIO TESTE</xNome><fone>54988887777</fone></dest>");
+        var result = NfseXmlReader.Parse(xml);
+        Assert.Contains("DESTINATARIO TESTE", result.DestinationDetails);
+        Assert.Contains("12345678000199", result.DestinationDetails);
+    }
+
+    [Fact]
+    public void Parse_LegacyDestinationInsideIbscbs_IsStillRead()
+    {
+        string xml = NationalXml(extra:
+            "<IBSCBS><dest><CNPJ>12345678000199</CNPJ><xNome>DESTINATARIO LEGADO</xNome></dest></IBSCBS>");
+        var result = NfseXmlReader.Parse(xml);
+        Assert.Contains("DESTINATARIO LEGADO", result.DestinationDetails);
+    }
+
+    [Fact]
     public void Parse_AbsentOptionalTaxes_RemainAbsent()
     {
         string xml = NationalXml()
