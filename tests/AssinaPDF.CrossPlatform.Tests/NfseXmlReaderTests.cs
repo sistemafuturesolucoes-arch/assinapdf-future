@@ -60,6 +60,16 @@ public class NfseXmlReaderTests
         Assert.Equal(15m, result.FederalWithholdings);
         Assert.Equal(5m, result.IbscbsAmount);
         Assert.Equal("Produção", result.Environment);
+        Assert.Equal("NFS-e gerada", result.Status);
+        Assert.Equal("Sistema próprio do município", result.GeneratingEnvironment);
+    }
+
+    [Fact]
+    public void Parse_AlphanumericCnpj_IsAccepted()
+    {
+        string xml = NationalXml().Replace("12345678000199", "12ABC34501DE35");
+        var result = NfseXmlReader.Parse(xml);
+        Assert.Equal("12ABC34501DE35", result.IssuerDocument);
     }
 
     [Fact]
