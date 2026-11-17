@@ -173,7 +173,9 @@ public static class NfseDanfseGenerator
             {
                 new Field("ISSQN APURADO", Money(d.IssqnAmount)),
                 new Field("RETENÇÕES FEDERAIS", Money(d.FederalWithholdings)),
-                new Field("TRIBUTAÇÃO MUNICIPAL", d.IssqnAmount > 0 ? "ISSQN informado no XML" : "Conforme XML da NFS-e"),
+                new Field("TRIBUTAÇÃO MUNICIPAL", d.IssqnAmount.HasValue && d.IssqnAmount.Value > 0
+                    ? "ISSQN informado no XML"
+                    : "TRIBUTAÇÃO MUNICIPAL (ISSQN) - OPERAÇÃO NÃO SUJEITA AO ISSQN"),
                 new Field("IBS / CBS", Money(d.IbscbsAmount))
             }, title, label, value, light, line);
 
@@ -184,7 +186,10 @@ public static class NfseDanfseGenerator
                 new Field("VALOR DO SERVIÇO / OPERAÇÃO", Money(d.ServiceAmount)),
                 new Field("DESCONTO INCONDICIONADO", Money(d.UnconditionalDiscount)),
                 new Field("DESCONTO CONDICIONADO", Money(d.ConditionalDiscount)),
-                new Field("TOTAL RETENÇÕES (ISSQN / FEDERAIS)", Money(d.IssqnAmount + d.FederalWithholdings)),
+                new Field("TOTAL RETENÇÕES (ISSQN / FEDERAIS)",
+                    Money(d.IssqnAmount.HasValue || d.FederalWithholdings.HasValue
+                        ? (d.IssqnAmount ?? 0m) + (d.FederalWithholdings ?? 0m)
+                        : null)),
                 new Field("VALOR LÍQUIDO DA NFS-e", Money(d.NetAmount)),
                 new Field("TOTAL IBS / CBS", Money(d.IbscbsAmount)),
                 new Field("VALOR LÍQUIDO + IBS/CBS", Money(d.NetAmount + d.IbscbsAmount))
@@ -293,7 +298,8 @@ public static class NfseDanfseGenerator
         return result;
     }
 
-    private static string Money(decimal amount) => amount.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
+    private static string Money(decimal? amount) =>
+        amount.HasValue ? amount.Value.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) : "";
     private static string Clip(string? text, int max)
     {
         string clean = (text ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
