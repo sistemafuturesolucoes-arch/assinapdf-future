@@ -340,7 +340,7 @@ public static class NfseXmlReader
         return string.Join(", ", new[]
         {
             Value(address, "xLgr"), Value(address, "nro"), Value(address, "xCpl"),
-            Value(address, "xBairro"), Value(address, "xCidade"), Value(address, "UF"),
+            Value(address, "xBairro"), FormatMunicipality(FirstValue(address, "xCidade", "cMun")), Value(address, "UF"),
             Value(address, "CEP")
         }.Where(x => !string.IsNullOrWhiteSpace(x)));
     }
