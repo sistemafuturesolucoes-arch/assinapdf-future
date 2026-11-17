@@ -123,8 +123,8 @@ public static class NfseDanfseGenerator
             new Field("SÉRIE DA DPS", d.DpsSeries),
             new Field("DATA/HORA DE EMISSÃO DA DPS", FormatDateTime(d.DpsIssuedAt)),
             new Field("EMITENTE DA NFS-e", IssuerType(d.IssuerType)),
-            new Field("SITUAÇÃO", d.Status),
-            new Field("FINALIDADE", d.Purpose)
+            new Field("SITUAÇÃO", Clip(d.Status, 37)),
+            new Field("FINALIDADE", Clip(d.Purpose, 37))
         }, 3, label, value, line);
         DrawQr(g, PublicQueryBase + Uri.EscapeDataString(d.AccessKey), 496, 47, 43);
         g.DrawString("A autenticidade desta NFS-e pode ser", small,
