@@ -19,17 +19,17 @@ public static class MdfeDamDfeGenerator
     private const double Left = 28, Right = 567, Width = Right - Left;
     private const double FooterY = 814;
 
-    private static readonly XFont Title = new("Liberation Serif", 11, XFontStyleEx.Bold);
-    private static readonly XFont Section = new("Liberation Serif", 9, XFontStyleEx.Bold);
-    private static readonly XFont Label = new("Liberation Serif", 6.3, XFontStyleEx.Regular);
-    private static readonly XFont Value = new("Liberation Serif", 7.6, XFontStyleEx.Bold);
-    private static readonly XFont Small = new("Liberation Serif", 6.2, XFontStyleEx.Regular);
+    private static readonly Lazy<XFont> Title = new(() => new XFont("Inter", 11, XFontStyleEx.Bold));
+    private static readonly Lazy<XFont> Section = new(() => new XFont("Inter", 9, XFontStyleEx.Bold));
+    private static readonly Lazy<XFont> Label = new(() => new XFont("Inter", 6.3, XFontStyleEx.Regular));
+    private static readonly Lazy<XFont> Value = new(() => new XFont("Inter", 7.6, XFontStyleEx.Bold));
+    private static readonly Lazy<XFont> Small = new(() => new XFont("Inter", 6.2, XFontStyleEx.Regular));
 
     public static void Generate(MdfeDocumentSummary summary, string outputPath)
     {
         ArgumentNullException.ThrowIfNull(summary);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
-        NfcePdfFontResolverBootstrap.EnsureConfigured();
+        NfePdfFontResolver.Register();
         if (!File.Exists(summary.SourcePath))
             throw new FileNotFoundException("XML original do MDF-e não encontrado.", summary.SourcePath);
 
@@ -114,7 +114,7 @@ public static class MdfeDamDfeGenerator
         DrawIssuerHeader(g, info, qrPayload);
         DrawHomologationNotice(g, s.Environment);
         g.DrawString("DAMDFE - Documento Auxiliar do Manifesto Eletrônico de Documentos Fiscais",
-            Small, XBrushes.Black, new XPoint(Left, 94));
+            Small.Value, XBrushes.Black, new XPoint(Left, 94));
 
         // Faixa de identificação do MDF-e.
         const double bandY = 108;
@@ -126,25 +126,25 @@ public static class MdfeDamDfeGenerator
         DrawBandCell(g, "UF carregamento", s.OriginState, Left + 324, bandY, 72);
         DrawBandCell(g, "UF descarregamento", s.DestinationState, Left + 396, bandY, 143);
 
-        g.DrawString("Modal Rodoviário de Carga", Section, XBrushes.Black, new XPoint(Left, 163));
+        g.DrawString("Modal Rodoviário de Carga", Section.Value, XBrushes.Black, new XPoint(Left, 163));
         DrawSummaryTile(g, "Qtd. CT-e", s.CteCount.ToString(Pt), Left, 171, 55);
         DrawSummaryTile(g, "Qtd. NF-e", s.NfeCount.ToString(Pt), Left + 58, 171, 55);
         DrawSummaryTile(g, "Peso total (" + UnitName(s.CargoUnit) + ")", s.CargoQuantity.ToString("N3", Pt), Left + 116, 171, 92);
 
         double controlX = Left + 213;
-        g.DrawString("CONTROLE DO FISCO", Label, XBrushes.Black,
+        g.DrawString("CONTROLE DO FISCO", Label.Value, XBrushes.Black,
             new XRect(controlX, 166, Width - 213, 10), XStringFormats.TopCenter);
         DrawBarcode(g, s.AccessKey, controlX, 178, Width - 213);
 
         // Protocolo e chave na mesma faixa, sem competir com o código de barras.
         double protocolY = 222;
-        g.DrawString("Protocolo de autorização", Section, XBrushes.Black, new XPoint(Left, protocolY));
+        g.DrawString("Protocolo de autorização", Section.Value, XBrushes.Black, new XPoint(Left, protocolY));
         var protocol = root.Element(Ns + "protMDFe")?.Element(Ns + "infProt");
         string protocolText = string.Join(" - ", new[] { V(protocol, "nProt"), FormatDate(V(protocol, "dhRecbto")) }
             .Where(x => !string.IsNullOrWhiteSpace(x)));
-        DrawTextFit(g, protocolText, Value, Left, protocolY + 12, 220, 12);
+        DrawTextFit(g, protocolText, Value.Value, Left, protocolY + 12, 220, 12);
         g.DrawString("Chave de acesso", Section, XBrushes.Black, new XPoint(controlX, protocolY));
-        DrawTextFit(g, GroupKey(s.AccessKey), Value, controlX, protocolY + 12, Width - 213, 12);
+        DrawTextFit(g, GroupKey(s.AccessKey), Value.Value, controlX, protocolY + 12, Width - 213, 12);
         g.DrawString("Consulte em https://dfe-portal.svrs.rs.gov.br/MDFe/Consulta",
             Small, XBrushes.Black, new XPoint(controlX, protocolY + 27));
 
@@ -170,7 +170,7 @@ public static class MdfeDamDfeGenerator
         DrawTextFit(g, V(issuer, "xNome"), Section, x, 27, 385, 12);
         string street = Join(address, "xLgr", "nro", "xCpl", "xBairro");
         string city = Join(address, "xMun", "UF", "CEP");
-        DrawTextFit(g, street, Small, x, 41, 385, 9);
+        DrawTextFit(g, street, Small.Value, x, 41, 385, 9);
         DrawTextFit(g, city, Small, x, 52, 385, 9);
         string registration = $"CNPJ/CPF: {First(issuer, "CNPJ", "CPF")}   IE: {V(issuer, "IE")}";
         var road = info.Element(Ns + "infModal")?.Element(Ns + "rodo");
@@ -208,7 +208,7 @@ public static class MdfeDamDfeGenerator
         g.DrawString("Condutor", Section, XBrushes.Black, new XPoint(Left + 270, y));
         g.DrawLine(XPens.Gray, Left, y + 5, Left + 245, y + 5);
         g.DrawLine(XPens.Gray, Left + 270, y + 5, Right, y + 5);
-        g.DrawString("Placa", Label, XBrushes.Black, new XPoint(Left, y + 17));
+        g.DrawString("Placa", Label.Value, XBrushes.Black, new XPoint(Left, y + 17));
         g.DrawString("RENAVAM", Label, XBrushes.Black, new XPoint(Left + 82, y + 17));
         g.DrawString("UF", Label, XBrushes.Black, new XPoint(Left + 165, y + 17));
         g.DrawString("RNTRC", Label, XBrushes.Black, new XPoint(Left + 198, y + 17));
