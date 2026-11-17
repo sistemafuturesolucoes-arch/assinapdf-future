@@ -178,6 +178,7 @@ public static class NfseXmlReader
         decimal? issqnAmount = OptionalDecimal(FirstDeepValue(tribMun, "vISSQN", "vISSQNapur"));
         decimal? federalWithholdings = SumDeepDecimalsOrNull(tribFed, "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS", "vRetCOFINS");
         decimal? ibscbsAmount = SumDeepDecimalsOrNull(ibsTotals, "vIBSTot", "vCBS")
+            ?? SumDeepDecimalsOrNull(ibsTotals, "vIBSSN", "vCBSSN")
             ?? OptionalDecimal(DeepValue(tribIbs, "vTotIBSCBS"))
             ?? SumDeepDecimalsOrNull(tribIbs, "vIBS", "vCBS");
 
