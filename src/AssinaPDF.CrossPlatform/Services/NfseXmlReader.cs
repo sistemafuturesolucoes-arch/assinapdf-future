@@ -175,12 +175,18 @@ public static class NfseXmlReader
 
         string destinationDetails = PartyDetails(dest, "DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e");
         string intermediaryDetails = PartyDetails(intermediary, "INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e");
+        string purposeCode = FirstValue(infDps, "finNFSe");
+        if (string.IsNullOrWhiteSpace(purposeCode))
+            purposeCode = FirstValue(ibsBlock, "finNFSe");
+        string purpose = PurposeDescription(purposeCode);
         string taxDetails = ExtractTaxDetails(tribMun, tribFed, tribIbs);
         string additional = string.Join(" · ", new[]
         {
             $"Número DFSe: {Value(info, "nDFSe")}",
             $"Aplicação geradora: {Value(info, "verAplic")}",
             $"Tipo de emissão: {Value(info, "tpEmis")}",
+            $"Tipo de NFS-e de débito: {Value(infDps, "tpNFSeDebito")}",
+            $"Tipo de NFS-e de crédito: {Value(infDps, "tpNFSeCredito")}",
             Value(infDps, "xInfComp"),
             Value(serv, "xInfComp"),
             Value(values, "xOutInf"),
@@ -223,6 +229,14 @@ public static class NfseXmlReader
             .ToArray();
         return details.Length == 0 ? "" : "Detalhamento tributário do XML: " + string.Join("; ", details);
     }
+
+    private static string PurposeDescription(string code) => code switch
+    {
+        "0" => "NFS-e regular",
+        "1" => "NFS-e de crédito",
+        "2" => "NFS-e de débito",
+        _ => code
+    };
 
     private static string StatusDescription(string code) => code switch
     {
