@@ -74,17 +74,17 @@ public static class NfseDanfseGenerator
         var light = new XSolidBrush(XColor.FromArgb(242, 242, 242));
         var line = new XPen(XColor.FromArgb(70, 70, 70), 0.5);
         var border = new XPen(XColors.Black, 1);
-        var title = new XFont("Arial", 7, XFontStyleEx.Bold);
-        var label = new XFont("Arial", 6, XFontStyleEx.Bold);
-        var value = new XFont("Arial", 7, XFontStyleEx.Regular);
-        var header = new XFont("Arial", 9, XFontStyleEx.Bold);
-        var small = new XFont("Arial", 6, XFontStyleEx.Regular);
+        var title = new XFont("Inter", 7, XFontStyleEx.Bold);
+        var label = new XFont("Inter", 6, XFontStyleEx.Bold);
+        var value = new XFont("Inter", 7, XFontStyleEx.Regular);
+        var header = new XFont("Inter", 9, XFontStyleEx.Bold);
+        var small = new XFont("Inter", 6, XFontStyleEx.Regular);
 
         g.DrawRectangle(border, Margin, Margin, PageWidth - 2 * Margin, PageHeight - 2 * Margin);
 
         // Cabeçalho nacional (NT 008/2026, item 2.4.3).
         g.DrawRectangle(light, Margin + 1, Margin + 1, PageWidth - 2 * Margin - 2, 51);
-        var logoFont = new XFont("Arial", 17, XFontStyleEx.Bold);
+        var logoFont = new XFont("Inter", 17, XFontStyleEx.Bold);
         g.DrawString("NFS", logoFont, new XSolidBrush(XColor.FromArgb(78, 132, 87)),
             new XRect(18, 20, 58, 22), XStringFormats.CenterLeft);
         g.DrawString("e", logoFont, new XSolidBrush(XColor.FromArgb(45, 66, 132)),
@@ -97,7 +97,7 @@ public static class NfseDanfseGenerator
             new XRect(165, 30, 245, 14), XStringFormats.Center);
         if (d.Environment == "Homologação")
             g.DrawString("NFS-e SEM VALIDADE JURÍDICA",
-                new XFont("Arial", 9, XFontStyleEx.Bold),
+                new XFont("Inter", 9, XFontStyleEx.Bold),
                 new XSolidBrush(XColor.FromArgb(200, 0, 0)),
                 new XRect(165, 43, 245, 13), XStringFormats.Center);
         g.DrawString(Clip($"{d.IssuerCity} / {d.IssuerState}", 38), value, black,
