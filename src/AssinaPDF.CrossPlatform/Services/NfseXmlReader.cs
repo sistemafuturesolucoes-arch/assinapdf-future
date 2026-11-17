@@ -178,6 +178,8 @@ public static class NfseXmlReader
         string purposeCode = FirstValue(infDps, "finNFSe");
         if (string.IsNullOrWhiteSpace(purposeCode))
             purposeCode = FirstValue(ibsBlock, "finNFSe");
+        if (string.IsNullOrWhiteSpace(purposeCode))
+            throw new InvalidDataException("O XML nacional não informa a finalidade da NFS-e (finNFSe).");
         string purpose = PurposeDescription(purposeCode);
         string taxDetails = ExtractTaxDetails(values, tribMun, tribFed, tribIbs);
         string serviceLocationCode = FirstValue(locPrest, "xCidade", "cLocPrestacao");
@@ -205,9 +207,9 @@ public static class NfseXmlReader
 
         return new NfseDocumentSummary(
             sourcePath, accessKey, number, competence, processedAt,
-            dpsNumber, dpsSeries, dpsIssuedAt, Value(infDps, "tpEmit"),
+            dpsNumber, dpsSeries, dpsIssuedAt, Required(infDps, "tpEmit"),
             StatusDescription(Required(info, "cStat")), purpose,
-            environment, GeneratingEnvironment(Value(info, "ambGer")),
+            environment, GeneratingEnvironment(Required(info, "ambGer")),
             issuerName, issuerDocument, Value(prest, "IM"), Value(prest, "fone"),
             Value(prest, "email"), prestAddress, prestCity.Name, prestCity.State,
             recipientName, First(toma, "CNPJ", "CPF", "NIF"),
