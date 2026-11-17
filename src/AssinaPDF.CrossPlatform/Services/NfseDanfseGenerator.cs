@@ -93,18 +93,18 @@ public static class NfseDanfseGenerator
             new XRect(18, 42, 150, 10), XStringFormats.CenterLeft);
         g.DrawString("DANFSe v2.0", header, black,
             new XRect(165, 14, 245, 16), XStringFormats.Center);
-        g.DrawString("Documento Auxiliar da NFS-e", header,
+        g.DrawString("Documento Auxiliar da NFS-e", header, black,
             new XRect(165, 30, 245, 14), XStringFormats.Center);
         if (d.Environment == "Homologação")
             g.DrawString("NFS-e SEM VALIDADE JURÍDICA",
                 new XFont("Arial", 9, XFontStyleEx.Bold),
                 new XSolidBrush(XColor.FromArgb(200, 0, 0)),
                 new XRect(165, 43, 245, 13), XStringFormats.Center);
-        g.DrawString(Clip($"{d.IssuerCity} / {d.IssuerState}", 38), value,
+        g.DrawString(Clip($"{d.IssuerCity} / {d.IssuerState}", 38), value, black,
             new XRect(420, 14, 155, 12), XStringFormats.CenterRight);
-        g.DrawString("Ambiente gerador: " + Clip(d.GeneratingEnvironment, 34), small,
+        g.DrawString("Ambiente gerador: " + Clip(d.GeneratingEnvironment, 34), small, black,
             new XRect(420, 28, 155, 10), XStringFormats.CenterRight);
-        g.DrawString("Sistema Nacional · " + d.Environment, small,
+        g.DrawString("Sistema Nacional · " + d.Environment, small, black,
             new XRect(420, 38, 155, 8), XStringFormats.CenterRight);
 
         // Identificação e QR Code.
@@ -127,13 +127,13 @@ public static class NfseDanfseGenerator
             new Field("FINALIDADE", Clip(d.Purpose, 37))
         }, 3, label, value, line);
         DrawQr(g, PublicQueryBase + Uri.EscapeDataString(d.AccessKey), 496, 47, 43);
-        g.DrawString("A autenticidade desta NFS-e pode ser", small,
+        g.DrawString("A autenticidade desta NFS-e pode ser", small, black,
             new XRect(448, 94, 134, 6.3), XStringFormats.TopCenter);
-        g.DrawString("verificada pela leitura deste código QR", small,
+        g.DrawString("verificada pela leitura deste código QR", small, black,
             new XRect(448, 100, 134, 6.3), XStringFormats.TopCenter);
-        g.DrawString("ou pela consulta da chave de acesso no", small,
+        g.DrawString("ou pela consulta da chave de acesso no", small, black,
             new XRect(448, 106, 134, 6.3), XStringFormats.TopCenter);
-        g.DrawString("portal nacional da NFS-e", small,
+        g.DrawString("portal nacional da NFS-e", small, black,
             new XRect(448, 112, 134, 6.3), XStringFormats.TopCenter);
 
         y = 157;
@@ -208,7 +208,7 @@ public static class NfseDanfseGenerator
             }, title, label, value, light, line);
 
         g.DrawString("Documento auxiliar gerado localmente a partir do XML da NFS-e do Padrão Nacional. O XML autorizado é o documento fiscal oficial.",
-            small, new XRect(Margin + 7, 812, PageWidth - 2 * Margin - 14, 16), XStringFormats.Center);
+            small, black, new XRect(Margin + 7, 812, PageWidth - 2 * Margin - 14, 16), XStringFormats.Center);
     }
 
     private static void DrawNarrativeSection(XGraphics g, string heading, string text, double x, double y,
