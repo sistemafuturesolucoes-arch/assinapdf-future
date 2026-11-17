@@ -41,14 +41,6 @@ public partial class ConverterWindow : Window
         StatusText.Text = "Você pode iniciar outra conversão.";
     }
 
-    private async void OfficeToPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        var window = new OfficeToPdfWindow();
-        await window.ShowDialog(this);
-        OfficeToPdfStatusText.Text = "Central Word/Excel para PDF fechada.";
-        StatusText.Text = "Você pode iniciar outra conversão.";
-    }
-
     private void Close_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
     private async void ImagesToPdf_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
