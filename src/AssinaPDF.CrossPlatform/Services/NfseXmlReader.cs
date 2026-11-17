@@ -189,7 +189,8 @@ public static class NfseXmlReader
         {
             Labeled("Número DFSe", Value(info, "nDFSe")),
             Labeled("Aplicação geradora", Value(info, "verAplic")),
-            Labeled("Tipo de emissão", Value(info, "tpEmis")),
+            Labeled("Tipo de emissão", EmissionType(Value(info, "tpEmis"))),
+            Labeled("Processo de emissão da DPS", ProcessType(Value(infDps, "procEmi")),
             Labeled("Tipo de NFS-e de débito", Value(infDps, "tpNFSeDebito")),
             Labeled("Tipo de NFS-e de crédito", Value(infDps, "tpNFSeCredito")),
             Value(infDps, "xInfComp"),
@@ -237,6 +238,21 @@ public static class NfseXmlReader
             .ToArray();
         return details.Length == 0 ? "" : "Detalhamento tributário do XML: " + string.Join("; ", details);
     }
+
+    private static string EmissionType(string code) => code switch
+    {
+        "1" => "Emissão direta no modelo da NFS-e Nacional",
+        "2" => "Emissão original em leiaute municipal, transcrita para o modelo nacional",
+        _ => code
+    };
+
+    private static string ProcessType(string code) => code switch
+    {
+        "1" => "Aplicativo do contribuinte via Web Service",
+        "2" => "Aplicativo disponibilizado pelo fisco (Web)",
+        "3" => "Aplicativo disponibilizado pelo fisco (App)",
+        _ => code
+    };
 
     private static string PurposeDescription(string code) => code switch
     {
