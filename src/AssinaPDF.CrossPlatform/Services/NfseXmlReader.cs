@@ -182,6 +182,10 @@ public static class NfseXmlReader
             Value(values, "xOutInf")
         }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
+        string recipientName = FirstValue(toma, "xNome");
+        if (toma is null)
+            recipientName = "TOMADOR/ADQUIRENTE DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e";
+
         return new NfseDocumentSummary(
             sourcePath, accessKey, number, competence, processedAt,
             dpsNumber, dpsSeries, dpsIssuedAt, Value(infDps, "tpEmit"),
@@ -189,7 +193,7 @@ public static class NfseXmlReader
             environment, GeneratingEnvironment(Value(info, "ambGer")),
             issuerName, issuerDocument, Value(prest, "IM"), Value(prest, "fone"),
             Value(prest, "email"), prestAddress, prestCity.Name, prestCity.State,
-            FirstValue(toma, "xNome"), First(toma, "CNPJ", "CPF", "NIF"),
+            recipientName, First(toma, "CNPJ", "CPF", "NIF"),
             Value(toma, "fone"), Value(toma, "email"), tomaAddress, tomaCity.Name, tomaCity.State,
             Value(cServ, "cTribNac"), Value(cServ, "cTribMun"), Value(cServ, "cNBS"),
             FirstValue(locPrest, "xCidade", "cLocPrestacao") + " " + Value(locPrest, "UF"),
