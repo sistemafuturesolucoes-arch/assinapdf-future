@@ -65,10 +65,18 @@
             <TextBlock x:Name="NfseStatusText" Text="Central de NFS-e Nacional com conversão em lote e pré-visualização de DANFSe." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
+        <Border Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="10" Padding="18">
+          <StackPanel Spacing="9">
+            <TextBlock Text="XML de MDF-e para DAMDFE" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+            <TextBlock Text="Importe MDF-e autorizados, gere o DAMDFE em PDF, visualize páginas, ajuste o zoom e exporte individualmente ou consolide vários documentos em um único PDF." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+            <Button Content="Importar XML de MDF-e" Click="MdfeImport_Click" HorizontalAlignment="Left" Background="#6741B8" Foreground="White" Padding="16,9"/>
+            <TextBlock x:Name="MdfeStatusText" Text="Central de MDF-e com geração e pré-visualização de DAMDFE em PDF." FontSize="11" Foreground="#747B86" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
         <Border Background="#ECEEF2" CornerRadius="8" Padding="14">
           <StackPanel Spacing="5">
             <TextBlock Text="Em desenvolvimento" FontSize="13" FontWeight="SemiBold" Foreground="#454B55"/>
-            <TextBlock Text="MDF-e → DAMDFE e outras conversões serão liberados após implementação e validação." FontSize="12" Foreground="#747B86" TextWrapping="Wrap"/>
+            <TextBlock Text="PDF → Word • Word → PDF • Excel → Word/PDF" FontSize="12" Foreground="#747B86" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
       </StackPanel>
