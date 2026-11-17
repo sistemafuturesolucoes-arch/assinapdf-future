@@ -23,9 +23,11 @@ public partial class NfseImportWindow : Window
     public NfseImportWindow()
     {
         InitializeComponent();
+        // Cada janela usa sua própria pasta temporária para não interferir
+        // em outra sessão de importação aberta simultaneamente.
         _temporaryDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "FutureSolucoes", "AssinaPDF", "NfseBatchPreview");
+            "FutureSolucoes", "AssinaPDF", "NfseBatchPreview", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_temporaryDirectory);
         DocumentsList.ItemsSource = _documents;
         DocumentScrollViewer.AddHandler(InputElement.PointerWheelChangedEvent,
