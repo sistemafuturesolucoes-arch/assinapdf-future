@@ -75,10 +75,10 @@ public static class NfseDanfseGenerator
         var line = new XPen(XColor.FromArgb(70, 70, 70), 0.5);
         var border = new XPen(XColors.Black, 1);
         var title = new XFont("Arial", 7, XFontStyleEx.Bold);
-        var label = new XFont("Arial", 5.4, XFontStyleEx.Bold);
-        var value = new XFont("Arial", 6.1, XFontStyleEx.Regular);
+        var label = new XFont("Arial", 6, XFontStyleEx.Bold);
+        var value = new XFont("Arial", 7, XFontStyleEx.Regular);
         var header = new XFont("Arial", 9, XFontStyleEx.Bold);
-        var small = new XFont("Arial", 5.5, XFontStyleEx.Regular);
+        var small = new XFont("Arial", 6, XFontStyleEx.Regular);
 
         g.DrawRectangle(border, Margin, Margin, PageWidth - 2 * Margin, PageHeight - 2 * Margin);
 
@@ -106,12 +106,12 @@ public static class NfseDanfseGenerator
 
         // Identificação e QR Code.
         double y = 57;
-        DrawSection(g, "DADOS DA NFS-e", Margin + 2, y, PageWidth - 2 * Margin - 4, 83, title, label, value, light, line);
+        DrawSection(g, "DADOS DA NFS-e", Margin + 2, y, PageWidth - 2 * Margin - 4, 95, title, label, value, light, line);
         g.DrawString("CHAVE DE ACESSO DA NFS-e", label, black,
             new XRect(Margin + 8, y + 16, 405, 7), XStringFormats.TopLeft);
         g.DrawString(d.AccessKey, value, black,
             new XRect(Margin + 8, y + 24, 405, 9), XStringFormats.TopLeft);
-        DrawFieldGrid(g, Margin + 8, y + 35, 405, 43, new[]
+        DrawFieldGrid(g, Margin + 8, y + 35, 405, 55, new[]
         {
             new Field("NÚMERO DA NFS-e", d.Number),
             new Field("COMPETÊNCIA", FormatDate(d.Competence)),
@@ -127,8 +127,8 @@ public static class NfseDanfseGenerator
         g.DrawString("A autenticidade desta NFS-e pode ser verificada pela leitura do QR Code ou pela consulta da chave de acesso no portal nacional.",
             small, new XRect(484, 91, 92, 27), XStringFormats.TopCenter);
 
-        y = 145;
-        DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 94,
+        y = 157;
+        DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 112,
             new[]
             {
                 new Field("CNPJ / CPF / NIF", d.IssuerDocument),
@@ -140,8 +140,8 @@ public static class NfseDanfseGenerator
                 new Field("E-MAIL", d.IssuerEmail)
             }, title, label, value, light, line);
 
-        y = 242;
-        DrawParty(g, "TOMADOR / ADQUIRENTE", Margin + 2, y, PageWidth - 2 * Margin - 4, 80,
+        y = 272;
+        DrawParty(g, "TOMADOR / ADQUIRENTE", Margin + 2, y, PageWidth - 2 * Margin - 4, 88,
             new[]
             {
                 new Field("CNPJ / CPF / NIF", string.IsNullOrWhiteSpace(d.RecipientDocument) ? "TOMADOR/ADQUIRENTE DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e" : d.RecipientDocument),
@@ -152,12 +152,12 @@ public static class NfseDanfseGenerator
                 new Field("E-MAIL", d.RecipientEmail)
             }, title, label, value, light, line);
 
-        y = 325;
-        DrawNarrativeSection(g, "DESTINATÁRIO DA OPERAÇÃO", d.DestinationDetails, Margin + 2, y, 282, 52, title, label, value, light, line);
-        DrawNarrativeSection(g, "INTERMEDIÁRIO DA OPERAÇÃO", d.IntermediaryDetails, Margin + 292, y, 282, 52, title, label, value, light, line);
+        y = 363;
+        DrawNarrativeSection(g, "DESTINATÁRIO DA OPERAÇÃO", d.DestinationDetails, Margin + 2, y, 282, 60, title, label, value, light, line);
+        DrawNarrativeSection(g, "INTERMEDIÁRIO DA OPERAÇÃO", d.IntermediaryDetails, Margin + 292, y, 282, 60, title, label, value, light, line);
 
-        y = 380;
-        DrawParty(g, "DADOS DO SERVIÇO PRESTADO", Margin + 2, y, PageWidth - 2 * Margin - 4, 98,
+        y = 426;
+        DrawParty(g, "DADOS DO SERVIÇO PRESTADO", Margin + 2, y, PageWidth - 2 * Margin - 4, 110,
             new[]
             {
                 new Field("CÓDIGO DE TRIBUTAÇÃO NACIONAL", d.ServiceCodeNational),
@@ -167,8 +167,8 @@ public static class NfseDanfseGenerator
                 new Field("DESCRIÇÃO DO SERVIÇO", d.ServiceDescription)
             }, title, label, value, light, line);
 
-        y = 481;
-        DrawParty(g, "TRIBUTAÇÃO MUNICIPAL E FEDERAL", Margin + 2, y, PageWidth - 2 * Margin - 4, 72,
+        y = 539;
+        DrawParty(g, "TRIBUTAÇÃO MUNICIPAL E FEDERAL", Margin + 2, y, PageWidth - 2 * Margin - 4, 76,
             new[]
             {
                 new Field("ISSQN APURADO", Money(d.IssqnAmount)),
@@ -177,8 +177,8 @@ public static class NfseDanfseGenerator
                 new Field("IBS / CBS", Money(d.IbscbsAmount))
             }, title, label, value, light, line);
 
-        y = 556;
-        DrawParty(g, "VALORES DA NFS-e", Margin + 2, y, PageWidth - 2 * Margin - 4, 65,
+        y = 618;
+        DrawParty(g, "VALORES DA NFS-e", Margin + 2, y, PageWidth - 2 * Margin - 4, 76,
             new[]
             {
                 new Field("VALOR DO SERVIÇO / OPERAÇÃO", Money(d.ServiceAmount)),
@@ -190,8 +190,8 @@ public static class NfseDanfseGenerator
                 new Field("VALOR LÍQUIDO + IBS/CBS", Money(d.NetAmount + d.IbscbsAmount))
             }, title, label, value, light, line);
 
-        y = 624;
-        DrawParty(g, "INFORMAÇÕES COMPLEMENTARES", Margin + 2, y, PageWidth - 2 * Margin - 4, 78,
+        y = 697;
+        DrawParty(g, "INFORMAÇÕES COMPLEMENTARES", Margin + 2, y, PageWidth - 2 * Margin - 4, 82,
             new[]
             {
                 new Field("INFORMAÇÕES DO SERVIÇO / DEMAIS DADOS DO XML", d.AdditionalInformation)
@@ -207,7 +207,7 @@ public static class NfseDanfseGenerator
         DrawSection(g, heading, x, y, width, height, title, label, value, light, line);
         var rect = new XRect(x + 5, y + 17, width - 10, height - 20);
         var lines = WrapText(g, text, value, rect.Width);
-        double lineHeight = 7;
+        double lineHeight = 8;
         if (lines.Count * lineHeight > rect.Height + 0.1)
             throw new InvalidDataException($"O bloco '{heading}' excede o espaço legível do DANFSe. O PDF não foi gerado para evitar perda de informação.");
         for (int i = 0; i < lines.Count; i++)
@@ -244,10 +244,10 @@ public static class NfseDanfseGenerator
             double cx = x + col * cellWidth, cy = y + row * cellHeight;
             var field = fields[i];
             g.DrawString(field.Label, label, XBrushes.Black,
-                new XRect(cx + 3, cy, cellWidth - 6, 6), XStringFormats.TopLeft);
-            var valueRect = new XRect(cx + 3, cy + 6, cellWidth - 6, Math.Max(7, cellHeight - 6));
+                new XRect(cx + 3, cy, cellWidth - 6, 7), XStringFormats.TopLeft);
+            var valueRect = new XRect(cx + 3, cy + 7, cellWidth - 6, Math.Max(7.5, cellHeight - 7));
             var lines = WrapText(g, field.Value, value, valueRect.Width);
-            double lineHeight = 6.5;
+            double lineHeight = 7.5;
             if (lines.Count * lineHeight > valueRect.Height + 0.1)
                 throw new InvalidDataException($"O campo '{field.Label}' excede o espaço legível do DANFSe. O PDF não foi gerado para evitar perda de informação.");
             for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
