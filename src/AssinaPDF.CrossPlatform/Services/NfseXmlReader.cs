@@ -190,7 +190,7 @@ public static class NfseXmlReader
             Labeled("Número DFSe", Value(info, "nDFSe")),
             Labeled("Aplicação geradora", Value(info, "verAplic")),
             Labeled("Tipo de emissão", EmissionType(Value(info, "tpEmis"))),
-            Labeled("Processo de emissão da DPS", ProcessType(Value(infDps, "procEmi")),
+            Labeled("Processo de emissão da DPS", ProcessType(Value(infDps, "procEmi"))),
             Labeled("Tipo de NFS-e de débito", Value(infDps, "tpNFSeDebito")),
             Labeled("Tipo de NFS-e de crédito", Value(infDps, "tpNFSeCredito")),
             Value(infDps, "xInfComp"),
