@@ -54,7 +54,7 @@ public static class NfseDanfseGenerator
                 page.Width = XUnit.FromPoint(PageWidth);
                 page.Height = XUnit.FromPoint(PageHeight);
                 using var graphics = XGraphics.FromPdfPage(page);
-                DrawPage(graphics, invoice);
+                DrawPage(graphics, validated);
                 document.Save(temporary);
             }
 
