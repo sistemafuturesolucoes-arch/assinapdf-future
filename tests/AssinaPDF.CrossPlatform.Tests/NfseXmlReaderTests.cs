@@ -56,12 +56,29 @@ public class NfseXmlReaderTests
         Assert.Equal("010701", result.ServiceCodeNational);
         Assert.Equal(1500m, result.ServiceAmount);
         Assert.Equal(1400m, result.NetAmount);
-        Assert.Equal(30m, result.IssqnAmount);
-        Assert.Equal(15m, result.FederalWithholdings);
-        Assert.Equal(5m, result.IbscbsAmount);
+        Assert.Equal(30m, result.IssqnAmount!.Value);
+        Assert.Equal(15m, result.FederalWithholdings!.Value);
+        Assert.Equal(5m, result.IbscbsAmount!.Value);
         Assert.Equal("Produção", result.Environment);
         Assert.Equal("NFS-e gerada", result.Status);
         Assert.Equal("Sistema próprio do município", result.GeneratingEnvironment);
+    }
+
+    [Fact]
+    public void Parse_AbsentOptionalTaxes_RemainAbsent()
+    {
+        string xml = NationalXml()
+            .Replace("<vDescIncond>100.00</vDescIncond>", "")
+            .Replace("<vDescCond>0.00</vDescCond>", "")
+            .Replace("<vISSQN>30.00</vISSQN>", "")
+            .Replace("<vRetIRRF>15.00</vRetIRRF>", "")
+            .Replace("<vIBS>2.00</vIBS><vCBS>3.00</vCBS>", "");
+        var result = NfseXmlReader.Parse(xml);
+        Assert.Null(result.UnconditionalDiscount);
+        Assert.Null(result.ConditionalDiscount);
+        Assert.Null(result.IssqnAmount);
+        Assert.Null(result.FederalWithholdings);
+        Assert.Null(result.IbscbsAmount);
     }
 
     [Fact]
