@@ -1,0 +1,233 @@
+using System.Globalization;
+using System.Xml;
+using System.Xml.Linq;
+
+namespace AssinaPDF.MacPrototype.Services;
+
+public sealed record NfseDocumentSummary(
+    string SourcePath,
+    string AccessKey,
+    string Number,
+    string Competence,
+    string ProcessedAt,
+    string DpsNumber,
+    string DpsSeries,
+    string DpsIssuedAt,
+    string IssuerType,
+    string Status,
+    string Purpose,
+    string Environment,
+    string GeneratingEnvironment,
+    string IssuerName,
+    string IssuerDocument,
+    string IssuerMunicipalRegistration,
+    string IssuerPhone,
+    string IssuerEmail,
+    string IssuerAddress,
+    string IssuerCity,
+    string IssuerState,
+    string RecipientName,
+    string RecipientDocument,
+    string RecipientPhone,
+    string RecipientEmail,
+    string RecipientAddress,
+    string RecipientCity,
+    string RecipientState,
+    string ServiceCodeNational,
+    string ServiceCodeMunicipal,
+    string NbsCode,
+    string ServiceLocation,
+    string ServiceDescription,
+    decimal ServiceAmount,
+    decimal UnconditionalDiscount,
+    decimal ConditionalDiscount,
+    decimal NetAmount,
+    decimal IssqnAmount,
+    decimal FederalWithholdings,
+    decimal IbscbsAmount,
+    string AdditionalInformation)
+{
+    public string DisplayName =>
+        $"NFS-e {Number} · {IssuerName} · {NetAmount.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))}";
+}
+
+public static class NfseXmlReader
+{
+    public const string NationalNamespace = "http://www.sped.fazenda.gov.br/nfse";
+    private static readonly XNamespace Ns = NationalNamespace;
+    private const long MaxXmlCharacters = 10_000_000;
+
+    public static NfseDocumentSummary ReadFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        using var stream = File.OpenRead(path);
+        using var reader = XmlReader.Create(stream, SecureSettings());
+        return ParseDocument(XDocument.Load(reader, LoadOptions.None), Path.GetFullPath(path));
+    }
+
+    public static NfseDocumentSummary Parse(string xml, string sourcePath = "")
+    {
+        ArgumentNullException.ThrowIfNull(xml);
+        using var input = new StringReader(xml);
+        using var reader = XmlReader.Create(input, SecureSettings());
+        return ParseDocument(XDocument.Load(reader, LoadOptions.None), sourcePath);
+    }
+
+    private static XmlReaderSettings SecureSettings() => new()
+    {
+        DtdProcessing = DtdProcessing.Prohibit,
+        XmlResolver = null,
+        MaxCharactersInDocument = MaxXmlCharacters,
+        MaxCharactersFromEntities = 1024,
+        IgnoreComments = true,
+        IgnoreWhitespace = true
+    };
+
+    private static NfseDocumentSummary ParseDocument(XDocument document, string sourcePath)
+    {
+        var root = document.Root ?? throw new InvalidDataException("O XML está vazio.");
+        if (root.Name != Ns + "NFSe")
+            throw new InvalidDataException("Arquivo não reconhecido como NFS-e do Padrão Nacional (elemento NFSe).");
+        if (root.Attribute("versao") is null || string.IsNullOrWhiteSpace(root.Attribute("versao")!.Value))
+            throw new InvalidDataException("O XML nacional não informa a versão da NFS-e.");
+
+        var info = root.Element(Ns + "infNFSe")
+            ?? throw new InvalidDataException("O XML nacional não contém infNFSe.");
+        string accessKey = Attr(info, "Id");
+        if (accessKey.StartsWith("NFS", StringComparison.Ordinal)) accessKey = accessKey[3..];
+        if (accessKey.Length != 50 || accessKey.Any(c => !char.IsAsciiLetterOrDigit(c) || char.IsLower(c)))
+            throw new InvalidDataException("A chave de acesso da NFS-e nacional deve conter 50 caracteres alfanuméricos em maiúsculas.");
+
+        var dps = Child(info, "DPS");
+        var infDps = Child(dps, "infDPS");
+        string environmentCode = Required(infDps, "tpAmb");
+        string environment = environmentCode switch
+        {
+            "1" => "Produção",
+            "2" => "Homologação",
+            _ => throw new InvalidDataException($"Ambiente da NFS-e inválido: {environmentCode}.")
+        };
+
+        var prest = Child(infDps, "prest");
+        var toma = OptionalChild(infDps, "toma");
+        var dest = OptionalChild(infDps, "IBSCBS") is { } ibs ? OptionalChild(ibs, "dest") : null;
+        var serv = Child(infDps, "serv");
+        var cServ = Child(serv, "cServ");
+        var locPrest = OptionalChild(serv, "locPrest");
+        var values = Child(info, "valores");
+        var trib = OptionalChild(values, "trib");
+        var tribMun = trib is null ? null : OptionalChild(trib, "tribMun");
+        var tribFed = trib is null ? null : OptionalChild(trib, "tribFed");
+        var tribIbs = trib is null ? null : OptionalChild(trib, "totTrib");
+        var emit = OptionalChild(info, "emit");
+
+        string issuerDocument = First(prest, "CNPJ", "CPF", "NIF");
+        if (string.IsNullOrWhiteSpace(issuerDocument))
+            issuerDocument = First(emit, "CNPJ", "CPF", "NIF");
+        if (string.IsNullOrWhiteSpace(issuerDocument))
+            throw new InvalidDataException("O XML nacional não identifica o prestador/emitente.");
+
+        string issuerName = First(prest, "xNome");
+        if (string.IsNullOrWhiteSpace(issuerName)) issuerName = First(emit, "xNome");
+        if (string.IsNullOrWhiteSpace(issuerName))
+            throw new InvalidDataException("O XML nacional não informa o nome do prestador.");
+
+        string processedAt = Value(info, "dhProc");
+        string number = Required(info, "nNFSe");
+        string competence = Required(infDps, "dCompet");
+        string dpsNumber = Required(infDps, "nDPS");
+        string dpsSeries = Required(infDps, "serie");
+        string dpsIssuedAt = Required(infDps, "dhEmi");
+
+        var prestAddress = ReadAddress(OptionalChild(prest, "end"));
+        var tomaAddress = ReadAddress(OptionalChild(toma, "end"));
+        var prestCity = ReadCity(OptionalChild(prest, "end"));
+        var tomaCity = ReadCity(OptionalChild(toma, "end"));
+
+        decimal serviceAmount = Decimal(FirstValue(values, "vServPrest", "vServ", "vBC"));
+        decimal unconditionalDiscount = Decimal(Value(values, "vDescIncond"));
+        decimal conditionalDiscount = Decimal(Value(values, "vDescCond"));
+        decimal netAmount = Decimal(FirstValue(values, "vLiq", "vLiqNFS"));
+        decimal issqnAmount = Decimal(FirstValue(tribMun, "vISSQN", "vISSQNapur"));
+        decimal federalWithholdings = SumDecimals(tribFed, "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS", "vRetCOFINS");
+        decimal ibscbsAmount = SumDecimals(tribIbs, "vIBS", "vCBS", "vTotIBSCBS");
+
+        string serviceDescription = FirstValue(cServ, "xDescServ");
+        if (string.IsNullOrWhiteSpace(serviceDescription))
+            serviceDescription = Value(serv, "xDescServ");
+        if (string.IsNullOrWhiteSpace(serviceDescription))
+            throw new InvalidDataException("O XML nacional não contém a descrição do serviço.");
+
+        string additional = string.Join(" · ", new[]
+        {
+            Value(infDps, "xInfComp"),
+            Value(serv, "xInfComp"),
+            Value(values, "xOutInf")
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+        return new NfseDocumentSummary(
+            sourcePath, accessKey, number, competence, processedAt,
+            dpsNumber, dpsSeries, dpsIssuedAt, Value(infDps, "tpEmit"),
+            Value(info, "cStat"), FirstValue(OptionalChild(infDps, "IBSCBS"), "finNFSe"),
+            environment, Value(info, "ambGer"),
+            issuerName, issuerDocument, Value(prest, "IM"), Value(prest, "fone"),
+            Value(prest, "email"), prestAddress, prestCity.Name, prestCity.State,
+            FirstValue(toma, "xNome"), First(toma, "CNPJ", "CPF", "NIF"),
+            Value(toma, "fone"), Value(toma, "email"), tomaAddress, tomaCity.Name, tomaCity.State,
+            Value(cServ, "cTribNac"), Value(cServ, "cTribMun"), Value(cServ, "cNBS"),
+            FirstValue(locPrest, "xCidade", "cLocPrestacao") + " " + Value(locPrest, "UF"),
+            serviceDescription, serviceAmount, unconditionalDiscount, conditionalDiscount,
+            netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
+    }
+
+    private static XElement Child(XElement? parent, string name) =>
+        OptionalChild(parent, name) ?? throw new InvalidDataException($"O XML nacional não contém o campo obrigatório {name}.");
+
+    private static XElement? OptionalChild(XElement? parent, string name) => parent?.Element(Ns + name);
+    private static string Value(XElement? parent, string name) => OptionalChild(parent, name)?.Value.Trim() ?? "";
+    private static string Required(XElement parent, string name)
+    {
+        string value = Value(parent, name);
+        return string.IsNullOrWhiteSpace(value) ? throw new InvalidDataException($"O campo {name} está ausente na NFS-e.") : value;
+    }
+    private static string Attr(XElement element, string name) => ((string?)element.Attribute(name) ?? "").Trim();
+    private static string First(XElement? parent, params string[] names) => FirstValue(parent, names);
+    private static string FirstValue(XElement? parent, params string[] names)
+    {
+        foreach (string name in names)
+        {
+            string value = Value(parent, name);
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+        }
+        return "";
+    }
+    private static decimal Decimal(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return 0m;
+        return decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture, out var result)
+            ? result : throw new InvalidDataException($"Valor monetário inválido na NFS-e: {value}.");
+    }
+    private static decimal SumDecimals(XElement? parent, params string[] names) =>
+        names.Sum(name => Decimal(Value(parent, name)));
+    private static (string Name, string State) ReadCity(XElement? end)
+    {
+        var national = OptionalChild(end, "endNac");
+        var external = OptionalChild(end, "endExt");
+        return (FirstValue(national, "xMun", "cMun") is { Length: > 0 } city ? city : Value(external, "xCidade"),
+            FirstValue(national, "UF", "UF") is { Length: > 0 } uf ? uf : Value(external, "xEstProvReg"));
+    }
+    private static string ReadAddress(XElement? end)
+    {
+        if (end is null) return "";
+        var national = OptionalChild(end, "endNac");
+        var external = OptionalChild(end, "endExt");
+        var address = national ?? external;
+        return string.Join(", ", new[]
+        {
+            Value(address, "xLgr"), Value(address, "nro"), Value(address, "xCpl"),
+            Value(address, "xBairro"), Value(address, "xCidade"), Value(address, "UF"),
+            Value(address, "CEP")
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    }
+}
