@@ -1,0 +1,58 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.OfficeToPdfWindow"
+        Title="AssinaPDF | Word e Excel para PDF"
+        Width="1180" Height="760" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterOwner" Background="#F3F4F6">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="14">
+    <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,12">
+      <TextBlock Text="Word e Excel para PDF" FontSize="22" FontWeight="SemiBold" Foreground="#252A34"/>
+      <TextBlock Text="Conversão local em lote. Os arquivos originais não são modificados. A aparência depende das fontes e da compatibilidade do LibreOffice instalado." FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+    </StackPanel>
+    <Grid Grid.Row="1" ColumnDefinitions="310,*" ColumnSpacing="10">
+      <Border Grid.Column="0" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="8" Padding="10">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+          <Button Grid.Row="0" Content="＋ Adicionar Word e Excel" Click="AddFiles_Click" Padding="10,9" Background="#6741B8" Foreground="White"/>
+          <TextBlock x:Name="CountText" Grid.Row="1" Text="Nenhum documento adicionado" FontSize="11" Foreground="#737B87" Margin="0,9,0,5"/>
+          <ListBox x:Name="DocumentsList" Grid.Row="2" SelectionChanged="DocumentsList_SelectionChanged">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:CompileBindings="False">
+                <StackPanel Spacing="2" Margin="3,7">
+                  <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="#34383E" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding Status}" FontSize="10" Foreground="#737B87" TextWrapping="Wrap"/>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Grid.Row="3" Spacing="6">
+            <Button Content="Converter selecionado" Click="ConvertSelected_Click" Padding="9,8" Background="#16804A" Foreground="White"/>
+            <Button Content="Converter todos" Click="ConvertAll_Click" Padding="9,8" Background="#6741B8" Foreground="White"/>
+            <Button Content="Exportar PDF selecionado" Click="ExportSelected_Click" Padding="9,8"/>
+            <Button Content="Exportar PDFs convertidos (pasta)" Click="ExportAll_Click" Padding="9,8"/>
+            <Button Content="Remover selecionado" Click="RemoveSelected_Click" Padding="9,8"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="#E9EBEF" BorderBrush="#DDE1E8" BorderThickness="1" CornerRadius="8" Padding="10">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0" Text="PRÉ-VISUALIZAÇÃO DO PDF" FontSize="10" FontWeight="SemiBold" Foreground="#555D69" Margin="3,2,3,8"/>
+          <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Border x:Name="PreviewSurface" IsVisible="False" Background="White" Padding="12" Margin="10" HorizontalAlignment="Center">
+              <Image x:Name="PreviewImage" Stretch="Uniform" MaxWidth="760" MaxHeight="900"/>
+            </Border>
+          </ScrollViewer>
+          <Border x:Name="EmptyState" Grid.Row="1" Background="#F7F8FA" CornerRadius="10" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="390">
+            <StackPanel Spacing="8" HorizontalAlignment="Center">
+              <TextBlock Text="Pré-visualização" FontSize="18" FontWeight="SemiBold" Foreground="#303744" HorizontalAlignment="Center"/>
+              <TextBlock Text="Adicione arquivos e converta para visualizar o PDF gerado." TextWrapping="Wrap" TextAlignment="Center" Foreground="#747C89" FontSize="12"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+      <TextBlock x:Name="StatusText" Text="Aguardando documentos." FontSize="11" Foreground="#666D78" VerticalAlignment="Center" TextWrapping="Wrap"/>
+      <Button Grid.Column="1" Content="Fechar" Click="Close_Click" Padding="16,7" Background="#E2E5EA" Foreground="#34383E"/>
+    </Grid>
+  </Grid>
+</Window>
