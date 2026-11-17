@@ -102,7 +102,7 @@ public static class NfseDanfseGenerator
         g.DrawString("Ambiente gerador: " + Clip(d.GeneratingEnvironment, 34), small,
             new XRect(420, 28, 155, 10), XStringFormats.CenterRight);
         g.DrawString("Sistema Nacional · " + d.Environment, small,
-            new XRect(420, 40, 155, 10), XStringFormats.CenterRight);
+            new XRect(420, 38, 155, 8), XStringFormats.CenterRight);
 
         // Identificação e QR Code.
         double y = 57;
@@ -124,8 +124,12 @@ public static class NfseDanfseGenerator
             new Field("FINALIDADE", d.Purpose)
         }, 3, label, value, line);
         DrawQr(g, PublicQueryBase + Uri.EscapeDataString(d.AccessKey), 496, 47, 43);
-        g.DrawString("A autenticidade desta NFS-e pode ser verificada pela leitura do QR Code ou pela consulta da chave de acesso no portal nacional.",
-            small, new XRect(484, 91, 92, 27), XStringFormats.TopCenter);
+        g.DrawString("A autenticidade desta NFS-e pode ser", small,
+            new XRect(448, 91, 134, 7), XStringFormats.TopCenter);
+        g.DrawString("verificada pelo QR Code ou pela chave de", small,
+            new XRect(448, 99, 134, 7), XStringFormats.TopCenter);
+        g.DrawString("acesso no portal nacional da NFS-e", small,
+            new XRect(448, 107, 134, 7), XStringFormats.TopCenter);
 
         y = 157;
         DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 112,
