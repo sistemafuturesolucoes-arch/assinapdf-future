@@ -50,7 +50,8 @@ public class NfseXmlReaderTests
     {
         var result = NfseXmlReader.Parse(NationalXml(), "nfse.xml");
 
-        Assert.Equal(AccessKey, result.AccessKey);
+        // The XML Id carries the 'NFS' prefix; AccessKey exposes the normalized 50-character key.
+        Assert.Equal(AccessKey[3..], result.AccessKey);
         Assert.Equal("2026000000123", result.Number);
         Assert.Equal("2026-11-01", result.Competence);
         Assert.Equal("PRESTADOR TESTE LTDA", result.IssuerName);
