@@ -120,9 +120,9 @@ public static class NfseDanfseGenerator
             new Field("SITUAÇÃO", d.Status),
             new Field("FINALIDADE", d.Purpose)
         }, 3, label, value, line);
-        DrawQr(g, PublicQueryBase + Uri.EscapeDataString(d.AccessKey), 486, y + 9, 43);
+        DrawQr(g, PublicQueryBase + Uri.EscapeDataString(d.AccessKey), 496, 47, 43);
         g.DrawString("A autenticidade desta NFS-e pode ser verificada pela leitura do QR Code ou pela consulta da chave de acesso no portal nacional.",
-            small, new XRect(473, y + 54, 94, 27), XStringFormats.TopCenter);
+            small, new XRect(484, 91, 92, 27), XStringFormats.TopCenter);
 
         y = 145;
         DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 94,
