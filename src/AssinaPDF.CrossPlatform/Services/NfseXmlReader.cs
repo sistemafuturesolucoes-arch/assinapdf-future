@@ -178,6 +178,9 @@ public static class NfseXmlReader
         string taxDetails = ExtractTaxDetails(tribMun, tribFed, tribIbs);
         string additional = string.Join(" · ", new[]
         {
+            $"Número DFSe: {Value(info, "nDFSe")}",
+            $"Aplicação geradora: {Value(info, "verAplic")}",
+            $"Tipo de emissão: {Value(info, "tpEmis")}",
             Value(infDps, "xInfComp"),
             Value(serv, "xInfComp"),
             Value(values, "xOutInf"),
@@ -198,7 +201,7 @@ public static class NfseXmlReader
             recipientName, First(toma, "CNPJ", "CPF", "NIF"),
             Value(toma, "fone"), Value(toma, "email"), tomaAddress, tomaCity.Name, tomaCity.State,
             Value(cServ, "cTribNac"), Value(cServ, "cTribMun"), Value(cServ, "cNBS"),
-            FirstValue(locPrest, "xCidade", "cLocPrestacao") + " " + Value(locPrest, "UF"),
+            FormatMunicipality(FirstValue(locPrest, "xCidade", "cLocPrestacao")) + " / " + Value(locPrest, "UF"),
             serviceDescription, destinationDetails, intermediaryDetails, serviceAmount, unconditionalDiscount, conditionalDiscount,
             netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
     }
@@ -321,9 +324,13 @@ public static class NfseXmlReader
     {
         var national = OptionalChild(end, "endNac");
         var external = OptionalChild(end, "endExt");
-        return (FirstValue(national, "xMun", "cMun") is { Length: > 0 } city ? city : Value(external, "xCidade"),
-            FirstValue(national, "UF", "UF") is { Length: > 0 } uf ? uf : Value(external, "xEstProvReg"));
+        string city = FirstValue(national, "xMun", "xCidade", "cMun");
+        if (string.IsNullOrWhiteSpace(city)) city = Value(external, "xCidade");
+        return (FormatMunicipality(city), FirstValue(national, "UF") is { Length: > 0 } uf ? uf : Value(external, "xEstProvReg"));
     }
+
+    private static string FormatMunicipality(string value) =>
+        value.Length == 7 && value.All(char.IsAsciiDigit) ? "IBGE " + value : value;
     private static string ReadAddress(XElement? end)
     {
         if (end is null) return "";
