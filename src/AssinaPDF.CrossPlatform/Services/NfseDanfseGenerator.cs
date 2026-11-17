@@ -43,6 +43,9 @@ public static class NfseDanfseGenerator
 
         try
         {
+            // Usa as fontes incorporadas já utilizadas pelo conversor NF-e,
+            // evitando dependência de Arial instalado no Windows ou macOS.
+            NfePdfFontResolver.Register();
             using (var document = new PdfDocument())
             {
                 document.Info.Title = $"DANFSe Nacional {invoice.Number}";
