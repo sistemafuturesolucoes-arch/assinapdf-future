@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -11,14 +12,18 @@ namespace AssinaPDF.MacPrototype;
 
 public partial class OfficeToPdfWindow : Window
 {
-    private sealed class OfficeDocumentItem
+    private sealed class OfficeDocumentItem : INotifyPropertyChanged
     {
         public required string SourcePath { get; init; }
         public required string DisplayName { get; init; }
-        public string Status { get; set; } = "Aguardando conversão";
-        public string? PdfPath { get; set; }
+        private string _status = "Aguardando conversão";
+        private string? _pdfPath;
+        private Bitmap? _preview;
+        public string Status { get => _status; set { _status = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Status))); } }
+        public string? PdfPath { get => _pdfPath; set { _pdfPath = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PdfPath))); } }
         public string? WorkDirectory { get; set; }
-        public Bitmap? Preview { get; set; }
+        public Bitmap? Preview { get => _preview; set { _preview = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Preview))); } }
+        public event PropertyChangedEventHandler? PropertyChanged;
     }
 
     private readonly ObservableCollection<OfficeDocumentItem> _documents = new();
@@ -106,8 +111,6 @@ public partial class OfficeToPdfWindow : Window
             foreach (var item in items)
             {
                 item.Status = "Convertendo…";
-                DocumentsList.ItemsSource = null;
-                DocumentsList.ItemsSource = _documents;
                 var work = Path.Combine(_sessionDirectory, Guid.NewGuid().ToString("N"));
                 item.WorkDirectory = work;
                 try
@@ -126,8 +129,6 @@ public partial class OfficeToPdfWindow : Window
                     item.Status = "Erro: " + ex.Message;
                     failed++;
                 }
-                DocumentsList.ItemsSource = null;
-                DocumentsList.ItemsSource = _documents;
             }
             UpdateCount();
             if (DocumentsList.SelectedItem is OfficeDocumentItem selected)
