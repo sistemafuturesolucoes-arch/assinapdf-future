@@ -104,9 +104,12 @@ public static class NfseDanfseGenerator
         // Identificação e QR Code.
         double y = 57;
         DrawSection(g, "DADOS DA NFS-e", Margin + 2, y, PageWidth - 2 * Margin - 4, 83, title, label, value, light, line);
-        DrawFieldGrid(g, Margin + 8, y + 15, 405, 65, new[]
+        g.DrawString("CHAVE DE ACESSO DA NFS-e", label, black,
+            new XRect(Margin + 8, y + 16, 405, 7), XStringFormats.TopLeft);
+        g.DrawString(d.AccessKey, value, black,
+            new XRect(Margin + 8, y + 24, 405, 9), XStringFormats.TopLeft);
+        DrawFieldGrid(g, Margin + 8, y + 35, 405, 43, new[]
         {
-            new Field("CHAVE DE ACESSO DA NFS-e", d.AccessKey),
             new Field("NÚMERO DA NFS-e", d.Number),
             new Field("COMPETÊNCIA", FormatDate(d.Competence)),
             new Field("DATA/HORA DE EMISSÃO", FormatDateTime(d.ProcessedAt)),
@@ -195,7 +198,7 @@ public static class NfseDanfseGenerator
         IReadOnlyList<Field> fields, XFont title, XFont label, XFont value, XBrush light, XPen line)
     {
         DrawSection(g, heading, x, y, width, height, title, label, value, light, line);
-        DrawFieldGrid(g, x + 6, y + 15, width - 12, height - 18, fields, 3, label, value, line);
+        DrawFieldGrid(g, x + 6, y + 15, width - 12, height - 18, fields, 2, label, value, line);
     }
 
     private static void DrawSection(XGraphics g, string heading, double x, double y, double width, double height,
@@ -221,9 +224,14 @@ public static class NfseDanfseGenerator
             var field = fields[i];
             g.DrawString(field.Label, label, XBrushes.Black,
                 new XRect(cx + 3, cy + 1, cellWidth - 6, 7), XStringFormats.TopLeft);
-            string text = Clip(field.Value, Math.Max(8, (int)(cellWidth / 3.2)));
-            g.DrawString(text, value, XBrushes.Black,
-                new XRect(cx + 3, cy + 8, cellWidth - 6, Math.Max(7, cellHeight - 8)), XStringFormats.TopLeft);
+            var valueRect = new XRect(cx + 3, cy + 8, cellWidth - 6, Math.Max(7, cellHeight - 8));
+            var lines = WrapText(g, field.Value, value, valueRect.Width);
+            double lineHeight = 7;
+            if (lines.Count * lineHeight > valueRect.Height + 0.1)
+                throw new InvalidDataException($"O campo '{field.Label}' excede o espaço legível do DANFSe. O PDF não foi gerado para evitar perda de informação.");
+            for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+                g.DrawString(lines[lineIndex], value, XBrushes.Black,
+                    new XRect(valueRect.X, valueRect.Y + lineIndex * lineHeight, valueRect.Width, lineHeight), XStringFormats.TopLeft);
             if (col > 0) g.DrawLine(line, cx, cy, cx, cy + cellHeight);
             if (row > 0 && col == 0) g.DrawLine(line, x, cy, x + width, cy);
         }
@@ -239,6 +247,29 @@ public static class NfseDanfseGenerator
         for (int col = 0; col < matrix.Width; col++)
             if (matrix[col, row])
                 g.DrawRectangle(XBrushes.Black, x + col * module, y + row * module, module + 0.05, module + 0.05);
+    }
+
+    private static List<string> WrapText(XGraphics g, string? text, XFont font, double maxWidth)
+    {
+        string clean = (text ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (clean.Length == 0) return new List<string> { "" };
+        var result = new List<string>();
+        string current = "";
+        foreach (string word in clean.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string candidate = current.Length == 0 ? word : current + " " + word;
+            if (g.MeasureString(candidate, font).Width <= maxWidth)
+            {
+                current = candidate;
+                continue;
+            }
+            if (current.Length == 0)
+                throw new InvalidDataException("Um campo da NFS-e contém texto indivisível maior que a área de impressão.");
+            result.Add(current);
+            current = word;
+        }
+        if (current.Length > 0) result.Add(current);
+        return result;
     }
 
     private static string Money(decimal amount) => amount.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
