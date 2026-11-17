@@ -128,11 +128,13 @@ public static class NfseDanfseGenerator
         }, 3, label, value, line);
         DrawQr(g, PublicQueryBase + Uri.EscapeDataString(d.AccessKey), 496, 47, 43);
         g.DrawString("A autenticidade desta NFS-e pode ser", small,
-            new XRect(448, 95, 134, 6.3), XStringFormats.TopCenter);
-        g.DrawString("verificada pelo QR Code ou pela chave de", small,
-            new XRect(448, 101.5, 134, 6.3), XStringFormats.TopCenter);
-        g.DrawString("acesso no portal nacional da NFS-e", small,
-            new XRect(448, 108, 134, 6.3), XStringFormats.TopCenter);
+            new XRect(448, 94, 134, 6.3), XStringFormats.TopCenter);
+        g.DrawString("verificada pela leitura deste código QR", small,
+            new XRect(448, 100, 134, 6.3), XStringFormats.TopCenter);
+        g.DrawString("ou pela consulta da chave de acesso no", small,
+            new XRect(448, 106, 134, 6.3), XStringFormats.TopCenter);
+        g.DrawString("portal nacional da NFS-e", small,
+            new XRect(448, 112, 134, 6.3), XStringFormats.TopCenter);
 
         y = 157;
         DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 112,
@@ -180,9 +182,9 @@ public static class NfseDanfseGenerator
             {
                 new Field("ISSQN APURADO", Money(d.IssqnAmount)),
                 new Field("RETENÇÕES FEDERAIS", Money(d.FederalWithholdings)),
-                new Field("TRIBUTAÇÃO MUNICIPAL", d.IssqnAmount.HasValue && d.IssqnAmount.Value > 0
+                new Field("TRIBUTAÇÃO MUNICIPAL", d.IssqnAmount.HasValue
                     ? "ISSQN informado no XML"
-                    : "TRIBUTAÇÃO MUNICIPAL (ISSQN) - OPERAÇÃO NÃO SUJEITA AO ISSQN"),
+                    : "ISSQN não informado no XML"),
                 new Field("IBS / CBS", Money(d.IbscbsAmount))
             }, title, label, value, light, line);
 
@@ -198,8 +200,7 @@ public static class NfseDanfseGenerator
                         ? (d.IssqnAmount ?? 0m) + (d.FederalWithholdings ?? 0m)
                         : null)),
                 new Field("VALOR LÍQUIDO DA NFS-e", Money(d.NetAmount)),
-                new Field("TOTAL IBS / CBS", Money(d.IbscbsAmount)),
-                new Field("VALOR LÍQUIDO + IBS/CBS", Money(d.IbscbsAmount.HasValue ? d.NetAmount + d.IbscbsAmount.Value : d.NetAmount))
+                new Field("TOTAL IBS / CBS", Money(d.IbscbsAmount))
             }, title, label, value, light, line);
 
         y = 697;
