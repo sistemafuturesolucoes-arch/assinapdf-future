@@ -86,7 +86,7 @@ public static class MdfeXmlReader
 
         var ide = Required(info, "ide");
         if (Value(ide, "mod") != "58")
-            throw new InvalidDataException("O XML não é de MDF-e modelo 58.");
+            throw new InvalidDataException("O XML não corresponde ao modelo MDF-e 58.");
 
         string numberText = RequiredValue(ide, "nMDF");
         string seriesText = RequiredValue(ide, "serie");
