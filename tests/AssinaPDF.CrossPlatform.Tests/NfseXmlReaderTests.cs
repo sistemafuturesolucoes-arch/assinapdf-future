@@ -31,11 +31,14 @@ public class NfseXmlReaderTests
                   <cServ><cTribNac>010701</cTribNac><cTribMun>001</cTribMun><cNBS>123456789</cNBS><xDescServ>Serviços de desenvolvimento e manutenção de sistemas.</xDescServ></cServ>
                 </serv>
                 {{extra}}
+                <valores>
+                  <vServPrest><vServ>1500.00</vServ></vServPrest>
+                  <vDescCondIncond><vDescIncond>100.00</vDescIncond><vDescCond>0.00</vDescCond></vDescCondIncond>
+                </valores>
               </infDPS>
             </DPS>
             <valores>
-              <vServPrest><vServ>1500.00</vServ></vServPrest>
-              <vDescIncond>100.00</vDescIncond><vDescCond>0.00</vDescCond><vLiq>1400.00</vLiq>
+              <vISSQN>30.00</vISSQN><vTotalRet>45.00</vTotalRet><vLiq>1400.00</vLiq>
               <trib><tribMun><vISSQN>30.00</vISSQN></tribMun><tribFed><vRetIRRF>15.00</vRetIRRF></tribFed><totTrib><vIBS>2.00</vIBS><vCBS>3.00</vCBS></totTrib></trib>
             </valores>
           </infNFSe>
@@ -91,6 +94,7 @@ public class NfseXmlReaderTests
         string xml = NationalXml()
             .Replace("<vDescIncond>100.00</vDescIncond>", "")
             .Replace("<vDescCond>0.00</vDescCond>", "")
+            .Replace("<vTotalRet>45.00</vTotalRet>", "")
             .Replace("<vISSQN>30.00</vISSQN>", "")
             .Replace("<vRetIRRF>15.00</vRetIRRF>", "")
             .Replace("<vIBS>2.00</vIBS><vCBS>3.00</vCBS>", "");
@@ -105,10 +109,7 @@ public class NfseXmlReaderTests
     [Fact]
     public void Parse_OfficialTotalRetentions_AreReadWithoutInferringFromIssqn()
     {
-        string xml = NationalXml().Replace(
-            "<vLiq>1400.00</vLiq>",
-            "<vTotalRet>45.00</vTotalRet><vLiq>1400.00</vLiq>");
-        var result = NfseXmlReader.Parse(xml);
+        var result = NfseXmlReader.Parse(NationalXml());
         Assert.Equal(45m, result.TotalRetentions);
     }
 
@@ -116,8 +117,8 @@ public class NfseXmlReaderTests
     public void Parse_CurrentNfseIbsCbsTotalizers_AreReadFromInfNfse()
     {
         string xml = NationalXml().Replace(
-            "</valores>",
-            "</valores><IBSCBS><totCIBS><gIBS><vIBSTot>12.50</vIBSTot></gIBS><gCBS><vCBS>7.25</vCBS></gCBS></totCIBS></IBSCBS>");
+            "</infNFSe>",
+            "<IBSCBS><totCIBS><gIBS><vIBSTot>12.50</vIBSTot></gIBS><gCBS><vCBS>7.25</vCBS></gCBS></totCIBS></IBSCBS></infNFSe>");
         var result = NfseXmlReader.Parse(xml);
         Assert.Equal(19.75m, result.IbscbsAmount);
     }
