@@ -266,7 +266,7 @@ public static class NfseXmlReader
     {
         "100" => "NFS-e gerada",
         "101" => "NFS-e de substituição gerada",
-        "102" => "NFS-e de decisão judicial",
+        "102" => "NFS-e de decisão judicial ou administrativa",
         "103" => "NFS-e avulsa",
         "107" => "NFS-e MEI",
         "108" => "Nota de crédito",
