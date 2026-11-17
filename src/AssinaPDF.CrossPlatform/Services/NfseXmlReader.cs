@@ -113,7 +113,9 @@ public static class NfseXmlReader
         var prest = Child(infDps, "prest");
         var toma = OptionalChild(infDps, "toma");
         var ibsBlock = OptionalChild(infDps, "IBSCBS");
-        var dest = OptionalChild(ibsBlock, "dest");
+        // NT 009 v1.01 reposicionou indDest/dest para a raiz de infDPS,
+        // logo após toma. Mantém fallback para XMLs de leiautes anteriores.
+        var dest = OptionalChild(infDps, "dest") ?? OptionalChild(ibsBlock, "dest");
         var intermediary = OptionalChild(infDps, "interm");
         var serv = Child(infDps, "serv");
         var cServ = Child(serv, "cServ");
