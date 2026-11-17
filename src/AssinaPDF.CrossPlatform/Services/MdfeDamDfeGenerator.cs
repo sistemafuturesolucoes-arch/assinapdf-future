@@ -80,7 +80,7 @@ public static class MdfeDamDfeGenerator
                 int remainingRows = Math.Max(0, rows.Count - firstPageDocumentRows);
                 int continuationPages = (int)Math.Ceiling(remainingRows / (double)rowsPerPage);
                 int totalPages = 1 + continuationPages;
-                DrawOfficialFirstPage(pdf, mdfe, info, root, summary, qrPayload,
+                DrawOfficialFirstPage(pdf, info, root, summary, qrPayload,
                     rows.Take(firstPageDocumentRows).ToList(), totalPages);
 
                 for (int offset = firstPageDocumentRows; offset < rows.Count; offset += rowsPerPage)
@@ -104,7 +104,7 @@ public static class MdfeDamDfeGenerator
         }
     }
 
-    private static void DrawOfficialFirstPage(PdfDocument pdf, XElement mdfe, XElement info,
+    private static void DrawOfficialFirstPage(PdfDocument pdf, XElement info,
         XElement root, MdfeDocumentSummary s, string? qrPayload, IReadOnlyList<string> documentRows, int totalPages)
     {
         var page = NewPage(pdf);
@@ -292,25 +292,6 @@ public static class MdfeDamDfeGenerator
         }
         if (documentRows.Count == 0)
             g.DrawString("Nenhum documento vinculado.", Small, XBrushes.Black, new XPoint(rightX, docY));
-    }
-
-    private static void DrawOtherModal(XGraphics g, XElement info, MdfeDocumentSummary s, double y)
-    {
-        g.DrawString("Informações do modal", Section, XBrushes.Black, new XPoint(Left, y));
-        g.DrawLine(XPens.Gray, Left, y + 5, Right, y + 5);
-        var modal = info.Element(Ns + "infModal");
-        var specific = modal?.Elements().FirstOrDefault();
-        var values = specific?.DescendantsAndSelf().Where(x => !x.HasElements)
-            .Select(x => $"{x.Name.LocalName}: {x.Value.Trim()}")
-            .Where(x => !x.EndsWith(": ", StringComparison.Ordinal)).Take(18).ToList() ?? new List<string>();
-        double rowY = y + 19;
-        foreach (var value in values)
-        {
-            DrawTextFit(g, value, Small, Left, rowY, Width, 10);
-            rowY += 12;
-        }
-        if (values.Count == 0)
-            g.DrawString($"Dados específicos do modal {ModalName(s.Modal)} não localizados.", Small, XBrushes.Black, new XPoint(Left, rowY));
     }
 
     private static void DrawTollInfo(XGraphics g, XElement info, double y)
