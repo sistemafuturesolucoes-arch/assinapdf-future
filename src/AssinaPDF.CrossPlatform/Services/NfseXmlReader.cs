@@ -125,6 +125,10 @@ public static class NfseXmlReader
         var tribMun = trib is null ? null : OptionalChild(trib, "tribMun");
         var tribFed = trib is null ? null : OptionalChild(trib, "tribFed");
         var tribIbs = trib is null ? null : OptionalChild(trib, "totTrib");
+        // Os totalizadores oficiais de IBS/CBS ficam em infNFSe/IBSCBS/totCIBS.
+        // O grupo totTrib legado é mantido como fallback para XMLs anteriores.
+        var ibsNfse = OptionalChild(info, "IBSCBS");
+        var ibsTotals = OptionalChild(ibsNfse, "totCIBS");
         var emit = OptionalChild(info, "emit");
 
         string issuerDocument = First(prest, "CNPJ", "CPF", "NIF");
@@ -164,10 +168,9 @@ public static class NfseXmlReader
         decimal netAmount = Decimal(netAmountText);
         decimal? issqnAmount = OptionalDecimal(FirstDeepValue(tribMun, "vISSQN", "vISSQNapur"));
         decimal? federalWithholdings = SumDeepDecimalsOrNull(tribFed, "vRetIRRF", "vRetCP", "vRetCSLL", "vRetPIS", "vRetCOFINS");
-        string totalIbsCbs = DeepValue(tribIbs, "vTotIBSCBS");
-        decimal? ibscbsAmount = totalIbsCbs.Length > 0
-            ? Decimal(totalIbsCbs)
-            : SumDeepDecimalsOrNull(tribIbs, "vIBS", "vCBS");
+        decimal? ibscbsAmount = SumDeepDecimalsOrNull(ibsTotals, "vIBSTot", "vCBS")
+            ?? OptionalDecimal(DeepValue(tribIbs, "vTotIBSCBS"))
+            ?? SumDeepDecimalsOrNull(tribIbs, "vIBS", "vCBS");
 
         string serviceDescription = FirstValue(cServ, "xDescServ");
         if (string.IsNullOrWhiteSpace(serviceDescription))
@@ -183,7 +186,7 @@ public static class NfseXmlReader
         if (string.IsNullOrWhiteSpace(purposeCode))
             throw new InvalidDataException("O XML nacional não informa a finalidade da NFS-e (finNFSe).");
         string purpose = PurposeDescription(purposeCode);
-        string taxDetails = ExtractTaxDetails(values, tribMun, tribFed, tribIbs);
+        string taxDetails = ExtractTaxDetails(values, tribMun, tribFed, tribIbs, ibsTotals);
         string serviceLocationCode = FirstValue(locPrest, "xCidade", "cLocPrestacao");
         string serviceLocation = string.IsNullOrWhiteSpace(serviceLocationCode)
             ? ""
