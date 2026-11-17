@@ -193,8 +193,11 @@ public static class NfseXmlReader
         string purposeCode = FirstValue(infDps, "finNFSe");
         if (string.IsNullOrWhiteSpace(purposeCode))
             purposeCode = FirstValue(ibsBlock, "finNFSe");
+        // O campo finNFSe foi introduzido pela NT 009 e não existe nos XMLs
+        // emitidos conforme o leiaute nacional anterior. Na ausência do campo,
+        // esses documentos são NFS-e regulares; não rejeitar uma nota válida.
         if (string.IsNullOrWhiteSpace(purposeCode))
-            throw new InvalidDataException("O XML nacional não informa a finalidade da NFS-e (finNFSe).");
+            purposeCode = "0";
         string purpose = PurposeDescription(purposeCode);
         string taxDetails = ExtractTaxDetails(dpsValues, values, tribMun, tribFed, tribIbs, ibsTotals);
         string serviceLocationCode = FirstValue(locPrest, "xCidade", "cLocPrestacao");
