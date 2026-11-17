@@ -144,7 +144,7 @@ public static class NfseDanfseGenerator
         DrawParty(g, "TOMADOR / ADQUIRENTE", Margin + 2, y, PageWidth - 2 * Margin - 4, 88,
             new[]
             {
-                new Field("CNPJ / CPF / NIF", string.IsNullOrWhiteSpace(d.RecipientDocument) ? "TOMADOR/ADQUIRENTE DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e" : d.RecipientDocument),
+                new Field("CNPJ / CPF / NIF", d.RecipientDocument),
                 new Field("NOME / NOME EMPRESARIAL", d.RecipientName),
                 new Field("TELEFONE", d.RecipientPhone),
                 new Field("MUNICÍPIO / UF", $"{d.RecipientCity} / {d.RecipientState}"),
@@ -192,7 +192,7 @@ public static class NfseDanfseGenerator
                         : null)),
                 new Field("VALOR LÍQUIDO DA NFS-e", Money(d.NetAmount)),
                 new Field("TOTAL IBS / CBS", Money(d.IbscbsAmount)),
-                new Field("VALOR LÍQUIDO + IBS/CBS", Money(d.NetAmount + d.IbscbsAmount))
+                new Field("VALOR LÍQUIDO + IBS/CBS", Money(d.IbscbsAmount.HasValue ? d.NetAmount + d.IbscbsAmount.Value : d.NetAmount))
             }, title, label, value, light, line);
 
         y = 697;
