@@ -125,7 +125,7 @@ public static class NfseDanfseGenerator
             small, new XRect(473, y + 54, 94, 27), XStringFormats.TopCenter);
 
         y = 145;
-        DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 73,
+        DrawParty(g, "PRESTADOR / FORNECEDOR", Margin + 2, y, PageWidth - 2 * Margin - 4, 94,
             new[]
             {
                 new Field("CNPJ / CPF / NIF", d.IssuerDocument),
@@ -137,11 +137,11 @@ public static class NfseDanfseGenerator
                 new Field("E-MAIL", d.IssuerEmail)
             }, title, label, value, light, line);
 
-        y = 221;
-        DrawParty(g, "TOMADOR / ADQUIRENTE", Margin + 2, y, PageWidth - 2 * Margin - 4, 67,
+        y = 242;
+        DrawParty(g, "TOMADOR / ADQUIRENTE", Margin + 2, y, PageWidth - 2 * Margin - 4, 80,
             new[]
             {
-                new Field("CNPJ / CPF / NIF", d.RecipientDocument),
+                new Field("CNPJ / CPF / NIF", string.IsNullOrWhiteSpace(d.RecipientDocument) ? "TOMADOR/ADQUIRENTE DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e" : d.RecipientDocument),
                 new Field("NOME / NOME EMPRESARIAL", d.RecipientName),
                 new Field("TELEFONE", d.RecipientPhone),
                 new Field("MUNICÍPIO / UF", $"{d.RecipientCity} / {d.RecipientState}"),
@@ -149,8 +149,12 @@ public static class NfseDanfseGenerator
                 new Field("E-MAIL", d.RecipientEmail)
             }, title, label, value, light, line);
 
-        y = 291;
-        DrawParty(g, "DADOS DO SERVIÇO PRESTADO", Margin + 2, y, PageWidth - 2 * Margin - 4, 87,
+        y = 325;
+        DrawNarrativeSection(g, "DESTINATÁRIO DA OPERAÇÃO", d.DestinationDetails, Margin + 2, y, 282, 52, title, label, value, light, line);
+        DrawNarrativeSection(g, "INTERMEDIÁRIO DA OPERAÇÃO", d.IntermediaryDetails, Margin + 292, y, 282, 52, title, label, value, light, line);
+
+        y = 380;
+        DrawParty(g, "DADOS DO SERVIÇO PRESTADO", Margin + 2, y, PageWidth - 2 * Margin - 4, 98,
             new[]
             {
                 new Field("CÓDIGO DE TRIBUTAÇÃO NACIONAL", d.ServiceCodeNational),
@@ -160,8 +164,8 @@ public static class NfseDanfseGenerator
                 new Field("DESCRIÇÃO DO SERVIÇO", d.ServiceDescription)
             }, title, label, value, light, line);
 
-        y = 381;
-        DrawParty(g, "TRIBUTAÇÃO MUNICIPAL E FEDERAL", Margin + 2, y, PageWidth - 2 * Margin - 4, 76,
+        y = 481;
+        DrawParty(g, "TRIBUTAÇÃO MUNICIPAL E FEDERAL", Margin + 2, y, PageWidth - 2 * Margin - 4, 72,
             new[]
             {
                 new Field("ISSQN APURADO", Money(d.IssqnAmount)),
@@ -170,7 +174,7 @@ public static class NfseDanfseGenerator
                 new Field("IBS / CBS", Money(d.IbscbsAmount))
             }, title, label, value, light, line);
 
-        y = 460;
+        y = 556;
         DrawParty(g, "VALORES DA NFS-e", Margin + 2, y, PageWidth - 2 * Margin - 4, 65,
             new[]
             {
@@ -183,7 +187,7 @@ public static class NfseDanfseGenerator
                 new Field("VALOR LÍQUIDO + IBS/CBS", Money(d.NetAmount + d.IbscbsAmount))
             }, title, label, value, light, line);
 
-        y = 528;
+        y = 624;
         DrawParty(g, "INFORMAÇÕES COMPLEMENTARES", Margin + 2, y, PageWidth - 2 * Margin - 4, 78,
             new[]
             {
@@ -192,6 +196,20 @@ public static class NfseDanfseGenerator
 
         g.DrawString("Documento auxiliar gerado localmente a partir do XML da NFS-e do Padrão Nacional. O XML autorizado é o documento fiscal oficial.",
             small, new XRect(Margin + 7, 812, PageWidth - 2 * Margin - 14, 16), XStringFormats.Center);
+    }
+
+    private static void DrawNarrativeSection(XGraphics g, string heading, string text, double x, double y,
+        double width, double height, XFont title, XFont label, XFont value, XBrush light, XPen line)
+    {
+        DrawSection(g, heading, x, y, width, height, title, label, value, light, line);
+        var rect = new XRect(x + 5, y + 17, width - 10, height - 20);
+        var lines = WrapText(g, text, value, rect.Width);
+        double lineHeight = 7;
+        if (lines.Count * lineHeight > rect.Height + 0.1)
+            throw new InvalidDataException($"O bloco '{heading}' excede o espaço legível do DANFSe. O PDF não foi gerado para evitar perda de informação.");
+        for (int i = 0; i < lines.Count; i++)
+            g.DrawString(lines[i], value, XBrushes.Black,
+                new XRect(rect.X, rect.Y + i * lineHeight, rect.Width, lineHeight), XStringFormats.TopLeft);
     }
 
     private static void DrawParty(XGraphics g, string heading, double x, double y, double width, double height,
