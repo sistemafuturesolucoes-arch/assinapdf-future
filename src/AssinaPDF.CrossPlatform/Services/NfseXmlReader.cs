@@ -180,11 +180,16 @@ public static class NfseXmlReader
             purposeCode = FirstValue(ibsBlock, "finNFSe");
         string purpose = PurposeDescription(purposeCode);
         string taxDetails = ExtractTaxDetails(values, tribMun, tribFed, tribIbs);
+        string serviceLocationCode = FirstValue(locPrest, "xCidade", "cLocPrestacao");
+        string serviceLocation = string.IsNullOrWhiteSpace(serviceLocationCode)
+            ? ""
+            : FormatMunicipality(serviceLocationCode) +
+              (string.IsNullOrWhiteSpace(Value(locPrest, "UF")) ? "" : " / " + Value(locPrest, "UF"));
         string additional = string.Join(" · ", new[]
         {
-            $"Número DFSe: {Value(info, "nDFSe")}",
-            $"Aplicação geradora: {Value(info, "verAplic")}",
-            $"Tipo de emissão: {Value(info, "tpEmis")}",
+            Labeled("Número DFSe", Value(info, "nDFSe")),
+            Labeled("Aplicação geradora", Value(info, "verAplic")),
+            Labeled("Tipo de emissão", Value(info, "tpEmis")),
             $"Tipo de NFS-e de débito: {Value(infDps, "tpNFSeDebito")}",
             $"Tipo de NFS-e de crédito: {Value(infDps, "tpNFSeCredito")}",
             Value(infDps, "xInfComp"),
@@ -207,10 +212,12 @@ public static class NfseXmlReader
             recipientName, First(toma, "CNPJ", "CPF", "NIF"),
             Value(toma, "fone"), Value(toma, "email"), tomaAddress, tomaCity.Name, tomaCity.State,
             Value(cServ, "cTribNac"), Value(cServ, "cTribMun"), Value(cServ, "cNBS"),
-            FormatMunicipality(FirstValue(locPrest, "xCidade", "cLocPrestacao")) + " / " + Value(locPrest, "UF"),
-            serviceDescription, destinationDetails, intermediaryDetails, serviceAmount, unconditionalDiscount, conditionalDiscount,
+            serviceLocation, serviceDescription, destinationDetails, intermediaryDetails, serviceAmount, unconditionalDiscount, conditionalDiscount,
             netAmount, issqnAmount, federalWithholdings, ibscbsAmount, additional);
     }
+
+    private static string Labeled(string label, string value) =>
+        string.IsNullOrWhiteSpace(value) ? "" : $"{label}: {value}";
 
     private static string ExtractTaxDetails(params XElement?[] groups)
     {
