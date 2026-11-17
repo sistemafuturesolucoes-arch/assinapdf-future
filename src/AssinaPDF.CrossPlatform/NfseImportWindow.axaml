@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AssinaPDF.MacPrototype.NfseImportWindow"
+        Title="AssinaPDF | Central NFS-e Nacional"
+        Width="1400" Height="850" MinWidth="1050" MinHeight="650"
+        WindowStartupLocation="CenterOwner" Background="#F3F4F6">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="14">
+    <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,10">
+      <TextBlock Text="Central NFS-e Nacional · DANFSe em lote" FontSize="22" FontWeight="SemiBold" Foreground="#252A34"/>
+      <TextBlock Text="Importe vários XMLs autorizados do Padrão Nacional. Cada arquivo é validado e convertido individualmente; um erro não interrompe o lote. Os XMLs originais permanecem intactos."
+                 FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+    </StackPanel>
+    <Grid Grid.Row="1" ColumnDefinitions="280,*" ColumnSpacing="10">
+      <Border Grid.Column="0" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="8" Padding="10">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+          <Button Grid.Row="0" Content="＋ Adicionar XMLs de NFS-e" Click="AddXml_Click" Padding="10,9" Background="#6741B8" Foreground="White"/>
+          <TextBlock x:Name="CountText" Grid.Row="1" Text="Nenhuma NFS-e importada" FontSize="11" Foreground="#737B87" Margin="0,10,0,5"/>
+          <ListBox x:Name="DocumentsList" Grid.Row="2" SelectionChanged="DocumentsList_SelectionChanged">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:CompileBindings="False">
+                <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" FontSize="11" Foreground="#34383E" Margin="3,6"/>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Grid.Row="3" Spacing="6" Margin="0,8,0,0">
+            <Button Content="Exportar selecionado" Click="ExportSelected_Click" Padding="8,7" Background="#E7E9ED" Foreground="#34383E"/>
+            <Button Content="Exportar todos em PDF único" Click="ExportAll_Click" Padding="8,7" Background="#6741B8" Foreground="White"/>
+            <Button Content="Remover selecionado" Click="RemoveSelected_Click" Padding="8,7" Background="#E7E9ED" Foreground="#34383E"/>
+            <Button Content="Limpar lista" Click="ClearList_Click" Padding="8,7" Background="#F4E9E9" Foreground="#8A3D3D"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Background="White" BorderBrush="#E0E3E8" BorderThickness="1" CornerRadius="8" Padding="10">
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Text="Pré-visualização do DANFSe" FontSize="15" FontWeight="SemiBold" Foreground="#292D36"/>
+              <TextBlock Text="Visualização local do PDF gerado · Ctrl + roda do mouse para ajustar o zoom" FontSize="10" Foreground="#737B87"/>
+            </StackPanel>
+            <TextBlock x:Name="PageIndicator" Grid.Column="1" Text="Nenhum DANFSe gerado" FontSize="11" Foreground="#737B87" VerticalAlignment="Center"/>
+          </Grid>
+          <Border Grid.Row="1" Background="#E9EBEF" BorderBrush="#D9DDE4" BorderThickness="1" CornerRadius="5" Padding="8">
+            <ScrollViewer x:Name="DocumentScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#E9EBEF">
+              <StackPanel x:Name="PagesPanel" Spacing="14" HorizontalAlignment="Center"/>
+            </ScrollViewer>
+          </Border>
+          <TextBlock x:Name="StatusText" Grid.Row="2" Text="Aguardando XMLs nacionais." FontSize="10" Foreground="#666D78" TextWrapping="Wrap"/>
+        </Grid>
+      </Border>
+    </Grid>
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,9,0,0">
+      <TextBlock Text="Conversão local · Padrão Nacional NFS-e" FontSize="10" Foreground="#666D78" VerticalAlignment="Center"/>
+      <Button Grid.Column="1" Content="Fechar" Click="Close_Click" Padding="14,7" Background="#E2E5EA" Foreground="#34383E"/>
+    </Grid>
+  </Grid>
+</Window>
