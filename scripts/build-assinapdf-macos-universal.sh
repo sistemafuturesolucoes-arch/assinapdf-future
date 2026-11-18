@@ -4,12 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT="$ROOT_DIR/src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj"
 ARTIFACTS="$ROOT_DIR/artifacts"
-PUBLISH_ROOT="$ARTIFACTS/publish"
+RUN_ID="$(date +%Y%m%d-%H%M%S)"
+RUN_ROOT="$ARTIFACTS/release-assinapdf/$RUN_ID"
+PUBLISH_ROOT="$RUN_ROOT/publish"
 ARM64="$PUBLISH_ROOT/osx-arm64"
 X64="$PUBLISH_ROOT/osx-x64"
 UNIVERSAL="$PUBLISH_ROOT/osx-universal"
-APP="$ARTIFACTS/AssinaPDF.app"
-STAGING="$ARTIFACTS/macos-dmg-staging"
+APP="$RUN_ROOT/AssinaPDF.app"
+STAGING="$RUN_ROOT/macos-dmg-staging"
 VERSION="${ASSINAPDF_VERSION:-1.0.0}"
 APP_EXECUTABLE="AssinaPDF.MacPrototype"
 
@@ -17,14 +19,14 @@ command -v dotnet >/dev/null || { echo "Instale o .NET 10 SDK."; exit 1; }
 command -v lipo >/dev/null || { echo "Este script deve ser executado no macOS (lipo não encontrado)."; exit 1; }
 command -v hdiutil >/dev/null || { echo "hdiutil não encontrado."; exit 1; }
 
-mkdir -p "$PUBLISH_ROOT" "$ARTIFACTS/installers"
+if [[ -e "$RUN_ROOT" ]]; then echo "Pasta de saída já existe: $RUN_ROOT"; exit 1; fi
+mkdir -p "$PUBLISH_ROOT" "$RUN_ROOT/installers"
 dotnet restore "$PROJECT"
 dotnet publish "$PROJECT" -c Release -r osx-arm64 --self-contained true \
   -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o "$ARM64"
 dotnet publish "$PROJECT" -c Release -r osx-x64 --self-contained true \
   -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o "$X64"
 
-rm -rf "$UNIVERSAL" "$APP" "$STAGING"
 mkdir -p "$UNIVERSAL" "$APP/Contents/MacOS" "$APP/Contents/Resources" "$STAGING"
 ditto "$ARM64" "$UNIVERSAL"
 
@@ -48,8 +50,7 @@ done < <(find "$ARM64" -type f -print0)
 ditto "$UNIVERSAL" "$APP/Contents/MacOS"
 chmod +x "$APP/Contents/MacOS/$APP_EXECUTABLE"
 
-ICONSET="$ARTIFACTS/AssinaPDF.iconset"
-rm -rf "$ICONSET"
+ICONSET="$RUN_ROOT/AssinaPDF.iconset"
 mkdir -p "$ICONSET"
 SOURCE_LOGO="$ROOT_DIR/src/AssinaPDF.CrossPlatform/logo-future.png"
 if [[ -f "$SOURCE_LOGO" ]]; then
@@ -99,8 +100,7 @@ Na primeira abertura, o macOS pode solicitar confirmação de segurança porque 
 A versão pública deve ser assinada com Developer ID e notarizada pela Apple.
 INFO
 
-DMG="$ARTIFACTS/installers/AssinaPDF-macOS-Universal-$VERSION.dmg"
-rm -f "$DMG"
+DMG="$RUN_ROOT/installers/AssinaPDF-macOS-Universal-$VERSION.dmg"
 hdiutil create -volname "AssinaPDF | Future Soluções" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
 
 echo "Instalador macOS Universal gerado: $DMG"
