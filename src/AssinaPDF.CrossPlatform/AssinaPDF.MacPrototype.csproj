@@ -32,6 +32,7 @@
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="Aspose.PDF.FOSS" Version="26.11.0" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="logo-future.png" CopyToOutputDirectory="PreserveNewest" />
