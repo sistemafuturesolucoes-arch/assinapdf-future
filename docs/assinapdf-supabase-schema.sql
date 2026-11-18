@@ -180,7 +180,7 @@ alter default privileges for role postgres in schema public
 insert into public.assinapdf_plans (code, name, description, price_cents, billing_interval, device_limit, sort_order)
 values
   ('free', 'Gratuito', 'Plano gratuito do AssinaPDF', 0, null, 1, 10),
-  ('premium', 'Premium', 'Plano pago do AssinaPDF; preço e periodicidade definidos no painel', null, 'monthly', 2, 20)
+  ('premium', 'Premium', 'Plano pago do AssinaPDF; preço e periodicidade definidos no painel', null, null, 1, 20)
 on conflict (code) do nothing;
 
 insert into public.assinapdf_plan_features (plan_id, feature_key, is_enabled)
