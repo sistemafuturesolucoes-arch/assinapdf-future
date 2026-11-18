@@ -27,13 +27,19 @@ No painel Asaas do mesmo ambiente da chave de API, cadastre um webhook:
   - `SUBSCRIPTION_DELETED`
   - `SUBSCRIPTION_INACTIVATED`
   - `PAYMENT_CREATED`
+  - `PAYMENT_UPDATED`
   - `PAYMENT_CONFIRMED`
   - `PAYMENT_RECEIVED`
   - `PAYMENT_OVERDUE`
   - `PAYMENT_REFUNDED`
+  - `PAYMENT_PARTIALLY_REFUNDED`
+  - `PAYMENT_RECEIVED_IN_CASH_UNDONE`
+  - `PAYMENT_CHARGEBACK_REQUESTED`
+  - `PAYMENT_CHARGEBACK_DISPUTE`
   - `PAYMENT_DELETED`
+  - `PAYMENT_RESTORED`
 
-O endpoint confere o token do cabeçalho `asaas-access-token`, registra os eventos e trata duplicidades usando o identificador do evento. Não use a página de retorno do checkout como confirmação de pagamento; a liberação acontece pelo webhook.
+O endpoint confere o token do cabeçalho `asaas-access-token`, registra os eventos e trata duplicidades usando o identificador do evento. Também compara a data de criação dos eventos de uma mesma cobrança para não deixar uma notificação atrasada desfazer um pagamento mais recente. Não use a página de retorno do checkout como confirmação de pagamento; a liberação acontece pelo webhook.
 
 ## 3. Preço do Premium
 
