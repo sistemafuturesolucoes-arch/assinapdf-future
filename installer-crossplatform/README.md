@@ -1,63 +1,47 @@
-# AssinaPDF CrossPlatform - Instalador Windows x64
+# AssinaPDF CrossPlatform - distribuição Windows e macOS
 
-## Estado
+O aplicativo CrossPlatform é independente do projeto Windows legado. Os instaladores são gerados manualmente, sem GitHub Actions, na branch de desenvolvimento dedicada.
 
-O workflow de distribuição gera um instalador MSI x64 autocontido. O pacote inclui o runtime .NET necessário para executar o aplicativo e não exige instalação prévia do .NET Desktop Runtime no computador do usuário.
+## Requisitos
 
-O projeto e o instalador Windows legado permanecem independentes e não devem ser alterados por este pacote.
+- .NET 10 SDK.
+- Windows x64 para gerar e testar o MSI.
+- macOS com Xcode Command Line Tools (lipo, sips, iconutil, codesign, hdiutil) para montar o pacote universal.
+- WiX Toolset SDK 5 é restaurado pelo projeto do instalador.
 
-## Requisitos do computador
+## Windows x64
 
-- Windows 10 ou Windows 11 de 64 bits.
-- Permissão de administrador para instalar em Program Files.
-- Não é necessário instalar .NET separadamente.
-
-## Arquivos publicados
-
-- Executável: `AssinaPDF.MacPrototype.exe`
-- Biblioteca nativa PDFium: `pdfium.dll` e dependências correspondentes.
-- Logo da Future: `logo-future.png`
-- Runtime .NET 10 x64 autocontido.
-
-## Instalação
-
-O artefato do GitHub Actions chamado `AssinaPDF-Windows-x64-Installer` contém:
-
-`AssinaPDF-CrossPlatform-Setup-x64.msi`
-
-O MSI instala em:
-
-`C:\Program Files\Future Soluções\AssinaPDF`
-
-Também cria atalhos no Menu Iniciar e na Área de Trabalho. A desinstalação é feita em Configurações do Windows > Aplicativos > Aplicativos instalados.
-
-## Compilação manual do MSI
-
-Na raiz do repositório, após publicar o aplicativo:
+Na raiz do repositório, execute no PowerShell:
 
 ```powershell
-dotnet publish ./src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o publish/win-x64
-
-dotnet build ./installer-crossplatform/AssinaPDF.CrossPlatform.wixproj -c Release -p:InstallerPlatform=x64 -p:PublishDir="$PWD/publish/win-x64/"
+.\scripts\build-assinapdf-windows.ps1
 ```
 
-O ícone Windows é gerado a partir do PNG oficial antes da publicação:
+O script publica o aplicativo self-contained, gera o MSI WiX e salva o instalador e o SHA-256 em uma nova pasta artifacts/release-assinapdf/<data-hora>/. As saídas anteriores não são apagadas.
 
-```powershell
-python -m pip install Pillow
-python scripts/generate_windows_icon.py
+## macOS Universal (Apple Silicon + Intel)
+
+Em um Mac, execute na raiz do repositório:
+
+```bash
+chmod +x ./scripts/build-assinapdf-macos-universal.sh
+./scripts/build-assinapdf-macos-universal.sh
 ```
 
-## Verificações obrigatórias antes de distribuir
+O script publica osx-arm64 e osx-x64, mescla os binários Mach-O correspondentes com lipo, monta AssinaPDF.app e cria um DMG universal. A saída fica em uma nova pasta artifacts/release-assinapdf/<data-hora>/.
 
-- Instalação em Windows limpo x64.
-- Inicialização pelo atalho do Menu Iniciar e da Área de Trabalho.
-- Abertura e renderização de PDF com PDFium.
-- Assinatura e validação com certificado A1.
-- Atualização por cima de uma versão anterior.
-- Desinstalação e remoção dos atalhos.
-- Conferência de que documentos, certificados e dados do usuário não são removidos indevidamente.
+## Homologação obrigatória
 
-## Segurança e distribuição
+Antes de distribuir, testar em máquinas limpas:
 
-A assinatura de código Authenticode ainda deve ser configurada antes da distribuição pública. O MSI deve ser testado em uma máquina Windows limpa antes de ser considerado instalador final.
+- Instalação, primeira abertura e desinstalação no Windows 10/11 x64.
+- Abertura de PDF e PDFium em Windows e macOS Intel/Apple Silicon.
+- Certificado A1, assinatura PAdES e validação independente.
+- Cadastro/login, restauração de sessão, ativação de chave manual e expiração.
+- Premium: bloqueio sem licença, ativação de dispositivo, limite de dispositivos e revogação pelo CRM.
+- Asaas Sandbox: checkout recorrente, confirmação, atraso, estorno, cancelamento e webhooks duplicados.
+- Atualização sobre versão anterior e preservação dos dados do usuário.
+
+## Assinatura dos instaladores
+
+O MSI ainda precisa de certificado Authenticode para distribuição pública. O pacote macOS gerado pelo script recebe assinatura ad-hoc apenas para homologação local; distribuição pública exige Developer ID e notarização da Apple. Não distribuir os artefatos de teste como releases públicos antes dessas etapas.
