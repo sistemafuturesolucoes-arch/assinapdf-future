@@ -87,11 +87,8 @@ public sealed class SupabaseAuthService
     public async Task<string> CreateMonthlyCheckoutAsync()
     {
         await EnsureSessionAsync();
-        using var request = new HttpRequestMessage(HttpMethod.Post, SupabaseUrl + "/functions/v1/assinapdf-asaas");
-        request.Headers.Add("apikey", PublishableKey);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-        request.Content = new StringContent(JsonSerializer.Serialize(new { action = "create_monthly_checkout" }), Encoding.UTF8, "application/json");
-        using var response = await Http.SendAsync(request);
+        using var response = await SendAuthenticatedFunctionAsync(
+            "assinapdf-asaas", new { action = "create_monthly_checkout" });
         var json = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(json, "A contratação online ainda não está disponível."));
@@ -199,13 +196,32 @@ public sealed class SupabaseAuthService
         return await Http.SendAsync(request);
     }
 
-    private async Task<HttpResponseMessage> SendFunctionAsync(object payload)
+    private Task<HttpResponseMessage> SendFunctionAsync(object payload) =>
+        SendAuthenticatedFunctionAsync("assinapdf-license", payload);
+
+    private async Task<HttpResponseMessage> SendAuthenticatedFunctionAsync(string functionName, object payload)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, SupabaseUrl + "/functions/v1/assinapdf-license");
-        request.Headers.Add("apikey", PublishableKey);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        return await Http.SendAsync(request);
+        await EnsureSessionAsync();
+
+        async Task<HttpResponseMessage> SendAsync()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, SupabaseUrl + "/functions/v1/" + functionName);
+            request.Headers.Add("apikey", PublishableKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            return await Http.SendAsync(request);
+        }
+
+        var response = await SendAsync();
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_refreshToken))
+        {
+            response.Dispose();
+            await RefreshSessionAsync();
+            if (string.IsNullOrWhiteSpace(_accessToken))
+                throw new InvalidOperationException("Sua sessão expirou. Entre novamente na sua conta AssinaPDF.");
+            response = await SendAsync();
+        }
+        return response;
     }
 
     private static string ReadError(string json, string fallback)
