@@ -123,7 +123,7 @@ public sealed class AccountWindow : Window
 
     private async void SignIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        await RunAsync(async () => await _auth.SignInAsync(_email.Text ?? "", _password.Password ?? ""));
+        await RunAsync(async () => await _auth.SignInAsync(_email.Text ?? "", _password.Text ?? ""));
         await RefreshAccountLabelAsync();
     }
 
