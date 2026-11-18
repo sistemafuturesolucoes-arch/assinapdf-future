@@ -1,54 +1,36 @@
-# ImageSharp: atualização de segurança e licença de build
+# ImageSharp: dependência transitiva e política de software gratuito
 
-## Por que esta dependência existe
+## Decisão do projeto
 
-O projeto CrossPlatform usa `Econet.DanfeDacte`, que depende de `PdfSharpCore`. O pacote `PdfSharpCore 1.3.67` declara ImageSharp a partir de `1.0.4`, sem um limite superior. Sem uma fixação explícita, o restore pode selecionar uma versão antiga e vulnerável.
+O AssinaPDF não deve exigir uma chave paga nem uma licença adicional para compilar ou executar suas funções.
 
-O projeto fixa `SixLabors.ImageSharp 4.1.3`, linha compatível com o alvo `.NET 10` e que contém as correções de segurança publicadas em setembro/outubro de 2026 para os avisos que afetavam a versão 2.1.11.
+Por isso, o projeto **não referencia SixLabors.ImageSharp diretamente**. A biblioteca permanece apenas como dependência transitiva de `PdfSharpCore`, utilizado pelo pacote de documentos fiscais `Econet.DanfeDacte`.
 
-## Requisito de licença
+A página do NuGet de PdfSharpCore informa que ImageSharp e SixLabors.Fonts são licenciados sob Apache 2.0 quando distribuídos como parte do PdfSharpCore. Essa é a modalidade de uso que estamos preservando: dependência transitiva, sem adicionar ImageSharp como pacote direto do AssinaPDF.
 
-A referência explícita a ImageSharp 4.x ativa a validação de licença da Six Labors durante o build. Portanto, o build local precisa de uma chave válida. A chave **não** deve ser enviada pelo chat, incluída no repositório, gravada no projeto ou compartilhada em logs.
+Referência: https://www.nuget.org/packages/PdfSharpCore/1.3.67
 
-A Six Labors informa que organizações com fins lucrativos e receita bruta anual inferior a USD 1 milhão podem solicitar uma licença Community gratuita, sujeita à avaliação/aprovação. Acima desse limite, o uso direto em software fechado com fins lucrativos exige licença comercial conforme os termos do fornecedor.
+## Segurança
 
-Solicitação e critérios: https://licensing.sixlabors.com/
-Termos e planos: https://sixlabors.com/pricing/
-Documentação de configuração: https://docs.sixlabors.com/articles/imagesharp/
+Em setembro de 2026 foram publicados avisos de segurança que afetam versões antigas do ImageSharp. Não devemos esconder esses avisos, desativar NuGet Audit ou declarar que a dependência está corrigida sem verificar a versão efetivamente resolvida no restore.
 
-## Configuração no Windows (PowerShell)
+O pacote PdfSharpCore declara ImageSharp com versão mínima `1.0.4`, sem limite superior. Ao manter a dependência transitiva, a versão efetivamente selecionada pelo NuGet deve ser conferida no ambiente local após o restore.
 
-1. Solicite e receba sua licença diretamente da Six Labors.
-2. Abra um PowerShell e defina a variável apenas na sessão atual, usando o conteúdo completo fornecido pelo fornecedor:
+Auditoria:
 
 ```powershell
-$env:SIXLABORS_LICENSE_KEY = 'COLE_AQUI_O_CONTEUDO_COMPLETO_DA_LICENCA'
-```
-
-3. Execute restore, testes e build:
-
-```powershell
-dotnet restore .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj
-dotnet test .\tests\AssinaPDF.CrossPlatform.Tests\AssinaPDF.CrossPlatform.Tests.csproj -c Release
-dotnet build .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj -c Release
-```
-
-Os scripts de publicação do projeto herdam a variável de ambiente da sessão PowerShell. Não use o texto de exemplo como se fosse uma chave real.
-
-## Regras de segurança
-
-- Não adicionar `sixlabors.lic` ao Git.
-- Não inserir chaves em `.csproj`, scripts, documentação, commits, issues ou logs.
-- Não desativar o NuGet Audit para ocultar avisos.
-- Não voltar para ImageSharp 2.1.11 apenas para evitar a validação de licença: essa versão apresentou os avisos de segurança reportados pelo NuGet.
-- Não considerar a atualização concluída até que o restore, build e testes sejam executados localmente com uma licença válida e o comando de auditoria de pacotes seja repetido.
-
-## Verificação de segurança
-
-Após o restore, execute:
-
-```powershell
+dotnet list .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj package --include-transitive
 dotnet list .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj package --vulnerable --include-transitive
 ```
 
-A auditoria deve confirmar que os avisos associados à versão antiga do ImageSharp deixaram de aparecer. Registre e avalie separadamente qualquer novo aviso transitivo.
+Se o NuGet selecionar uma versão vulnerável, a correção deve ser feita sem introduzir uma licença comercial obrigatória ao produto. As alternativas são substituir a dependência que traz ImageSharp por uma biblioteca PDF/DANFE com licença permissiva adequada, ou avaliar uma versão transitiva corrigida cuja licença permita essa distribuição sem chave. Não adicionar uma referência direta a ImageSharp 4.x ou 3.2.x como solução automática.
+
+## Regras
+
+- Não exigir chave `SIXLABORS_LICENSE_KEY`.
+- Não armazenar licença ou credencial de fornecedor no repositório.
+- Não adicionar `SixLabors.ImageSharp` como PackageReference direto.
+- Não desativar o NuGet Audit.
+- Não ocultar alertas de segurança.
+- Manter a proposta de software gratuito e dependências compatíveis com a distribuição planejada.
+- Validar a versão resolvida, build e testes localmente antes de considerar a alteração concluída.
