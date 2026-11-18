@@ -99,6 +99,24 @@ public sealed class SupabaseAuthService
         return plan.TryGetProperty("code", out var code) && string.Equals(code.GetString(), "premium", StringComparison.OrdinalIgnoreCase);
     }
 
+
+    public async Task RegisterCurrentDeviceAsync()
+    {
+        await EnsureSessionAsync();
+        var fingerprint = await CredentialStore.GetDeviceFingerprintAsync();
+        using var response = await SendFunctionAsync(new
+        {
+            action = "register_device",
+            device_fingerprint = fingerprint,
+            device_label = Environment.MachineName,
+            platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "unknown",
+            app_version = "1.0.0"
+        });
+        var json = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(json, "Não foi possível validar este dispositivo."));
+    }
+
     public async Task SignOutAsync()
     {
         if (IsSignedIn)
@@ -199,6 +217,24 @@ public sealed class SupabaseAuthService
         private static string WindowsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "FutureSolucoes", "AssinaPDF", "session.bin");
+
+
+        public static async Task<string> GetDeviceFingerprintAsync()
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FutureSolucoes", "AssinaPDF");
+            var path = Path.Combine(directory, "device.id");
+            Directory.CreateDirectory(directory);
+            if (File.Exists(path))
+            {
+                var existing = (await File.ReadAllTextAsync(path)).Trim();
+                if (existing.Length >= 32) return existing;
+            }
+            var fingerprint = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            await File.WriteAllTextAsync(path, fingerprint);
+            return fingerprint;
+        }
 
         public static async Task WriteAsync(string value)
         {
