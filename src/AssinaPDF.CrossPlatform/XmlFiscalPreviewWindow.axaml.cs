@@ -13,6 +13,11 @@ public partial class XmlFiscalPreviewWindow : Window
     private readonly bool _isNfce;
     private readonly ObservableCollection<string> _fields = new();
 
+    // Required by Avalonia's runtime XAML loader; the regular flow supplies the document type.
+    public XmlFiscalPreviewWindow() : this(false)
+    {
+    }
+
     public XmlFiscalPreviewWindow(bool isNfce)
     {
         _isNfce = isNfce;
