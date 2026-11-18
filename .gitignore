@@ -37,3 +37,7 @@ Thumbs.db
 src/AssinaPDF.CrossPlatform/**/*.bak*
 src/AssinaPDF.CrossPlatform/**/*.recuperacao
 src/AssinaPDF.CrossPlatform/**/*backup*
+
+# Chaves de licença locais (nunca versionar)
+**/sixlabors.lic
+sixlabors.lic
