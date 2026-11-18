@@ -19,12 +19,24 @@
             <TextBlock Text="AssinaPDF" FontSize="22" FontWeight="SemiBold" Foreground="#292D36"/>
             <TextBlock Text="Documentos seguros. Processos simples." FontSize="12" Foreground="#747B86"/>
           </StackPanel>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-            <TextBlock x:Name="AccountStatusText" Text="Minha conta" FontSize="11"
-                       Foreground="#777E89" VerticalAlignment="Center"/>
-            <Button Content="Minha conta / Premium" Click="OpenAccount_Click"
-                    Background="#6741B8" Foreground="White" BorderThickness="0" Padding="14,8"/>
-          </StackPanel>
+          <Button x:Name="AccountMenuButton" Grid.Column="2" Click="ToggleAccountMenu_Click"
+                  Background="#F5F2FB" BorderBrush="#DED5EF" BorderThickness="1"
+                  CornerRadius="9" Padding="13,8" HorizontalContentAlignment="Stretch">
+            <StackPanel Spacing="3">
+              <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                <TextBlock Text="Minha conta" FontSize="12" FontWeight="SemiBold"
+                           Foreground="#40345B"/>
+                <Border Background="#E7DDF8" CornerRadius="9" Padding="7,2">
+                  <TextBlock x:Name="AccountPlanBadge" Text="Gratuito" FontSize="10"
+                             FontWeight="SemiBold" Foreground="#6741B8"/>
+                </Border>
+                <TextBlock Text="⌄" FontSize="13" Foreground="#6741B8"/>
+              </StackPanel>
+              <TextBlock x:Name="AccountStatusText" Text="Entre ou crie sua conta"
+                         FontSize="10" Foreground="#777E89" MaxWidth="220"
+                         TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+          </Button>
         </Grid>
       </Border>
 
@@ -156,6 +168,41 @@
                      Foreground="#666D78" VerticalAlignment="Center"/>
         </Grid>
       </Border>
+
+      <Popup x:Name="AccountMenuPopup" Placement="Bottom" IsLightDismissEnabled="True">
+        <Border Width="310" Background="White" BorderBrush="#E0E3E8"
+                BorderThickness="1" CornerRadius="12" Padding="18">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Sua conta" FontSize="17" FontWeight="SemiBold"
+                       Foreground="#292D36"/>
+            <TextBlock x:Name="AccountMenuNameText" Text="Visitante"
+                       FontSize="13" FontWeight="SemiBold" Foreground="#454B55"/>
+            <TextBlock x:Name="AccountMenuEmailText" Text="Entre para acessar sua conta"
+                       FontSize="11" Foreground="#777E89" TextWrapping="Wrap"/>
+            <Border Background="#F6F3FA" CornerRadius="8" Padding="11">
+              <StackPanel Spacing="5">
+                <TextBlock x:Name="AccountMenuProfileText" Text="Perfil: Cliente"
+                           FontSize="11" Foreground="#5E6470"/>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Plano:" FontSize="12" Foreground="#5E6470"/>
+                  <TextBlock x:Name="AccountMenuPlanText" Text="Gratuito"
+                             FontSize="12" FontWeight="SemiBold" Foreground="#6741B8"/>
+                </StackPanel>
+                <TextBlock x:Name="AccountMenuValidityText" Text="Sem validade Premium ativa"
+                           FontSize="11" Foreground="#5E6470"/>
+              </StackPanel>
+            </Border>
+            <TextBlock x:Name="AccountMenuDeviceText" Text="Dispositivo atual"
+                       FontSize="11" Foreground="#777E89" TextWrapping="Wrap"/>
+            <Button Content="Gerenciar conta e plano" Click="OpenAccountFromMenu_Click"
+                    Background="#6741B8" Foreground="White" BorderThickness="0"
+                    Padding="12,9" HorizontalAlignment="Stretch"/>
+            <Button Content="Sair da conta" Click="SignOutFromMenu_Click"
+                    Background="#F0F1F3" Foreground="#454B55" BorderThickness="0"
+                    Padding="12,8" HorizontalAlignment="Stretch"/>
+          </StackPanel>
+        </Border>
+      </Popup>
     </Grid>
 
     <!-- ÁREA DE TRABALHO: FLUXOS EXISTENTES PRESERVADOS -->
