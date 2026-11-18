@@ -130,7 +130,10 @@ public partial class MainWindow : Window
         try
         {
             if (_accountService.IsSignedIn && await _accountService.HasPremiumAsync())
+            {
+                await _accountService.RegisterCurrentDeviceAsync();
                 return true;
+            }
         }
         catch { }
 
