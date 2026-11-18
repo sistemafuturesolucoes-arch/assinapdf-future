@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AccountMenuPopup.PlacementTarget = AccountMenuButton;
         LoadFutureLogo();
         PdfScrollViewer.SizeChanged += (_, _) => ApplyZoom();
         PdfScrollViewer.AddHandler(
@@ -90,7 +91,40 @@ public partial class MainWindow : Window
     }
 
 
+    private async void ToggleAccountMenu_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (!AccountMenuPopup.IsOpen)
+            await RefreshAccountStatusAsync();
+        AccountMenuPopup.IsOpen = !AccountMenuPopup.IsOpen;
+    }
+
+    private async void OpenAccountFromMenu_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        AccountMenuPopup.IsOpen = false;
+        await OpenAccountAsync();
+    }
+
+    private async void SignOutFromMenu_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        AccountMenuPopup.IsOpen = false;
+        try
+        {
+            await _accountService.SignOutAsync();
+            DashboardStatusText.Text = "Você saiu da sua conta AssinaPDF.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível sair da conta: {ex.Message}";
+        }
+        await RefreshAccountStatusAsync();
+    }
+
     private async void OpenAccount_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await OpenAccountAsync();
+    }
+
+    private async Task OpenAccountAsync()
     {
         await _accountService.InitializeAsync();
         await new AccountWindow(_accountService).ShowDialog(this);
@@ -102,13 +136,42 @@ public partial class MainWindow : Window
         try
         {
             await _accountService.InitializeAsync();
-            bool premium = _accountService.IsSignedIn && await _accountService.HasPremiumAsync();
-            AccountStatusText.Text = premium ? "Premium ativo" :
-                (_accountService.IsSignedIn ? _accountService.Email ?? "Conta conectada" : "Minha conta");
+            var summary = await _accountService.GetLicenseSummaryAsync();
+            bool signedIn = _accountService.IsSignedIn;
+            string displayName = !string.IsNullOrWhiteSpace(_accountService.FullName)
+                ? _accountService.FullName!
+                : (_accountService.Email ?? "Visitante");
+
+            AccountStatusText.Text = signedIn
+                ? (_accountService.Email ?? "Conta conectada")
+                : "Entre ou crie sua conta";
+            AccountPlanBadge.Text = summary.PlanName;
+            AccountMenuNameText.Text = displayName;
+            AccountMenuEmailText.Text = signedIn ? (_accountService.Email ?? "") : "Entre para sincronizar seu plano e seus dispositivos.";
+            AccountMenuProfileText.Text = signedIn ? "Perfil: Cliente" : "Perfil: Visitante";
+            AccountMenuPlanText.Text = summary.PlanName;
+            AccountMenuValidityText.Text = summary.ValidUntil.HasValue
+                ? $"Validade até {summary.ValidUntil.Value.ToLocalTime():dd/MM/yyyy} · {summary.StatusText}"
+                : summary.StatusText;
+            string platform = OperatingSystem.IsWindows() ? "Windows" : OperatingSystem.IsMacOS() ? "macOS" : "Dispositivo";
+            AccountMenuDeviceText.Text = signedIn
+                ? $"Dispositivo atual: {Environment.MachineName} ({platform})"
+                : "Dispositivos vinculados aparecem após entrar na conta.";
+            AccountPlanBadge.Foreground = summary.IsPremium
+                ? Avalonia.Media.Brush.Parse("#27865A")
+                : Avalonia.Media.Brush.Parse("#6741B8");
         }
-        catch
+        catch (Exception ex)
         {
-            AccountStatusText.Text = _accountService.IsSignedIn ? _accountService.Email ?? "Minha conta" : "Minha conta";
+            AccountStatusText.Text = _accountService.IsSignedIn
+                ? (_accountService.Email ?? "Conta conectada")
+                : "Minha conta";
+            AccountPlanBadge.Text = "Indisponível";
+            AccountMenuNameText.Text = _accountService.FullName ?? "Minha conta";
+            AccountMenuEmailText.Text = _accountService.Email ?? "Não foi possível consultar a conta.";
+            AccountMenuPlanText.Text = "Não foi possível consultar";
+            AccountMenuValidityText.Text = ex.Message;
+            AccountMenuProfileText.Text = _accountService.IsSignedIn ? "Perfil: Cliente" : "Perfil: Visitante";
         }
     }
 
