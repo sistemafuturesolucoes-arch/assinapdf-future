@@ -7,6 +7,8 @@
     <ApplicationIcon Condition="'$(RuntimeIdentifier)' == 'win-x64'">Assets/assinapdf.ico</ApplicationIcon>
     <!-- Required by Avalonia NativeWebView when creating its native child window on Windows. -->
     <ApplicationManifest Condition="'$(OS)' == 'Windows_NT'">app.manifest</ApplicationManifest>
+    <!-- Read the Six Labors license from the local environment; never store the key in source control. -->
+    <SixLaborsLicenseKey Condition="'$(SIXLABORS_LICENSE_KEY)' != ''">$(SIXLABORS_LICENSE_KEY)</SixLaborsLicenseKey>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
@@ -29,7 +31,9 @@
          package does not declare the dependency. Keep it explicit so the
          assembly is restored and copied to build/publish output. -->
     <PackageReference Include="PdfSharpCore" Version="1.3.67" />
-    <!-- Pin ImageSharp to the patched .NET 8+ line; PdfSharpCore declares >= 1.0.4. -->
+    <!-- PdfSharpCore (used by Econet.DanfeDacte) requests ImageSharp >= 1.0.4.
+         Pin the transitive dependency to the patched .NET 8+ release for this net10 app.
+         This explicit reference requires a valid Six Labors license key at build time. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="4.1.3" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="Aspose.PDF.FOSS" Version="26.11.0" />
