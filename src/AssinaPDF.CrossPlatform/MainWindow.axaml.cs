@@ -118,7 +118,10 @@ public partial class MainWindow : Window
         {
             await _accountService.InitializeAsync();
             if (_accountService.IsSignedIn && await _accountService.HasPremiumAsync())
+            {
+                await _accountService.RegisterCurrentDeviceAsync();
                 return true;
+            }
         }
         catch { }
 
