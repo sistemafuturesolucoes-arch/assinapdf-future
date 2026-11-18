@@ -29,6 +29,8 @@
          package does not declare the dependency. Keep it explicit so the
          assembly is restored and copied to build/publish output. -->
     <PackageReference Include="PdfSharpCore" Version="1.3.67" />
+    <!-- PdfSharpCore accepts ImageSharp >= 1.0.4; pin the patched 2.x line to avoid GHSA-rxmq-m78w-7wmc. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.11" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="Aspose.PDF.FOSS" Version="26.11.0" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
