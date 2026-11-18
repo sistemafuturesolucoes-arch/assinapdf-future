@@ -83,6 +83,24 @@ public sealed class SupabaseAuthService
         return "Premium ativado com sucesso!";
     }
 
+
+    public async Task<string> CreateMonthlyCheckoutAsync()
+    {
+        await EnsureSessionAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, SupabaseUrl + "/functions/v1/assinapdf-asaas");
+        request.Headers.Add("apikey", PublishableKey);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        request.Content = new StringContent(JsonSerializer.Serialize(new { action = "create_monthly_checkout" }), Encoding.UTF8, "application/json");
+        using var response = await Http.SendAsync(request);
+        var json = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(json, "A contratação online ainda não está disponível."));
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("checkout_url", out var url) || string.IsNullOrWhiteSpace(url.GetString()))
+            throw new InvalidOperationException("O Asaas não retornou o link de pagamento.");
+        return url.GetString()!;
+    }
+
     public async Task<bool> HasPremiumAsync()
     {
         await EnsureSessionAsync();
