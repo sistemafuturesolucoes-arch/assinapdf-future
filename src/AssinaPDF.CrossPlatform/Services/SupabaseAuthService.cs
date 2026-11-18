@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 
 namespace AssinaPDF.MacPrototype.Services;
 
@@ -163,12 +164,30 @@ public sealed class SupabaseAuthService
             action = "register_device",
             device_fingerprint = fingerprint,
             device_label = Environment.MachineName,
-            platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "unknown",
-            app_version = "1.0.0"
+            platform = GetCurrentDevicePlatform(),
+            app_version = typeof(SupabaseAuthService).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"
         });
         var json = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(json, "Não foi possível validar este dispositivo."));
+    }
+
+    private static string GetCurrentDevicePlatform()
+    {
+        if (OperatingSystem.IsWindows() && RuntimeInformation.ProcessArchitecture == Architecture.X64)
+            return "windows-x64";
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.Arm64 => "macos-arm64",
+                Architecture.X64 => "macos-x64",
+                _ => throw new PlatformNotSupportedException("A arquitetura deste Mac não é suportada pelo AssinaPDF.")
+            };
+        }
+
+        throw new PlatformNotSupportedException("O AssinaPDF oferece ativação de dispositivos no Windows x64 e macOS Intel/Apple Silicon.");
     }
 
     public async Task SignOutAsync()
