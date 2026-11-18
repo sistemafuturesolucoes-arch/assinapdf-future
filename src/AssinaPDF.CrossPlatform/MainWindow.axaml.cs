@@ -114,19 +114,31 @@ public partial class MainWindow : Window
 
     private async Task<bool> EnsurePremiumAccessAsync()
     {
+        await _accountService.InitializeAsync();
+        bool premium = false;
         try
         {
-            await _accountService.InitializeAsync();
-            if (_accountService.IsSignedIn && await _accountService.HasPremiumAsync())
-            {
-                await _accountService.RegisterCurrentDeviceAsync();
-                return true;
-            }
+            premium = _accountService.IsSignedIn && await _accountService.HasPremiumAsync();
         }
         catch { }
 
+        if (premium)
+        {
+            try
+            {
+                await _accountService.RegisterCurrentDeviceAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DashboardStatusText.Text = ex.Message;
+                return false;
+            }
+        }
+
         await new AccountWindow(_accountService).ShowDialog(this);
         await RefreshAccountStatusAsync();
+
         try
         {
             if (_accountService.IsSignedIn && await _accountService.HasPremiumAsync())
@@ -135,7 +147,11 @@ public partial class MainWindow : Window
                 return true;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = ex.Message;
+            return false;
+        }
 
         DashboardStatusText.Text = "Este recurso faz parte do AssinaPDF Premium. Entre e ative uma chave válida para continuar.";
         return false;
