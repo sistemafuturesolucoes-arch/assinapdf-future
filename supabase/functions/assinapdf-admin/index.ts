@@ -17,7 +17,12 @@ const allowedOrigins = new Set([
 ]);
 
 function corsHeaders(origin: string | null) {
-  const allowedOrigin = origin && allowedOrigins.has(origin) ? origin : "https://crm.futuresolucoes.com.br";
+  const isTrustedVercelPreview = !!origin
+    && origin.startsWith("https://spc-vision-crm-")
+    && origin.endsWith(".vercel.app");
+  const allowedOrigin = origin && (allowedOrigins.has(origin) || isTrustedVercelPreview)
+    ? origin
+    : "https://crm.futuresolucoes.com.br";
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
