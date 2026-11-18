@@ -29,6 +29,7 @@ public partial class MainWindow : Window
 {
     private readonly CertificateStoreService _certificateStore = new();
     private readonly EditorHistoryService _editorHistory = new();
+    private readonly SupabaseAuthService _accountService = SupabaseAuthService.Instance;
     private readonly List<CertificateInfo> _certificates = new();
 
     private Bitmap? _futureLogo;
@@ -85,6 +86,53 @@ public partial class MainWindow : Window
         DashboardView.IsVisible = true;
         WorkspaceView.IsVisible = false;
         RefreshCertificates();
+        _ = RefreshAccountStatusAsync();
+    }
+
+
+    private async void OpenAccount_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await _accountService.InitializeAsync();
+        await new AccountWindow(_accountService).ShowDialog(this);
+        await RefreshAccountStatusAsync();
+    }
+
+    private async Task RefreshAccountStatusAsync()
+    {
+        try
+        {
+            await _accountService.InitializeAsync();
+            bool premium = _accountService.IsSignedIn && await _accountService.HasPremiumAsync();
+            AccountStatusText.Text = premium ? "Premium ativo" :
+                (_accountService.IsSignedIn ? _accountService.Email ?? "Conta conectada" : "Minha conta");
+        }
+        catch
+        {
+            AccountStatusText.Text = _accountService.IsSignedIn ? _accountService.Email ?? "Minha conta" : "Minha conta";
+        }
+    }
+
+    private async Task<bool> EnsurePremiumAccessAsync()
+    {
+        try
+        {
+            await _accountService.InitializeAsync();
+            if (_accountService.IsSignedIn && await _accountService.HasPremiumAsync())
+                return true;
+        }
+        catch { }
+
+        await new AccountWindow(_accountService).ShowDialog(this);
+        await RefreshAccountStatusAsync();
+        try
+        {
+            if (_accountService.IsSignedIn && await _accountService.HasPremiumAsync())
+                return true;
+        }
+        catch { }
+
+        DashboardStatusText.Text = "Este recurso faz parte do AssinaPDF Premium. Entre e ative uma chave válida para continuar.";
+        return false;
     }
 
     private void LoadFutureLogo()
@@ -332,6 +380,7 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (!await EnsurePremiumAccessAsync()) return;
         try
         {
             var editorCenter = new EditorCenterWindow();
@@ -348,6 +397,7 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (!await EnsurePremiumAccessAsync()) return;
         try
         {
             var organizer = new PdfOrganizerWindow();
@@ -364,6 +414,7 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (!await EnsurePremiumAccessAsync()) return;
         try
         {
             var converter = new ConverterWindow();
