@@ -17,10 +17,12 @@ public sealed class SupabaseAuthService
     private string? _accessToken;
     private string? _refreshToken;
     private string? _email;
+    private string? _fullName;
     private bool _initialized;
 
     public bool IsSignedIn => !string.IsNullOrWhiteSpace(_accessToken);
     public string? Email => _email;
+    public string? FullName => _fullName;
     private SupabaseAuthService() { }
 
     public async Task InitializeAsync()
@@ -34,6 +36,7 @@ public sealed class SupabaseAuthService
             using var document = JsonDocument.Parse(saved);
             _refreshToken = document.RootElement.GetProperty("refresh_token").GetString();
             _email = document.RootElement.TryGetProperty("email", out var email) ? email.GetString() : null;
+            _fullName = document.RootElement.TryGetProperty("full_name", out var fullName) ? fullName.GetString() : null;
             if (!string.IsNullOrWhiteSpace(_refreshToken)) await RefreshSessionAsync();
         }
         catch
@@ -98,21 +101,57 @@ public sealed class SupabaseAuthService
         return url.GetString()!;
     }
 
-    public async Task<bool> HasPremiumAsync()
+    public async Task<LicenseSummary> GetLicenseSummaryAsync()
     {
-        await EnsureSessionAsync();
-        if (!IsSignedIn) return false;
+        await InitializeAsync();
+        if (!IsSignedIn)
+            return new LicenseSummary("Gratuito", "Sem conta conectada", null, false);
+
         using var response = await SendFunctionAsync(new { action = "license_status" });
         var json = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode) return false;
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(json, "Não foi possível consultar seu plano."));
+
         using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("license", out var license) || license.ValueKind == JsonValueKind.Null) return false;
-        if (!license.TryGetProperty("status", out var status) || status.GetString() != "active") return false;
-        if (license.TryGetProperty("valid_until", out var until) && until.ValueKind != JsonValueKind.Null
-            && DateTimeOffset.TryParse(until.GetString(), out var expiry) && expiry <= DateTimeOffset.UtcNow) return false;
-        if (!license.TryGetProperty("assinapdf_plans", out var plan) || plan.ValueKind != JsonValueKind.Object) return false;
-        return plan.TryGetProperty("code", out var code) && string.Equals(code.GetString(), "premium", StringComparison.OrdinalIgnoreCase);
+        if (!doc.RootElement.TryGetProperty("license", out var license) ||
+            license.ValueKind == JsonValueKind.Null)
+            return new LicenseSummary("Gratuito", "Sem licença Premium ativa", null, false);
+
+        var status = license.TryGetProperty("status", out var statusElement)
+            ? statusElement.GetString() ?? "unknown" : "unknown";
+        DateTimeOffset? validUntil = null;
+        if (license.TryGetProperty("valid_until", out var until) &&
+            until.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParse(until.GetString(), out var parsedUntil))
+            validUntil = parsedUntil;
+
+        string planName = "Gratuito";
+        bool isPremium = false;
+        if (license.TryGetProperty("assinapdf_plans", out var plan) &&
+            plan.ValueKind == JsonValueKind.Object)
+        {
+            if (plan.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
+                planName = name.GetString() ?? planName;
+            if (plan.TryGetProperty("code", out var code) &&
+                string.Equals(code.GetString(), "premium", StringComparison.OrdinalIgnoreCase))
+                isPremium = true;
+        }
+
+        bool active = string.Equals(status, "active", StringComparison.OrdinalIgnoreCase) &&
+            (!validUntil.HasValue || validUntil.Value > DateTimeOffset.UtcNow);
+        return new LicenseSummary(isPremium && active ? "Premium" : "Gratuito",
+            active ? "Ativo" : (status == "expired" ? "Expirado" : "Sem licença Premium ativa"),
+            validUntil, isPremium && active);
     }
+
+    public async Task<bool> HasPremiumAsync()
+    {
+        try { return (await GetLicenseSummaryAsync()).IsPremium; }
+        catch { return false; }
+    }
+
+    public sealed record LicenseSummary(string PlanName, string StatusText,
+        DateTimeOffset? ValidUntil, bool IsPremium);
 
 
     public async Task RegisterCurrentDeviceAsync()
@@ -145,7 +184,7 @@ public sealed class SupabaseAuthService
             }
             catch { }
         }
-        _accessToken = null; _refreshToken = null; _email = null;
+        _accessToken = null; _refreshToken = null; _email = null; _fullName = null;
         await CredentialStore.DeleteAsync();
     }
 
@@ -178,14 +217,20 @@ public sealed class SupabaseAuthService
     {
         _accessToken = root.GetProperty("access_token").GetString();
         _refreshToken = root.GetProperty("refresh_token").GetString();
-        if (root.TryGetProperty("user", out var user) && user.TryGetProperty("email", out var email))
-            _email = email.GetString();
+        if (root.TryGetProperty("user", out var user))
+        {
+            if (user.TryGetProperty("email", out var email))
+                _email = email.GetString();
+            if (user.TryGetProperty("user_metadata", out var metadata) &&
+                metadata.TryGetProperty("full_name", out var fullName))
+                _fullName = fullName.GetString();
+        }
     }
 
     private async Task SaveSessionAsync()
     {
         if (!string.IsNullOrWhiteSpace(_refreshToken))
-            await CredentialStore.WriteAsync(JsonSerializer.Serialize(new { refresh_token = _refreshToken, email = _email }));
+            await CredentialStore.WriteAsync(JsonSerializer.Serialize(new { refresh_token = _refreshToken, email = _email, full_name = _fullName }));
     }
 
     private static async Task<HttpResponseMessage> SendAuthAsync(string path, object payload)
