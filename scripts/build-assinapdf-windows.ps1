@@ -3,10 +3,14 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $Root "src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj"
 $Installer = Join-Path $Root "installer-crossplatform/AssinaPDF.CrossPlatform.wixproj"
-$PublishDir = Join-Path $Root "artifacts/publish/win-x64"
-$ArtifactDir = Join-Path $Root "artifacts/installers"
+$RunId = Get-Date -Format "yyyyMMdd-HHmmss"
+$RunRoot = Join-Path $Root "artifacts/release-assinapdf/$RunId"
+$PublishDir = Join-Path $RunRoot "publish/win-x64"
+$ArtifactDir = Join-Path $RunRoot "installers"
+$WixOutput = Join-Path $RunRoot "wix-bin"
+$WixIntermediate = Join-Path $RunRoot "wix-obj"
 
-New-Item -ItemType Directory -Force -Path $PublishDir, $ArtifactDir | Out-Null
+New-Item -ItemType Directory -Force -Path $PublishDir, $ArtifactDir, $WixOutput, $WixIntermediate | Out-Null
 
 Write-Host "Publicando AssinaPDF Windows x64 (self-contained)..."
 dotnet restore $Project
@@ -19,10 +23,10 @@ if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar o AssinaPDF Windows x64." }
 
 Write-Host "Gerando instalador MSI..."
 $PublishProperty = $PublishDir.TrimEnd('\') + '\'
-dotnet build $Installer -c Release -p:InstallerPlatform=x64 "-p:PublishDir=$PublishProperty"
+dotnet build $Installer -c Release -p:InstallerPlatform=x64 "-p:PublishDir=$PublishProperty" "-p:BaseOutputPath=$WixOutput/" "-p:BaseIntermediateOutputPath=$WixIntermediate/"
 if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar o MSI." }
 
-$Msi = Get-ChildItem (Join-Path $Root "installer-crossplatform/bin/Release") -Filter "AssinaPDF-CrossPlatform-Setup-x64.msi" -Recurse |
+$Msi = Get-ChildItem (Join-Path $WixOutput "Release") -Filter "AssinaPDF-CrossPlatform-Setup-x64.msi" -Recurse |
   Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $Msi) { throw "O MSI não foi encontrado na saída do WiX." }
 
