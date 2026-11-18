@@ -26,14 +26,26 @@ public partial class PdfViewerWindow : Window
     private float _renderScale = 1.5f;
     private bool _loading;
 
-    public PdfViewerWindow(string pdfPath, Func<Task<string?>> editAction)
+    // Required by Avalonia's runtime XAML loader. This instance is preview-only;
+    // normal application flows use the constructor that receives a PDF path.
+    public PdfViewerWindow() : this(string.Empty, static () => Task.FromResult<string?>(null), runtimePreviewOnly: true)
     {
-        _originalPath = Path.GetFullPath(pdfPath);
+    }
+
+    public PdfViewerWindow(string pdfPath, Func<Task<string?>> editAction)
+        : this(pdfPath, editAction, runtimePreviewOnly: false)
+    {
+    }
+
+    private PdfViewerWindow(string pdfPath, Func<Task<string?>> editAction, bool runtimePreviewOnly)
+    {
+        _originalPath = string.IsNullOrWhiteSpace(pdfPath) ? string.Empty : Path.GetFullPath(pdfPath);
         _editAction = editAction;
         InitializeComponent();
-        DocumentNameText.Text = Path.GetFileName(_originalPath);
-        Title = $"AssinaPDF | {Path.GetFileName(_originalPath)}";
-        Opened += (_, _) => LoadDocument(_originalPath);
+        DocumentNameText.Text = string.IsNullOrEmpty(_originalPath) ? "Visualização de PDF" : Path.GetFileName(_originalPath);
+        Title = string.IsNullOrEmpty(_originalPath) ? "AssinaPDF | Visualizador de PDF" : $"AssinaPDF | {Path.GetFileName(_originalPath)}";
+        if (!runtimePreviewOnly)
+            Opened += (_, _) => LoadDocument(_originalPath);
         PageScrollViewer.ScrollChanged += PageScrollViewer_ScrollChanged;
         Closed += (_, _) => DisposeResources();
         PageScrollViewer.AddHandler(
