@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -63,6 +64,7 @@ public sealed class AccountWindow : Window
                     Text = "Cole a chave enviada pela Future Soluções após a confirmação do pagamento.",
                     TextWrapping = TextWrapping.Wrap, Foreground = Brush.Parse("#737B87"), FontSize = 12
                 },
+                RowButton("Assinar Premium mensal pelo Asaas", CreateCheckout_Click, "#6741B8"),
                 _activationKey,
                 RowButton("Ativar minha chave", RedeemKey_Click, "#27865A")
             }
@@ -123,6 +125,18 @@ public sealed class AccountWindow : Window
     {
         await RunAsync(async () => await _auth.SignInAsync(_email.Text ?? "", _password.Password ?? ""));
         await RefreshAccountLabelAsync();
+    }
+
+
+    private async void CreateCheckout_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await RunAsync(async () =>
+        {
+            if (!_auth.IsSignedIn) throw new InvalidOperationException("Entre na sua conta antes de contratar o Premium.");
+            var url = await _auth.CreateMonthlyCheckoutAsync();
+            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            return "Abrimos a página segura do Asaas no seu navegador. A licença será liberada após a confirmação do pagamento pelo webhook.";
+        });
     }
 
     private async void RedeemKey_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
