@@ -345,6 +345,7 @@ public partial class MainWindow : Window
             PdfViewerWindow? viewer = null;
             viewer = new PdfViewerWindow(originalPath, async () =>
             {
+                if (!await EnsurePremiumAccessAsync()) return originalPath;
                 editEntry ??= _editorHistory.CreateWorkingCopy(originalPath);
                 var entry = editEntry;
                 string documentDirectory = System.IO.Path.GetDirectoryName(entry.WorkingCopyPath)
