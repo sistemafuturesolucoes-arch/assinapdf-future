@@ -9,10 +9,10 @@ namespace AssinaPDF.MacPrototype;
 public sealed class AccountWindow : Window
 {
     private readonly SupabaseAuthService _auth;
-    private readonly TextBox _name = new() { Watermark = "Seu nome completo" };
-    private readonly TextBox _email = new() { Watermark = "E-mail" };
-    private readonly PasswordBox _password = new() { Watermark = "Senha (mínimo 6 caracteres)" };
-    private readonly TextBox _activationKey = new() { Watermark = "FUT-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" };
+    private readonly TextBox _name = new() { PlaceholderText = "Seu nome completo" };
+    private readonly TextBox _email = new() { PlaceholderText = "E-mail" };
+    private readonly TextBox _password = new() { PlaceholderText = "Senha (mínimo 6 caracteres)", PasswordChar = '•' };
+    private readonly TextBox _activationKey = new() { PlaceholderText = "FUT-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Foreground = Brush.Parse("#5E6470") };
     private readonly TextBlock _account = new() { Foreground = Brush.Parse("#454B55"), FontWeight = FontWeight.SemiBold };
 
@@ -115,7 +115,7 @@ public sealed class AccountWindow : Window
 
     private async void CreateAccount_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        await RunAsync(async () => await _auth.SignUpAsync(_name.Text ?? "", _email.Text ?? "", _password.Password ?? ""));
+        await RunAsync(async () => await _auth.SignUpAsync(_name.Text ?? "", _email.Text ?? "", _password.Text ?? ""));
         await RefreshAccountLabelAsync();
     }
 
