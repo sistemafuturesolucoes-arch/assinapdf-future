@@ -12,7 +12,7 @@ X64="$PUBLISH_ROOT/osx-x64"
 UNIVERSAL="$PUBLISH_ROOT/osx-universal"
 APP="$RUN_ROOT/AssinaPDF.app"
 STAGING="$RUN_ROOT/macos-dmg-staging"
-VERSION="${ASSINAPDF_VERSION:-1.0.0}"
+VERSION="${ASSINAPDF_VERSION:-0.4.2}"
 APP_EXECUTABLE="AssinaPDF.MacPrototype"
 
 command -v dotnet >/dev/null || { echo "Instale o .NET 10 SDK."; exit 1; }
@@ -28,7 +28,7 @@ dotnet publish "$PROJECT" -c Release -r osx-x64 --self-contained true \
   -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o "$X64"
 
 mkdir -p "$UNIVERSAL" "$APP/Contents/MacOS" "$APP/Contents/Resources" "$STAGING"
-ditto "$ARM64" "$UNIVERSAL"
+ditto "$ARM64/." "$UNIVERSAL/"
 
 echo "Mesclando binários nativos arm64 + x86_64..."
 while IFS= read -r -d '' ARM_FILE; do
@@ -40,14 +40,28 @@ while IFS= read -r -d '' ARM_FILE; do
   if file "$ARM_FILE" | grep -q "Mach-O"; then
     ARM_ARCHS="$(lipo -archs "$ARM_FILE" 2>/dev/null || true)"
     X64_ARCHS="$(lipo -archs "$X64_FILE" 2>/dev/null || true)"
-    if [[ "$ARM_ARCHS" == *arm64* && "$X64_ARCHS" == *x86_64* ]]; then
+    if [[ "$ARM_ARCHS" == *arm64* && "$ARM_ARCHS" == *x86_64* ]]; then
+      continue
+    elif [[ "$X64_ARCHS" == *arm64* && "$X64_ARCHS" == *x86_64* ]]; then
+      cp -p "$X64_FILE" "$DEST"
+    elif [[ "$ARM_ARCHS" == *arm64* && "$X64_ARCHS" == *x86_64* ]]; then
       mkdir -p "$(dirname "$DEST")"
       lipo -create "$ARM_FILE" "$X64_FILE" -output "$DEST"
     fi
   fi
 done < <(find "$ARM64" -type f -print0)
 
-ditto "$UNIVERSAL" "$APP/Contents/MacOS"
+# Inclui arquivos exclusivos do publish Intel, sem substituir os equivalentes mesclados.
+while IFS= read -r -d '' X64_FILE; do
+  RELATIVE="${X64_FILE#"$X64/"}"
+  DEST="$UNIVERSAL/$RELATIVE"
+  if [[ ! -e "$DEST" ]]; then
+    mkdir -p "$(dirname "$DEST")"
+    cp -p "$X64_FILE" "$DEST"
+  fi
+done < <(find "$X64" -type f -print0)
+
+ditto "$UNIVERSAL/." "$APP/Contents/MacOS/"
 chmod +x "$APP/Contents/MacOS/$APP_EXECUTABLE"
 
 ICONSET="$RUN_ROOT/AssinaPDF.iconset"
