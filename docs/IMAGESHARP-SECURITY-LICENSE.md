@@ -2,30 +2,33 @@
 
 ## Decisão aplicada
 
-O CrossPlatform não utiliza diretamente as APIs de `Econet.DanfeDacte` nem de `PdfSharpCore`. A geração fiscal está implementada por componentes já presentes no projeto:
+O AssinaPDF CrossPlatform não utiliza diretamente as APIs de `Econet.DanfeDacte` nem de `PdfSharpCore`. A geração fiscal está implementada por:
 
 - NF-e / DANFE: `Danfe.NFe.Core` (projeto ThirdParty, baseado em PDFsharp 6).
 - CT-e / DACTE: `Zion.NFe.Danfe`.
 - NFS-e / DANFSe: `PDFsharp` e `ZXing.Net`.
 
-As referências redundantes a `Econet.DanfeDacte` e `PdfSharpCore` foram removidas do projeto CrossPlatform. O `PdfSharpCore 1.3.67` era a origem transitiva de `SixLabors.ImageSharp 1.0.4` e dos avisos de segurança.
+As referências redundantes a `Econet.DanfeDacte` e `PdfSharpCore` foram removidas. O `PdfSharpCore 1.3.67` era a origem transitiva de `SixLabors.ImageSharp 1.0.4` e dos avisos de segurança.
 
-Não substituímos o pacote por ImageSharp 3.2/4.x nem adicionamos chave/licença Six Labors. A remoção da dependência sem uso elimina a cadeia vulnerável sem alterar os geradores atualmente utilizados.
+Não substituímos o pacote por ImageSharp 3.2/4.x nem adicionamos chave/licença Six Labors. A remoção da dependência sem uso elimina essa cadeia sem alterar os geradores atualmente utilizados.
 
-## Verificações obrigatórias
+## Verificação local obrigatória
 
-Após restore, a validação do GitHub Actions verifica que `SixLabors.ImageSharp` não aparece no grafo transitivo e executa os testes do projeto, incluindo o teste de geração de DANFE a partir do XML sintético.
-
-Auditoria local:
+Executar no PowerShell, a partir da raiz do repositório:
 
 ```powershell
+dotnet restore .\tests\AssinaPDF.CrossPlatform.Tests\AssinaPDF.CrossPlatform.Tests.csproj
 dotnet list .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj package --include-transitive
 dotnet list .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj package --vulnerable --include-transitive
+dotnet test .\tests\AssinaPDF.CrossPlatform.Tests -c Release --no-restore
+dotnet publish .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o .\artifacts\publish\win-x64
 ```
+
+Confirmar que `SixLabors.ImageSharp` não aparece na lista transitiva, revisar alertas NuGet e verificar o executável em `artifacts\publish\win-x64`.
 
 ## Regras para futuras alterações
 
 - Não reintroduzir `Econet.DanfeDacte` ou `PdfSharpCore` sem confirmar uso real no código e testes de geração.
 - Não adicionar `SixLabors.ImageSharp` como dependência direta.
 - Não desativar o NuGet Audit nem suprimir alertas.
-- Se outro componente fiscal passar a exigir PdfSharpCore, avaliar a substituição do componente e testar DANFE/DACTE antes de restaurar essa cadeia.
+- Se outro componente fiscal exigir PdfSharpCore, avaliar a substituição e testar DANFE/DACTE antes de restaurar essa cadeia.
