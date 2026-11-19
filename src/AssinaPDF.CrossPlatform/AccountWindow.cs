@@ -119,7 +119,8 @@ public sealed class AccountWindow : Window
         _registerMode = register;
         _name.IsVisible = register;
         _submitButton.Content = register ? "Criar minha conta" : "Entrar";
-        _submitButton.Click -= register ? SignIn_Click : CreateAccount_Click;
+        _submitButton.Click -= SignIn_Click;
+        _submitButton.Click -= CreateAccount_Click;
         _submitButton.Click += register ? CreateAccount_Click : SignIn_Click;
         _loginTab.Background = Brush.Parse(register ? "#F0EDF5" : "#6741B8");
         _loginTab.Foreground = register ? Brush.Parse("#514568") : Brushes.White;
@@ -359,7 +360,9 @@ public sealed class AccountWindow : Window
             const string details = "AssinaPDF Premium — plano mensal recorrente. Recursos Premium mediante licença ativa. Ativação por chave ou contratação online. Licença vinculada à conta e ao dispositivo. Valor mensal: consulte a Future Soluções.";
             try
             {
-                await TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(details)!;
+                var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                if (clipboard is null) throw new InvalidOperationException("Área de transferência indisponível.");
+                await clipboard.SetTextAsync(details);
                 _status.Text = "Informações do Premium copiadas.";
             }
             catch { _status.Text = "Não foi possível copiar as informações neste dispositivo."; }
