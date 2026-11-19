@@ -2,15 +2,15 @@
 
 ## Decisão aplicada
 
-O AssinaPDF CrossPlatform não utiliza diretamente as APIs de `Econet.DanfeDacte` nem de `PdfSharpCore`. A geração fiscal está implementada por:
+O AssinaPDF CrossPlatform utiliza `Econet.DanfeDacte` para gerar DACTE. `PdfSharpCore` não deve ser referenciado diretamente porque a versão 1.3.67 introduz a dependência vulnerável `SixLabors.ImageSharp` 1.0.4. A geração fiscal está implementada por:
 
 - NF-e / DANFE: `Danfe.NFe.Core` (projeto ThirdParty, baseado em PDFsharp 6).
 - CT-e / DACTE: `Econet.DanfeDacte` 2.2.0.1 (inclui os modelos CT-e 57 e CT-e OS 67; a API utilizada pelo gerador está no namespace `Zion.NFe.Danfe`).
 - NFS-e / DANFSe: `PDFsharp` e `ZXing.Net`.
 
-As referências redundantes a `Econet.DanfeDacte` e `PdfSharpCore` foram removidas. O `PdfSharpCore 1.3.67` era a origem transitiva de `SixLabors.ImageSharp 1.0.4` e dos avisos de segurança.
+`Econet.DanfeDacte` 2.2.0.1 foi mantido/restaurado como dependência do gerador de CT-e. O cadastro dessa versão no NuGet informa que ela não declara dependências de pacote; a compilação e a geração real do DACTE devem confirmar que o assembly funciona sem `PdfSharpCore` no grafo.
 
-Não substituímos o pacote por ImageSharp 3.2/4.x nem adicionamos chave/licença Six Labors. A remoção da dependência sem uso elimina essa cadeia sem alterar os geradores atualmente utilizados.
+Não adicionamos chave/licença Six Labors, não usamos ImageSharp 3.2/4.x e não devemos aceitar a reintrodução de `PdfSharpCore` 1.3.67 sem nova avaliação de segurança.
 
 ## Verificação local obrigatória
 
