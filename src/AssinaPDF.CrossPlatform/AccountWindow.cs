@@ -22,6 +22,7 @@ public sealed class AccountWindow : Window
     private readonly Button _submitButton;
     private readonly Button _signOutButton;
     private bool _registerMode;
+    private bool _signedIn;
 
     public AccountWindow(SupabaseAuthService auth)
     {
@@ -118,7 +119,13 @@ public sealed class AccountWindow : Window
     private void SetRegisterMode(bool register)
     {
         _registerMode = register;
-        _name.IsVisible = register;
+        _name.IsVisible = register && !_signedIn;
+        _loginTab.IsVisible = !_signedIn;
+        _registerTab.IsVisible = !_signedIn;
+        _email.IsVisible = !_signedIn;
+        _password.IsVisible = !_signedIn;
+        _submitButton.IsVisible = !_signedIn;
+        _signOutButton.IsVisible = _signedIn;
         _submitButton.Content = register ? "Criar minha conta" : "Entrar";
         _submitButton.Click -= SignIn_Click;
         _submitButton.Click -= CreateAccount_Click;
@@ -229,9 +236,16 @@ public sealed class AccountWindow : Window
     private async Task RefreshAccountLabelAsync()
     {
         await _auth.InitializeAsync();
-        bool signedIn = _auth.IsSignedIn;
-        _account.Text = signedIn ? $"Conectado: {_auth.Email}" : "Você ainda não entrou.";
-        _signOutButton.IsVisible = signedIn;
+        _signedIn = _auth.IsSignedIn;
+        _loginTab.IsVisible = !_signedIn;
+        _registerTab.IsVisible = !_signedIn;
+        _name.IsVisible = !_signedIn && _registerMode;
+        _email.IsVisible = !_signedIn;
+        _password.IsVisible = !_signedIn;
+        _submitButton.IsVisible = !_signedIn;
+        _signOutButton.IsVisible = _signedIn;
+        var displayName = string.IsNullOrWhiteSpace(_auth.FullName) ? _auth.Email : _auth.FullName;
+        _account.Text = _signedIn ? $"Você está logado como {displayName}." : "Você ainda não entrou.";
     }
 
     private sealed class PlansWindow : Window
