@@ -37,6 +37,17 @@ jobs:
       - name: Restore
         run: dotnet restore src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj
 
+      - name: Verify ImageSharp is not restored
+        shell: pwsh
+        run: |
+          $packages = dotnet list src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj package --include-transitive | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            throw "Falha ao listar dependências transitivas."
+          }
+          if ($packages -match "SixLabors.ImageSharp") {
+            throw "SixLabors.ImageSharp continua no grafo de dependências. Investigar antes de liberar."
+          }
+
       - name: Report vulnerable transitive packages
         shell: pwsh
         run: |

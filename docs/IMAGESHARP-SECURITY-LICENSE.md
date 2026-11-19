@@ -1,36 +1,31 @@
-# ImageSharp: dependência transitiva e política de software gratuito
+# ImageSharp: resolução da dependência vulnerável
 
-## Decisão do projeto
+## Decisão aplicada
 
-O AssinaPDF não deve exigir uma chave paga nem uma licença adicional para compilar ou executar suas funções.
+O CrossPlatform não utiliza diretamente as APIs de `Econet.DanfeDacte` nem de `PdfSharpCore`. A geração fiscal está implementada por componentes já presentes no projeto:
 
-Por isso, o projeto **não referencia SixLabors.ImageSharp diretamente**. A biblioteca permanece apenas como dependência transitiva de `PdfSharpCore`, utilizado pelo pacote de documentos fiscais `Econet.DanfeDacte`.
+- NF-e / DANFE: `Danfe.NFe.Core` (projeto ThirdParty, baseado em PDFsharp 6).
+- CT-e / DACTE: `Zion.NFe.Danfe`.
+- NFS-e / DANFSe: `PDFsharp` e `ZXing.Net`.
 
-A página do NuGet de PdfSharpCore informa que ImageSharp e SixLabors.Fonts são licenciados sob Apache 2.0 quando distribuídos como parte do PdfSharpCore. Essa é a modalidade de uso que estamos preservando: dependência transitiva, sem adicionar ImageSharp como pacote direto do AssinaPDF.
+As referências redundantes a `Econet.DanfeDacte` e `PdfSharpCore` foram removidas do projeto CrossPlatform. O `PdfSharpCore 1.3.67` era a origem transitiva de `SixLabors.ImageSharp 1.0.4` e dos avisos de segurança.
 
-Referência: https://www.nuget.org/packages/PdfSharpCore/1.3.67
+Não substituímos o pacote por ImageSharp 3.2/4.x nem adicionamos chave/licença Six Labors. A remoção da dependência sem uso elimina a cadeia vulnerável sem alterar os geradores atualmente utilizados.
 
-## Segurança
+## Verificações obrigatórias
 
-Em setembro de 2026 foram publicados avisos de segurança que afetam versões antigas do ImageSharp. Não devemos esconder esses avisos, desativar NuGet Audit ou declarar que a dependência está corrigida sem verificar a versão efetivamente resolvida no restore.
+Após restore, a validação do GitHub Actions verifica que `SixLabors.ImageSharp` não aparece no grafo transitivo e executa os testes do projeto, incluindo o teste de geração de DANFE a partir do XML sintético.
 
-O pacote PdfSharpCore declara ImageSharp com versão mínima `1.0.4`, sem limite superior. Ao manter a dependência transitiva, a versão efetivamente selecionada pelo NuGet deve ser conferida no ambiente local após o restore.
-
-Auditoria:
+Auditoria local:
 
 ```powershell
 dotnet list .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj package --include-transitive
 dotnet list .\src\AssinaPDF.CrossPlatform\AssinaPDF.MacPrototype.csproj package --vulnerable --include-transitive
 ```
 
-Se o NuGet selecionar uma versão vulnerável, a correção deve ser feita sem introduzir uma licença comercial obrigatória ao produto. As alternativas são substituir a dependência que traz ImageSharp por uma biblioteca PDF/DANFE com licença permissiva adequada, ou avaliar uma versão transitiva corrigida cuja licença permita essa distribuição sem chave. Não adicionar uma referência direta a ImageSharp 4.x ou 3.2.x como solução automática.
+## Regras para futuras alterações
 
-## Regras
-
-- Não exigir chave `SIXLABORS_LICENSE_KEY`.
-- Não armazenar licença ou credencial de fornecedor no repositório.
-- Não adicionar `SixLabors.ImageSharp` como PackageReference direto.
-- Não desativar o NuGet Audit.
-- Não ocultar alertas de segurança.
-- Manter a proposta de software gratuito e dependências compatíveis com a distribuição planejada.
-- Validar a versão resolvida, build e testes localmente antes de considerar a alteração concluída.
+- Não reintroduzir `Econet.DanfeDacte` ou `PdfSharpCore` sem confirmar uso real no código e testes de geração.
+- Não adicionar `SixLabors.ImageSharp` como dependência direta.
+- Não desativar o NuGet Audit nem suprimir alertas.
+- Se outro componente fiscal passar a exigir PdfSharpCore, avaliar a substituição do componente e testar DANFE/DACTE antes de restaurar essa cadeia.
