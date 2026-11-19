@@ -5,7 +5,7 @@
 O AssinaPDF CrossPlatform não utiliza diretamente as APIs de `Econet.DanfeDacte` nem de `PdfSharpCore`. A geração fiscal está implementada por:
 
 - NF-e / DANFE: `Danfe.NFe.Core` (projeto ThirdParty, baseado em PDFsharp 6).
-- CT-e / DACTE: `Zion.NFe.Danfe`.
+- CT-e / DACTE: `Econet.DanfeDacte` 2.2.0.1 (inclui os modelos CT-e 57 e CT-e OS 67; a API utilizada pelo gerador está no namespace `Zion.NFe.Danfe`).
 - NFS-e / DANFSe: `PDFsharp` e `ZXing.Net`.
 
 As referências redundantes a `Econet.DanfeDacte` e `PdfSharpCore` foram removidas. O `PdfSharpCore 1.3.67` era a origem transitiva de `SixLabors.ImageSharp 1.0.4` e dos avisos de segurança.
@@ -28,7 +28,7 @@ Confirmar que `SixLabors.ImageSharp` não aparece na lista transitiva, revisar a
 
 ## Regras para futuras alterações
 
-- Não reintroduzir `Econet.DanfeDacte` ou `PdfSharpCore` sem confirmar uso real no código e testes de geração.
+- Não reintroduzir `PdfSharpCore` 1.3.67 nem `SixLabors.ImageSharp` 1.0.4. `Econet.DanfeDacte` 2.2.0.1 é a dependência usada pelo gerador de CT-e e deve permanecer coberta por testes de compilação e geração.
 - Não adicionar `SixLabors.ImageSharp` como dependência direta.
 - Não desativar o NuGet Audit nem suprimir alertas.
 - Se outro componente fiscal exigir PdfSharpCore, avaliar a substituição e testar DANFE/DACTE antes de restaurar essa cadeia.
