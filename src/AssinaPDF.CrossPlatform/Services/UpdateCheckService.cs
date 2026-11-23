@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -9,8 +10,10 @@ public sealed class UpdateCheckService
 {
     private const string SupabaseUrl = "https://zcquhikpsqohrclflnjo.supabase.co";
     private const string PublishableKey = "sb_publishable_QGohhsJ9qwrmjzzT_QKqrw_dPQ_lRY7";
+    private const long MaximumPackageBytes = 1_500_000_000;
     private static readonly string CurrentVersion = GetInstalledVersion();
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private static readonly HttpClient DownloadHttp = new() { Timeout = Timeout.InfiniteTimeSpan };
 
     public static UpdateCheckService Instance { get; } = new();
     private UpdateCheckService() { }
@@ -53,6 +56,122 @@ public sealed class UpdateCheckService
             GetString(release, "sha256"),
             release.TryGetProperty("is_mandatory", out var mandatory) && mandatory.ValueKind == JsonValueKind.True,
             GetString(release, "release_notes"));
+    }
+
+    public async Task<string> DownloadAndVerifyAsync(
+        UpdateCheckResult update,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        if (!update.UpdateAvailable)
+            throw new InvalidOperationException("Não há uma atualização disponível para baixar.");
+
+        if (!Version.TryParse(update.LatestVersion, out _))
+            throw new InvalidOperationException("A versão informada pelo serviço de atualizações é inválida.");
+
+        if (string.IsNullOrWhiteSpace(update.DownloadUrl) ||
+            !Uri.TryCreate(update.DownloadUrl, UriKind.Absolute, out var downloadUri) ||
+            downloadUri.Scheme != Uri.UriSchemeHttps ||
+            !string.Equals(downloadUri.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
+            !downloadUri.AbsolutePath.Contains("/releases/download/", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrEmpty(downloadUri.UserInfo))
+            throw new InvalidOperationException(
+                "O endereço do instalador não é um link HTTPS válido do GitHub Releases.");
+
+        if (string.IsNullOrWhiteSpace(update.Sha256) ||
+            update.Sha256.Length != 64 ||
+            update.Sha256.Any(character => !Uri.IsHexDigit(character)))
+            throw new InvalidOperationException("O SHA-256 publicado para este instalador é inválido.");
+
+        string extension = update.Platform switch
+        {
+            "windows-x64" => ".msi",
+            "macos-x64" or "macos-arm64" => ".dmg",
+            _ => throw new PlatformNotSupportedException(
+                $"Não há pacote de atualização configurado para {update.Platform}.")
+        };
+
+        byte[] expectedHash = Convert.FromHexString(update.Sha256);
+        string version = update.LatestVersion!;
+        string fileName = $"AssinaPDF-{version}-{update.Platform}{extension}";
+        string updateDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FutureSolucoes", "AssinaPDF", "Updates");
+        Directory.CreateDirectory(updateDirectory);
+
+        string destinationPath = Path.Combine(updateDirectory, fileName);
+        string temporaryPath = Path.Combine(
+            updateDirectory, $".{fileName}.{Guid.NewGuid():N}.download");
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, downloadUri);
+            using var response = await DownloadHttp.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            if (response.Content.Headers.ContentLength is long declaredLength &&
+                (declaredLength <= 0 || declaredLength > MaximumPackageBytes))
+                throw new InvalidDataException("O tamanho informado para o instalador é inválido.");
+
+            await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken))
+            await using (var output = new FileStream(
+                temporaryPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 81920,
+                options: FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                var buffer = new byte[81920];
+                long totalBytes = 0;
+                int bytesRead;
+
+                while ((bytesRead = await input.ReadAsync(buffer.AsMemory(), cancellationToken)) > 0)
+                {
+                    totalBytes += bytesRead;
+                    if (totalBytes > MaximumPackageBytes)
+                        throw new InvalidDataException("O instalador excede o limite de tamanho permitido.");
+
+                    await output.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+
+                    if (response.Content.Headers.ContentLength is long totalLength && totalLength > 0)
+                        progress?.Report(Math.Min(1d, (double)totalBytes / totalLength));
+                }
+
+                if (totalBytes == 0)
+                    throw new InvalidDataException("O servidor retornou um instalador vazio.");
+            }
+
+            byte[] actualHash;
+            await using (var file = new FileStream(
+                temporaryPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                bufferSize: 81920, options: FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                actualHash = await SHA256.HashDataAsync(file, cancellationToken);
+            }
+
+            if (!CryptographicOperations.FixedTimeEquals(expectedHash, actualHash))
+                throw new CryptographicException(
+                    "A verificação de integridade falhou. O SHA-256 do instalador não corresponde ao publicado.");
+
+            File.Move(temporaryPath, destinationPath, overwrite: true);
+            progress?.Report(1d);
+            return destinationPath;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temporaryPath))
+                    File.Delete(temporaryPath);
+            }
+            catch
+            {
+                // A limpeza não deve substituir o erro original do download ou da validação.
+            }
+        }
     }
 
     private static string GetInstalledVersion()
