@@ -4,7 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <Platform>x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
-    <ProductVersion Condition="'$(ProductVersion)' == ''">0.4.2</ProductVersion>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.4.3</ProductVersion>
     <DefineConstants>PublishDir=$(PublishDir);ProductVersion=$(ProductVersion)</DefineConstants>
     <OutputName>AssinaPDF-CrossPlatform-Setup-x64</OutputName>
   </PropertyGroup>
