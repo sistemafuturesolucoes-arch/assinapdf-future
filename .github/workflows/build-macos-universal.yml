@@ -86,12 +86,15 @@ jobs:
             fi
           done < <(find "$X64" -type f -print0)
 
-          # Fail if the ARM64 publish contains a native binary absent from the Intel publish.
+          # Fail if an ARM64 native binary has no matching Intel Mach-O counterpart.
           while IFS= read -r -d '' afile; do
             rel="${afile#"$ARM64/"}"
-            if /usr/bin/file -b "$afile" | grep -q 'Mach-O' && [[ ! -f "$X64/$rel" ]]; then
-              echo "ARM64-only Mach-O binary cannot be merged: $rel" >&2
-              exit 1
+            if /usr/bin/file -b "$afile" | grep -q 'Mach-O'; then
+              xfile="$X64/$rel"
+              if [[ ! -f "$xfile" ]] || ! /usr/bin/file -b "$xfile" | grep -q 'Mach-O'; then
+                echo "No matching Intel Mach-O binary for ARM64 file: $rel" >&2
+                exit 1
+              fi
             fi
           done < <(find "$ARM64" -type f -print0)
 
