@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
@@ -8,7 +9,7 @@ public sealed class UpdateCheckService
 {
     private const string SupabaseUrl = "https://zcquhikpsqohrclflnjo.supabase.co";
     private const string PublishableKey = "sb_publishable_QGohhsJ9qwrmjzzT_QKqrw_dPQ_lRY7";
-    private const string CurrentVersion = "0.4.2";
+    private static readonly string CurrentVersion = GetInstalledVersion();
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
 
     public static UpdateCheckService Instance { get; } = new();
@@ -52,6 +53,29 @@ public sealed class UpdateCheckService
             GetString(release, "sha256"),
             release.TryGetProperty("is_mandatory", out var mandatory) && mandatory.ValueKind == JsonValueKind.True,
             GetString(release, "release_notes"));
+    }
+
+    private static string GetInstalledVersion()
+    {
+        var version = typeof(UpdateCheckService).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+
+        if (string.IsNullOrWhiteSpace(version))
+            throw new InvalidOperationException(
+                "A versão do AssinaPDF não foi definida nos metadados do aplicativo.");
+
+        // O SDK pode acrescentar metadados de compilação (+commit). A API de versões
+        // recebe somente a versão comercial, por exemplo 0.4.2.
+        var metadataSeparator = version.IndexOf('+');
+        if (metadataSeparator >= 0)
+            version = version[..metadataSeparator];
+
+        if (!Version.TryParse(version, out _))
+            throw new InvalidOperationException(
+                $"A versão instalada do AssinaPDF é inválida: {version}");
+
+        return version;
     }
 
     private static string GetPlatform()
