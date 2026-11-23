@@ -12,7 +12,7 @@ X64="$PUBLISH_ROOT/osx-x64"
 UNIVERSAL="$PUBLISH_ROOT/osx-universal"
 APP="$RUN_ROOT/AssinaPDF.app"
 STAGING="$RUN_ROOT/macos-dmg-staging"
-VERSION="${ASSINAPDF_VERSION:-0.4.2}"
+VERSION="${ASSINAPDF_VERSION:-$(awk -F'[<>]' '/<Version>/{print $3; exit}' "$PROJECT")}"
 APP_EXECUTABLE="AssinaPDF.MacPrototype"
 
 command -v dotnet >/dev/null || { echo "Instale o .NET 10 SDK."; exit 1; }
@@ -23,9 +23,11 @@ if [[ -e "$RUN_ROOT" ]]; then echo "Pasta de saída já existe: $RUN_ROOT"; exit
 mkdir -p "$PUBLISH_ROOT" "$RUN_ROOT/installers"
 dotnet restore "$PROJECT"
 dotnet publish "$PROJECT" -c Release -r osx-arm64 --self-contained true \
-  -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o "$ARM64"
+  -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None \
+  -p:Version="$VERSION" -p:AssemblyVersion="${VERSION}.0" -p:FileVersion="${VERSION}.0" -p:InformationalVersion="$VERSION" -o "$ARM64"
 dotnet publish "$PROJECT" -c Release -r osx-x64 --self-contained true \
-  -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o "$X64"
+  -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None \
+  -p:Version="$VERSION" -p:AssemblyVersion="${VERSION}.0" -p:FileVersion="${VERSION}.0" -p:InformationalVersion="$VERSION" -o "$X64"
 
 mkdir -p "$UNIVERSAL" "$APP/Contents/MacOS" "$APP/Contents/Resources" "$STAGING"
 ditto "$ARM64/." "$UNIVERSAL/"
