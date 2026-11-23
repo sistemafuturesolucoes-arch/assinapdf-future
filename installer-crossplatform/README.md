@@ -54,6 +54,8 @@ O fluxo de atualização usa o Supabase apenas para consultar os metadados da ve
 - macOS abre o DMG; o usuário conclui a substituição arrastando o app para Aplicativos.
 - Os scripts de build usam a mesma versão do projeto para os metadados do app e do instalador.
 
+A próxima compilação do cliente com o atualizador está versionada como **0.4.3**. O instalador aprovado **0.4.2** permanece preservado. Para homologar uma atualização real, primeiro instalar manualmente o pacote 0.4.3 e, em seguida, publicar um pacote 0.4.4 para testar a detecção e a instalação sobre a versão anterior.
+
 Não publicar uma release enquanto o instalador real, a URL pública e o SHA-256 do arquivo final não estiverem conferidos. Para distribuição pública, o MSI precisa de assinatura Authenticode e o app macOS precisa de Developer ID e notarização.
 
 ## Assinatura dos instaladores
