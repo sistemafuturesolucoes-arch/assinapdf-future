@@ -60,7 +60,7 @@
         <Shortcut
           Id="StartMenuShortcut"
           Name="AssinaPDF"
-          Target="[#AssinaPDFExecutable]"
+          Target="[INSTALLFOLDER]AssinaPDF.MacPrototype.exe"
           WorkingDirectory="INSTALLFOLDER"
           Icon="AssinaPDFIcon" />
         <RegistryValue
@@ -82,7 +82,7 @@
         <Shortcut
           Id="DesktopShortcut"
           Name="AssinaPDF"
-          Target="[#AssinaPDFExecutable]"
+          Target="[INSTALLFOLDER]AssinaPDF.MacPrototype.exe"
           WorkingDirectory="INSTALLFOLDER"
           Icon="AssinaPDFIcon" />
         <RegistryValue
