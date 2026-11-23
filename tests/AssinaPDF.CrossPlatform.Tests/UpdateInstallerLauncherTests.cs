@@ -55,3 +55,31 @@ public sealed class UpdateInstallerLauncherTests
         }
     }
 }
+
+public sealed class UpdatePackageValidationTests
+{
+    [Fact]
+    public async Task DownloadAndVerify_WhenDownloadUrlIsNotHttpsGitHubRelease_RejectsBeforeNetworkRequest()
+    {
+        var update = new UpdateCheckResult(
+            "0.4.2", "windows-x64", true, "0.4.3",
+            "http://github.com/example/assinapdf/releases/download/v0.4.3/setup.msi",
+            new string('a', 64), false, null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            UpdateCheckService.Instance.DownloadAndVerifyAsync(update));
+    }
+
+    [Fact]
+    public async Task DownloadAndVerify_WhenSha256IsMalformed_RejectsBeforeNetworkRequest()
+    {
+        var update = new UpdateCheckResult(
+            "0.4.2", "windows-x64", true, "0.4.3",
+            "https://github.com/example/assinapdf/releases/download/v0.4.3/setup.msi",
+            "not-a-sha256", false, null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            UpdateCheckService.Instance.DownloadAndVerifyAsync(update));
+    }
+}
+
