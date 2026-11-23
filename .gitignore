@@ -41,3 +41,8 @@ src/AssinaPDF.CrossPlatform/**/*backup*
 # Chaves de licença locais (nunca versionar)
 **/sixlabors.lic
 sixlabors.lic
+
+# Artefatos locais do editor React/Vite (não versionar)
+src/AssinaPDF.CrossPlatform/EditorWeb/node_modules/
+src/AssinaPDF.CrossPlatform/EditorWeb/dist/
+src/AssinaPDF.CrossPlatform/EditorWeb/tsconfig.tsbuildinfo
