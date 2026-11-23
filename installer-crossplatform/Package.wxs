@@ -86,7 +86,7 @@
           WorkingDirectory="INSTALLFOLDER"
           Icon="AssinaPDFIcon" />
         <RegistryValue
-          Root="HKLM"
+          Root="HKCU"
           Key="Software\Future Soluções\AssinaPDF\Shortcuts"
           Name="Desktop"
           Type="integer"
