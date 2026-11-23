@@ -108,18 +108,7 @@ public partial class MainWindow : Window
             }
 
             DashboardStatusText.Text = $"Nova versão {result.LatestVersion} disponível.";
-            var details = new StringBuilder();
-            details.AppendLine($"Versão instalada: {result.CurrentVersion}");
-            details.AppendLine($"Nova versão: {result.LatestVersion}");
-            details.AppendLine($"Plataforma: {result.Platform}");
-            details.AppendLine($"Atualização obrigatória: {(result.IsMandatory ? "Sim" : "Não")}");
-            details.AppendLine();
-            details.AppendLine(string.IsNullOrWhiteSpace(result.ReleaseNotes)
-                ? "Não foram informadas notas desta versão."
-                : result.ReleaseNotes);
-            details.AppendLine();
-            details.AppendLine("Nesta etapa, o AssinaPDF apenas identifica a atualização. O download e a instalação serão habilitados após validarmos o pacote e o fluxo de atualização.");
-            await ShowValidationReportAsync("Atualização disponível", details.ToString());
+            await ShowUpdateAvailableDialogAsync(result);
         }
         catch (Exception ex)
         {
@@ -1429,6 +1418,137 @@ public partial class MainWindow : Window
             await ShowValidationReportAsync("Propriedades da assinatura", technicalReport);
         };
         closeButton.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowUpdateAvailableDialogAsync(UpdateCheckResult update)
+    {
+        using var cancellation = new CancellationTokenSource();
+
+        var notesText = string.IsNullOrWhiteSpace(update.ReleaseNotes)
+            ? "Não foram informadas notas desta versão."
+            : update.ReleaseNotes;
+
+        var progressBar = new ProgressBar
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Value = 0,
+            Height = 10,
+            IsVisible = false
+        };
+
+        var statusText = new TextBlock
+        {
+            Text = "O instalador será baixado do GitHub e validado pelo SHA-256 antes de ser liberado.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 13
+        };
+
+        var downloadButton = new Button
+        {
+            Content = "Baixar e verificar",
+            MinWidth = 160,
+            Padding = new Thickness(14, 9)
+        };
+
+        var closeButton = new Button
+        {
+            Content = "Fechar",
+            MinWidth = 100,
+            Padding = new Thickness(14, 9)
+        };
+
+        var actions = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Spacing = 10,
+            Children = { downloadButton, closeButton }
+        };
+
+        var dialog = new Window
+        {
+            Title = "Atualização disponível",
+            Width = 720,
+            Height = 430,
+            MinWidth = 580,
+            MinHeight = 360,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(22),
+                Spacing = 14,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"Nova versão {update.LatestVersion}",
+                        FontSize = 21,
+                        FontWeight = FontWeight.SemiBold
+                    },
+                    new TextBlock
+                    {
+                        Text = $"Versão instalada: {update.CurrentVersion}\nPlataforma: {update.Platform}\nAtualização obrigatória: {(update.IsMandatory ? "Sim" : "Não")}",
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 14
+                    },
+                    new TextBlock
+                    {
+                        Text = notesText,
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 13
+                    },
+                    progressBar,
+                    statusText,
+                    actions
+                }
+            }
+        };
+
+        closeButton.Click += (_, _) => dialog.Close();
+        dialog.Closed += (_, _) => cancellation.Cancel();
+
+        downloadButton.Click += async (_, _) =>
+        {
+            downloadButton.IsEnabled = false;
+            progressBar.IsVisible = true;
+            progressBar.Value = 0;
+            statusText.Text = "Baixando o instalador e preparando a verificação de integridade...";
+
+            var progress = new Progress<double>(value =>
+            {
+                progressBar.Value = Math.Clamp(value * 100, 0, 100);
+                statusText.Text = $"Baixando instalador... {progressBar.Value:0}%";
+            });
+
+            try
+            {
+                string downloadedPath = await UpdateCheckService.Instance.DownloadAndVerifyAsync(
+                    update, progress, cancellation.Token);
+
+                progressBar.Value = 100;
+                statusText.Text =
+                    "Download concluído. A integridade SHA-256 foi confirmada.\n\n" +
+                    $"Arquivo salvo em:\n{downloadedPath}\n\n" +
+                    "A instalação será habilitada na próxima etapa, após os testes do pacote.";
+                downloadButton.IsVisible = false;
+                closeButton.Content = "Concluir";
+                DashboardStatusText.Text = $"Atualização {update.LatestVersion} baixada e verificada.";
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                // O usuário fechou a janela durante o download.
+            }
+            catch (Exception ex)
+            {
+                statusText.Text = $"Não foi possível baixar ou validar o instalador.\n\n{ex.Message}";
+                downloadButton.IsEnabled = true;
+                DashboardStatusText.Text = $"Falha no download da atualização: {ex.Message}";
+            }
+        };
+
         await dialog.ShowDialog(this);
     }
 
