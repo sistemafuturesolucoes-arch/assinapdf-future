@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Evita que pushes próximos disputem simultaneamente o runner macOS.
+concurrency:
+  group: assinapdf-macos-universal-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-macos-universal:
     name: Build macOS Universal (Intel + Apple Silicon)
