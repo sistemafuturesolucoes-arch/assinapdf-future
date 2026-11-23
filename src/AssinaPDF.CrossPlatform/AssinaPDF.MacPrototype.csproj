@@ -54,8 +54,8 @@
           Command="npm run build" />
 
     <ItemGroup>
-      <Content Remove="EditorWeb\\dist\\**\\*" />
-      <Content Include="EditorWeb\\dist\\**\\*">
+      <Content Remove="EditorWeb/dist/**/*" />
+      <Content Include="EditorWeb/dist/**/*">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       </Content>
