@@ -34,8 +34,9 @@ public static class UpdateInstallerLauncher
                 Verb = "runas"
             };
 
-            Process.Start(startInfo)
-                ?? throw new InvalidOperationException("Não foi possível iniciar o instalador do Windows.");
+            var process = Process.Start(startInfo);
+            if (process is null)
+                throw new InvalidOperationException("Não foi possível iniciar o instalador do Windows.");
             return;
         }
 
@@ -48,8 +49,9 @@ public static class UpdateInstallerLauncher
             };
             startInfo.ArgumentList.Add(packagePath);
 
-            Process.Start(startInfo)
-                ?? throw new InvalidOperationException("Não foi possível abrir a imagem de disco do macOS.");
+            var process = Process.Start(startInfo);
+            if (process is null)
+                throw new InvalidOperationException("Não foi possível abrir a imagem de disco do macOS.");
             return;
         }
 
