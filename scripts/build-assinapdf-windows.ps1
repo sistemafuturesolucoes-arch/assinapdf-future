@@ -26,7 +26,7 @@ $PublishProperty = $PublishDir.TrimEnd('\') + '\'
 dotnet build $Installer -c Release -p:InstallerPlatform=x64 "-p:PublishDir=$PublishProperty" "-p:BaseOutputPath=$WixOutput/" "-p:BaseIntermediateOutputPath=$WixIntermediate/"
 if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar o MSI." }
 
-$Msi = Get-ChildItem (Join-Path $WixOutput "Release") -Filter "AssinaPDF-CrossPlatform-Setup-x64.msi" -Recurse |
+$Msi = Get-ChildItem $WixOutput -Filter "AssinaPDF-CrossPlatform-Setup-x64.msi" -File -Recurse |
   Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $Msi) { throw "O MSI não foi encontrado na saída do WiX." }
 
