@@ -34,7 +34,6 @@
     <Content Include="logo-future.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="ThirdPartyLicenses/DanfeSharp.Next-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="ThirdPartyLicenses/Econet.DanfeDacte-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="EditorWeb/dist/**/*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Assets\Fonts\Inter-Regular.ttf" />
@@ -43,6 +42,22 @@
   <ItemGroup>
     <ProjectReference Include="ThirdParty\Danfe.NFe.Core\Danfe.NFe.Core.csproj" />
   </ItemGroup>
+
+  <!--
+    O editor React/Vite precisa ser compilado antes da publicação desktop.
+    A pasta dist é artefato gerado e não é versionada no Git.
+  -->
+  <Target Name="BuildEditorWebForPublish" BeforeTargets="PrepareForPublish">
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)/EditorWeb"
+          Command="npm install --no-save --no-package-lock --no-audit --no-fund" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)/EditorWeb"
+          Command="npm run build" />
+    <ItemGroup>
+      <Content Include="EditorWeb/dist/**/*"
+               CopyToOutputDirectory="PreserveNewest"
+               CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
   <!--
     A biblioteca DANFE é compilada pelo ProjectReference.
