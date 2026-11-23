@@ -1425,6 +1425,8 @@ public partial class MainWindow : Window
     {
         using var cancellation = new CancellationTokenSource();
 
+        string? verifiedPackagePath = null;
+
         var notesText = string.IsNullOrWhiteSpace(update.ReleaseNotes)
             ? "Não foram informadas notas desta versão."
             : update.ReleaseNotes;
@@ -1512,6 +1514,21 @@ public partial class MainWindow : Window
 
         downloadButton.Click += async (_, _) =>
         {
+            if (!string.IsNullOrWhiteSpace(verifiedPackagePath))
+            {
+                try
+                {
+                    UpdateInstallerLauncher.Launch(verifiedPackagePath, update.Platform);
+                    dialog.Close();
+                    Close();
+                }
+                catch (Exception ex)
+                {
+                    statusText.Text = $"Não foi possível iniciar a instalação.\n\n{ex.Message}";
+                }
+                return;
+            }
+
             downloadButton.IsEnabled = false;
             progressBar.IsVisible = true;
             progressBar.Value = 0;
@@ -1528,13 +1545,16 @@ public partial class MainWindow : Window
                 string downloadedPath = await UpdateCheckService.Instance.DownloadAndVerifyAsync(
                     update, progress, cancellation.Token);
 
+                verifiedPackagePath = downloadedPath;
                 progressBar.Value = 100;
-                statusText.Text =
-                    "Download concluído. A integridade SHA-256 foi confirmada.\n\n" +
-                    $"Arquivo salvo em:\n{downloadedPath}\n\n" +
-                    "A instalação será habilitada na próxima etapa, após os testes do pacote.";
-                downloadButton.IsVisible = false;
-                closeButton.Content = "Concluir";
+                statusText.Text = update.Platform == "windows-x64"
+                    ? "Download concluído e SHA-256 confirmado. Ao continuar, o Windows solicitará autorização para instalar a atualização. O AssinaPDF será fechado."
+                    : "Download concluído e SHA-256 confirmado. Ao continuar, o macOS abrirá o DMG. Arraste o AssinaPDF para a pasta Aplicativos e confirme a substituição da versão anterior.";
+                downloadButton.Content = update.Platform == "windows-x64"
+                    ? "Instalar atualização"
+                    : "Abrir instalador";
+                downloadButton.IsEnabled = true;
+                closeButton.Content = "Depois";
                 DashboardStatusText.Text = $"Atualização {update.LatestVersion} baixada e verificada.";
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
