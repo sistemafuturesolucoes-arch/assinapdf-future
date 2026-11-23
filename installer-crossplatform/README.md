@@ -42,6 +42,20 @@ Antes de distribuir, testar em máquinas limpas:
 - Asaas Sandbox: checkout recorrente, confirmação, atraso, estorno, cancelamento e webhooks duplicados.
 - Atualização sobre versão anterior e preservação dos dados do usuário.
 
+## Atualizações do aplicativo
+
+O fluxo de atualização usa o Supabase apenas para consultar os metadados da versão publicada e o GitHub Releases para hospedar os instaladores.
+
+- A versão instalada é lida dos metadados do assembly, definidos no `AssinaPDF.MacPrototype.csproj`.
+- O cliente identifica Windows x64, macOS Intel ou macOS Apple Silicon.
+- O download aceita somente links HTTPS de assets do GitHub Releases e valida a extensão esperada por plataforma.
+- O SHA-256 é conferido antes de liberar o instalador. Pacotes acima de 1,5 GB são rejeitados.
+- Windows inicia o MSI com elevação UAC; o pacote WiX usa `MajorUpgrade` para atualizar a instalação existente.
+- macOS abre o DMG; o usuário conclui a substituição arrastando o app para Aplicativos.
+- Os scripts de build usam a mesma versão do projeto para os metadados do app e do instalador.
+
+Não publicar uma release enquanto o instalador real, a URL pública e o SHA-256 do arquivo final não estiverem conferidos. Para distribuição pública, o MSI precisa de assinatura Authenticode e o app macOS precisa de Developer ID e notarização.
+
 ## Assinatura dos instaladores
 
 O MSI ainda precisa de certificado Authenticode para distribuição pública. O pacote macOS gerado pelo script recebe assinatura ad-hoc apenas para homologação local; distribuição pública exige Developer ID e notarização da Apple. Não distribuir os artefatos de teste como releases públicos antes dessas etapas.
