@@ -54,7 +54,7 @@ Deno.serve(async (request: Request) => {
     const { data, error } = await supabase
       .from("assinapdf_releases")
       .select("id,platform,channel,version,build_number,minimum_supported_version,download_url,sha256,signature,release_notes,is_mandatory,published_at")
-      .eq("platform", platform)
+      .in("platform", platform.startsWith("macos-") ? [platform, "macos-universal"] : [platform])
       .eq("channel", channel)
       .eq("is_published", true)
       .not("published_at", "is", null)
