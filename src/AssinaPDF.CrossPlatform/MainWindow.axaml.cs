@@ -1368,10 +1368,10 @@ public partial class MainWindow : Window
         };
         var closeButton = new Button
         {
-            Content = update.IsMandatory ? "Atualização obrigatória" : "Fechar",
+            Content = "Fechar",
             MinWidth = 100,
             Padding = new Thickness(14, 9),
-            IsEnabled = !update.IsMandatory
+            IsEnabled = true
         };
         var actions = new StackPanel
         {
