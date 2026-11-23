@@ -91,6 +91,38 @@ public partial class MainWindow : Window
     }
 
 
+    private async void CheckUpdates_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        DashboardStatusText.Text = "Verificando atualizações...";
+        try
+        {
+            var result = await UpdateCheckService.Instance.CheckAsync();
+            if (!result.UpdateAvailable)
+            {
+                DashboardStatusText.Text = $"Você já está usando a versão mais recente ({result.CurrentVersion}).";
+                return;
+            }
+
+            DashboardStatusText.Text = $"Nova versão {result.LatestVersion} disponível.";
+            var details = new StringBuilder();
+            details.AppendLine($"Versão instalada: {result.CurrentVersion}");
+            details.AppendLine($"Nova versão: {result.LatestVersion}");
+            details.AppendLine($"Plataforma: {result.Platform}");
+            details.AppendLine($"Atualização obrigatória: {(result.IsMandatory ? "Sim" : "Não")}");
+            details.AppendLine();
+            details.AppendLine(string.IsNullOrWhiteSpace(result.ReleaseNotes)
+                ? "Não foram informadas notas desta versão."
+                : result.ReleaseNotes);
+            details.AppendLine();
+            details.AppendLine("Nesta etapa, o AssinaPDF apenas identifica a atualização. O download e a instalação serão habilitados após validarmos o pacote e o fluxo de atualização.");
+            await ShowValidationReportAsync("Atualização disponível", details.ToString());
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível verificar atualizações: {ex.Message}";
+        }
+    }
+
     private async void ToggleAccountMenu_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (!AccountMenuPopup.IsOpen)
