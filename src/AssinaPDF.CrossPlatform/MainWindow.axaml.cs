@@ -99,7 +99,11 @@ public partial class MainWindow : Window
             var result = await UpdateCheckService.Instance.CheckAsync();
             if (!result.UpdateAvailable)
             {
-                DashboardStatusText.Text = $"Você já está usando a versão mais recente ({result.CurrentVersion}).";
+                var message = $"Você já está usando a versão mais recente ({result.CurrentVersion}).\n\n" +
+                    $"Plataforma verificada: {result.Platform}\n" +
+                    "Nenhuma atualização foi publicada para este canal.";
+                DashboardStatusText.Text = $"Verificação concluída: versão {result.CurrentVersion} atualizada.";
+                await ShowValidationReportAsync("AssinaPDF está atualizado", message);
                 return;
             }
 
@@ -119,7 +123,17 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            DashboardStatusText.Text = $"Não foi possível verificar atualizações: {ex.Message}";
+            var message = "Não foi possível consultar o serviço de atualizações.\n\n" +
+                ex.Message + "\n\nConfira a conexão com a internet e tente novamente.";
+            DashboardStatusText.Text = $"Falha ao verificar atualizações: {ex.Message}";
+            try
+            {
+                await ShowValidationReportAsync("Falha na verificação", message);
+            }
+            catch
+            {
+                // A mensagem também permanece na barra de status caso a janela não possa ser exibida.
+            }
         }
     }
 
