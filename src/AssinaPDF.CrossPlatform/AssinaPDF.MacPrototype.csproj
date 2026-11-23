@@ -47,15 +47,18 @@
     O editor React/Vite precisa ser compilado antes da publicação desktop.
     A pasta dist é artefato gerado e não é versionada no Git.
   -->
-  <Target Name="BuildEditorWebForPublish" BeforeTargets="PrepareForPublish">
+  <Target Name="BuildEditorWebForPublish" BeforeTargets="AssignTargetPaths">
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)/EditorWeb"
           Command="npm install --no-save --no-package-lock --no-audit --no-fund" />
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)/EditorWeb"
           Command="npm run build" />
+
     <ItemGroup>
-      <Content Include="EditorWeb/dist/**/*"
-               CopyToOutputDirectory="PreserveNewest"
-               CopyToPublishDirectory="PreserveNewest" />
+      <Content Remove="EditorWeb\\dist\\**\\*" />
+      <Content Include="EditorWeb\\dist\\**\\*">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </Content>
     </ItemGroup>
   </Target>
 
