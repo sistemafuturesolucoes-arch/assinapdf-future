@@ -1368,9 +1368,10 @@ public partial class MainWindow : Window
         };
         var closeButton = new Button
         {
-            Content = "Fechar",
+            Content = update.IsMandatory ? "Atualização obrigatória" : "Fechar",
             MinWidth = 100,
-            Padding = new Thickness(14, 9)
+            Padding = new Thickness(14, 9),
+            IsEnabled = !update.IsMandatory
         };
         var actions = new StackPanel
         {
@@ -1426,6 +1427,7 @@ public partial class MainWindow : Window
         using var cancellation = new CancellationTokenSource();
 
         string? verifiedPackagePath = null;
+        bool installerStarted = false;
 
         var notesText = string.IsNullOrWhiteSpace(update.ReleaseNotes)
             ? "Não foram informadas notas desta versão."
@@ -1510,7 +1512,12 @@ public partial class MainWindow : Window
         };
 
         closeButton.Click += (_, _) => dialog.Close();
-        dialog.Closed += (_, _) => cancellation.Cancel();
+        dialog.Closing += (_, args) =>
+        {
+            if (update.IsMandatory && !installerStarted)
+                args.Cancel = true;
+        };
+                dialog.Closed += (_, _) => cancellation.Cancel();
 
         downloadButton.Click += async (_, _) =>
         {
@@ -1519,6 +1526,7 @@ public partial class MainWindow : Window
                 try
                 {
                     UpdateInstallerLauncher.Launch(verifiedPackagePath, update.Platform);
+                    installerStarted = true;
                     dialog.Close();
                     Close();
                 }
@@ -1554,7 +1562,7 @@ public partial class MainWindow : Window
                     ? "Instalar atualização"
                     : "Abrir instalador";
                 downloadButton.IsEnabled = true;
-                closeButton.Content = "Depois";
+                closeButton.Content = update.IsMandatory ? "Instalação obrigatória" : "Depois";
                 DashboardStatusText.Text = $"Atualização {update.LatestVersion} baixada e verificada.";
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
