@@ -1,0 +1,142 @@
+name: Build AssinaPDF macOS Universal
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/conversoes-fiscais-e-documentos-2026-11-16
+    paths:
+      - '.github/workflows/build-macos-universal.yml'
+      - 'src/AssinaPDF.CrossPlatform/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-universal:
+    name: Build macOS Universal (Intel + Apple Silicon)
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Restore .NET dependencies
+        run: dotnet restore src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj
+
+      - name: Build React PDF editor
+        working-directory: src/AssinaPDF.CrossPlatform/EditorWeb
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund
+          npm run build
+
+      - name: Publish Intel and Apple Silicon
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT="src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj"
+          X64="$RUNNER_TEMP/publish/osx-x64"
+          ARM64="$RUNNER_TEMP/publish/osx-arm64"
+          mkdir -p "$X64" "$ARM64"
+
+          dotnet publish "$PROJECT" -c Release -r osx-x64 --self-contained true -p:UseAppHost=true -p:PublishSingleFile=false -o "$X64"
+          dotnet publish "$PROJECT" -c Release -r osx-arm64 --self-contained true -p:UseAppHost=true -p:PublishSingleFile=false -o "$ARM64"
+
+          test -f "$X64/AssinaPDF.MacPrototype"
+          test -f "$ARM64/AssinaPDF.MacPrototype"
+          test -f "$X64/EditorWeb/dist/index.html"
+          test -f "$ARM64/EditorWeb/dist/index.html"
+
+      - name: Assemble Universal .app
+        shell: bash
+        run: |
+          set -euo pipefail
+          X64="$RUNNER_TEMP/publish/osx-x64"
+          ARM64="$RUNNER_TEMP/publish/osx-arm64"
+          APP="$RUNNER_TEMP/AssinaPDF.app"
+          MACOS="$APP/Contents/MacOS"
+          DIST="$RUNNER_TEMP/macos-universal-dist"
+
+          mkdir -p "$MACOS" "$APP/Contents/Resources" "$DIST"
+          ditto "$X64/." "$MACOS/"
+
+          # Replace every thin Mach-O binary with a true x86_64 + arm64 universal binary.
+          while IFS= read -r -d '' xfile; do
+            rel="${xfile#"$X64/"}"
+            if /usr/bin/file -b "$xfile" | grep -q 'Mach-O'; then
+              afile="$ARM64/$rel"
+              if [[ ! -f "$afile" ]] || ! /usr/bin/file -b "$afile" | grep -q 'Mach-O'; then
+                echo "Missing matching ARM64 Mach-O binary: $rel" >&2
+                exit 1
+              fi
+              mkdir -p "$MACOS/$(dirname "$rel")"
+              lipo -create "$xfile" "$afile" -output "$MACOS/$rel.universal"
+              mv "$MACOS/$rel.universal" "$MACOS/$rel"
+            fi
+          done < <(find "$X64" -type f -print0)
+
+          # Fail if the ARM64 publish contains a native binary absent from the Intel publish.
+          while IFS= read -r -d '' afile; do
+            rel="${afile#"$ARM64/"}"
+            if /usr/bin/file -b "$afile" | grep -q 'Mach-O' && [[ ! -f "$X64/$rel" ]]; then
+              echo "ARM64-only Mach-O binary cannot be merged: $rel" >&2
+              exit 1
+            fi
+          done < <(find "$ARM64" -type f -print0)
+
+          EXECUTABLE="AssinaPDF.MacPrototype"
+          test -x "$MACOS/$EXECUTABLE"
+          ARCHS="$(lipo -archs "$MACOS/$EXECUTABLE")"
+          echo "Universal apphost architectures: $ARCHS"
+          echo "$ARCHS" | grep -q 'x86_64'
+          echo "$ARCHS" | grep -q 'arm64'
+
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>AssinaPDF</string>
+            <key>CFBundleDisplayName</key><string>AssinaPDF | Future Soluções</string>
+            <key>CFBundleIdentifier</key><string>br.com.futuresolucoes.assinapdf</string>
+            <key>CFBundleVersion</key><string>0.4.2</string>
+            <key>CFBundleShortVersionString</key><string>0.4.2</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleExecutable</key><string>AssinaPDF.MacPrototype</string>
+            <key>LSMinimumSystemVersion</key><string>12.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+
+          plutil -lint "$APP/Contents/Info.plist"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$DIST/AssinaPDF-macOS-Universal.zip"
+          hdiutil create -volname "AssinaPDF" -srcfolder "$APP" -ov -format UDZO "$DIST/AssinaPDF-macOS-Universal.dmg"
+
+          echo "=== Mach-O binaries in app bundle ==="
+          find "$MACOS" -type f -print0 | while IFS= read -r -d '' f; do
+            if /usr/bin/file -b "$f" | grep -q 'Mach-O'; then
+              echo "$f: $(lipo -archs "$f")"
+            fi
+          done
+
+      - name: Upload macOS Universal artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssinaPDF-macOS-Universal
+          path: |
+            ${{ runner.temp }}/macos-universal-dist/AssinaPDF-macOS-Universal.dmg
+            ${{ runner.temp }}/macos-universal-dist/AssinaPDF-macOS-Universal.zip
+          if-no-files-found: error
+          retention-days: 30
