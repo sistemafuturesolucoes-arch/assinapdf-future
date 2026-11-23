@@ -1,0 +1,76 @@
+name: AssinaPDF CrossPlatform - macOS Universal
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão do instalador macOS"
+        required: true
+        default: "0.4.2"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-universal:
+    # macos-14 provides the Apple toolchain used by the universal packaging script.
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify Apple packaging tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in lipo sips iconutil codesign hdiutil; do
+            command -v "$tool"
+          done
+
+      - name: Build macOS Universal DMG
+        shell: bash
+        env:
+          ASSINAPDF_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/build-assinapdf-macos-universal.sh
+          ./scripts/build-assinapdf-macos-universal.sh
+
+          DMG="$(find artifacts/release-assinapdf -type f -name "AssinaPDF-macOS-Universal-${ASSINAPDF_VERSION}.dmg" -print -quit)"
+          if [[ -z "$DMG" || ! -s "$DMG" ]]; then
+            echo "DMG universal não foi gerado ou está vazio."
+            exit 1
+          fi
+
+          APP="$(find artifacts/release-assinapdf -type d -name "AssinaPDF.app" -print -quit)"
+          EXECUTABLE="$APP/Contents/MacOS/AssinaPDF.MacPrototype"
+          ARCHS="$(lipo -archs "$EXECUTABLE")"
+          echo "Arquiteturas do executável: $ARCHS"
+          [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]] || {
+            echo "O executável não contém arm64 e x86_64."
+            exit 1
+          }
+
+          shasum -a 256 "$DMG" | tee "${DMG}.sha256"
+          echo "DMG gerado: $DMG"
+
+      - name: Upload macOS Universal installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssinaPDF-macOS-Universal-${{ inputs.version }}
+          path: |
+            artifacts/release-assinapdf/**/installers/AssinaPDF-macOS-Universal-${{ inputs.version }}.dmg
+            artifacts/release-assinapdf/**/installers/AssinaPDF-macOS-Universal-${{ inputs.version }}.dmg.sha256
+          if-no-files-found: error
+          retention-days: 14
