@@ -73,6 +73,7 @@ public sealed class UpdateCheckService
         if (string.IsNullOrWhiteSpace(update.DownloadUrl) ||
             !Uri.TryCreate(update.DownloadUrl, UriKind.Absolute, out var downloadUri) ||
             downloadUri.Scheme != Uri.UriSchemeHttps ||
+            !downloadUri.IsDefaultPort ||
             !string.Equals(downloadUri.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
             !downloadUri.AbsolutePath.Contains("/releases/download/", StringComparison.OrdinalIgnoreCase) ||
             !string.IsNullOrEmpty(downloadUri.UserInfo))
@@ -91,6 +92,10 @@ public sealed class UpdateCheckService
             _ => throw new PlatformNotSupportedException(
                 $"Não há pacote de atualização configurado para {update.Platform}.")
         };
+
+        if (!downloadUri.AbsolutePath.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                $"O arquivo publicado não possui a extensão esperada ({extension}) para {update.Platform}.");
 
         byte[] expectedHash = Convert.FromHexString(update.Sha256);
         string version = update.LatestVersion!;
