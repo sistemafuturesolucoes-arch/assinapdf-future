@@ -1,0 +1,72 @@
+name: AssinaPDF macOS Universal (Intel + Apple Silicon)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão do pacote macOS"
+        required: true
+        default: "0.4.4"
+        type: string
+  push:
+    branches:
+      - feature/conversoes-fiscais-e-documentos-2026-11-16
+    paths:
+      - "scripts/build-assinapdf-macos-universal.sh"
+      - ".github/workflows/assinapdf-macos-universal-ci.yml"
+      - "src/AssinaPDF.CrossPlatform/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assinapdf-macos-universal-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify universal DMG
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      ASSINAPDF_VERSION: ${{ inputs.version || '0.4.4' }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/AssinaPDF.CrossPlatform/EditorWeb/package.json
+
+      - name: Confirm Apple toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sw_vers
+          dotnet --info
+          for tool in lipo hdiutil codesign sips iconutil ditto; do command -v "$tool"; done
+
+      - name: Build universal macOS app and DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/build-assinapdf-macos-universal.sh
+          ./scripts/build-assinapdf-macos-universal.sh
+
+      - name: Upload universal installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssinaPDF-macOS-Universal-${{ env.ASSINAPDF_VERSION }}
+          path: |
+            ${{ runner.temp }}/assinapdf-macos-${{ env.ASSINAPDF_VERSION }}/dist/AssinaPDF-macOS-Universal-${{ env.ASSINAPDF_VERSION }}.dmg
+            ${{ runner.temp }}/assinapdf-macos-${{ env.ASSINAPDF_VERSION }}/dist/AssinaPDF-macOS-Universal-${{ env.ASSINAPDF_VERSION }}.dmg.sha256
+          if-no-files-found: error
+          retention-days: 30
