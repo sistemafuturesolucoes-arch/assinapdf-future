@@ -65,6 +65,6 @@ jobs:
           name: AssinaPDF-macOS-Universal-${{ env.ASSINAPDF_VERSION }}
           path: |
             ${{ runner.temp }}/assinapdf-macos-${{ env.ASSINAPDF_VERSION }}-${{ github.run_id }}/dist/AssinaPDF-macOS-Universal-${{ env.ASSINAPDF_VERSION }}.dmg
-            ${{ runner.temp }}/assinapdf-macos-${{ env.ASSINAPDF_VERSION }}/dist/AssinaPDF-macOS-Universal-${{ env.ASSINAPDF_VERSION }}.dmg.sha256
+            ${{ runner.temp }}/assinapdf-macos-${{ env.ASSINAPDF_VERSION }}-${{ github.run_id }}/dist/AssinaPDF-macOS-Universal-${{ env.ASSINAPDF_VERSION }}.dmg.sha256
           if-no-files-found: error
           retention-days: 30
