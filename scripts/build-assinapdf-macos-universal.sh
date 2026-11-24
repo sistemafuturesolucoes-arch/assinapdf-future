@@ -10,7 +10,8 @@ for tool in dotnet lipo hdiutil codesign sips iconutil ditto; do
   command -v "$tool" >/dev/null || { echo "Ferramenta obrigatória ausente: $tool (este build requer runner macOS)." >&2; exit 2; }
 done
 
-RUN_ROOT="${RUNNER_TEMP:-$ROOT_DIR/artifacts}/assinapdf-macos-$VERSION"
+RUN_ID="${GITHUB_RUN_ID:-$(date +%Y%m%d-%H%M%S)}"
+RUN_ROOT="${RUNNER_TEMP:-$ROOT_DIR/artifacts}/assinapdf-macos-$VERSION-$RUN_ID"
 PUBLISH_ROOT="$RUN_ROOT/publish"
 X64="$PUBLISH_ROOT/osx-x64"
 ARM64="$PUBLISH_ROOT/osx-arm64"
