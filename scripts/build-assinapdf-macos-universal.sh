@@ -3,83 +3,93 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT="$ROOT_DIR/src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj"
-ARTIFACTS="$ROOT_DIR/artifacts"
-RUN_ID="$(date +%Y%m%d-%H%M%S)"
-RUN_ROOT="$ARTIFACTS/release-assinapdf/$RUN_ID"
-PUBLISH_ROOT="$RUN_ROOT/publish"
-ARM64="$PUBLISH_ROOT/osx-arm64"
-X64="$PUBLISH_ROOT/osx-x64"
-UNIVERSAL="$PUBLISH_ROOT/osx-universal"
-APP="$RUN_ROOT/AssinaPDF.app"
-STAGING="$RUN_ROOT/macos-dmg-staging"
 VERSION="${ASSINAPDF_VERSION:-$(awk -F'[<>]' '/<Version>/{print $3; exit}' "$PROJECT")}"
-APP_EXECUTABLE="AssinaPDF.MacPrototype"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "Versão inválida: $VERSION" >&2; exit 2; }
 
-command -v dotnet >/dev/null || { echo "Instale o .NET 10 SDK."; exit 1; }
-command -v lipo >/dev/null || { echo "Este script deve ser executado no macOS (lipo não encontrado)."; exit 1; }
-command -v hdiutil >/dev/null || { echo "hdiutil não encontrado."; exit 1; }
+for tool in dotnet lipo hdiutil codesign sips iconutil ditto; do
+  command -v "$tool" >/dev/null || { echo "Ferramenta obrigatória ausente: $tool (este build requer runner macOS)." >&2; exit 2; }
+done
 
-if [[ -e "$RUN_ROOT" ]]; then echo "Pasta de saída já existe: $RUN_ROOT"; exit 1; fi
-mkdir -p "$PUBLISH_ROOT" "$RUN_ROOT/installers"
+RUN_ROOT="${RUNNER_TEMP:-$ROOT_DIR/artifacts}/assinapdf-macos-$VERSION"
+PUBLISH_ROOT="$RUN_ROOT/publish"
+X64="$PUBLISH_ROOT/osx-x64"
+ARM64="$PUBLISH_ROOT/osx-arm64"
+APP="$RUN_ROOT/AssinaPDF.app"
+MACOS="$APP/Contents/MacOS"
+STAGING="$RUN_ROOT/dmg-staging"
+DIST="$RUN_ROOT/dist"
+EXECUTABLE="AssinaPDF.MacPrototype"
+
+rm -rf "$RUN_ROOT"
+mkdir -p "$X64" "$ARM64" "$MACOS" "$APP/Contents/Resources" "$STAGING" "$DIST"
+
+echo "== Restore =="
 dotnet restore "$PROJECT"
-dotnet publish "$PROJECT" -c Release -r osx-arm64 --self-contained true \
-  -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None \
-  -p:Version="$VERSION" -p:AssemblyVersion="${VERSION}.0" -p:FileVersion="${VERSION}.0" -p:InformationalVersion="$VERSION" -o "$ARM64"
+
+echo "== Publish Intel x86_64 =="
 dotnet publish "$PROJECT" -c Release -r osx-x64 --self-contained true \
-  -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None \
-  -p:Version="$VERSION" -p:AssemblyVersion="${VERSION}.0" -p:FileVersion="${VERSION}.0" -p:InformationalVersion="$VERSION" -o "$X64"
+  -p:UseAppHost=true -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None \
+  -p:Version="$VERSION" -p:AssemblyVersion="$VERSION.0" -p:FileVersion="$VERSION.0" \
+  -p:InformationalVersion="$VERSION" -o "$X64"
 
-mkdir -p "$UNIVERSAL" "$APP/Contents/MacOS" "$APP/Contents/Resources" "$STAGING"
-ditto "$ARM64/." "$UNIVERSAL/"
+echo "== Publish Apple Silicon arm64 =="
+dotnet publish "$PROJECT" -c Release -r osx-arm64 --self-contained true \
+  -p:UseAppHost=true -p:PublishSingleFile=false -p:DebugSymbols=false -p:DebugType=None \
+  -p:Version="$VERSION" -p:AssemblyVersion="$VERSION.0" -p:FileVersion="$VERSION.0" \
+  -p:InformationalVersion="$VERSION" -o "$ARM64"
 
-echo "Mesclando binários nativos arm64 + x86_64..."
-while IFS= read -r -d '' ARM_FILE; do
-  RELATIVE="${ARM_FILE#"$ARM64/"}"
-  X64_FILE="$X64/$RELATIVE"
-  DEST="$UNIVERSAL/$RELATIVE"
-  [[ -f "$X64_FILE" ]] || continue
+test -s "$X64/$EXECUTABLE"
+test -s "$ARM64/$EXECUTABLE"
+ditto "$ARM64/." "$MACOS/"
 
-  if file "$ARM_FILE" | grep -q "Mach-O"; then
-    ARM_ARCHS="$(lipo -archs "$ARM_FILE" 2>/dev/null || true)"
-    X64_ARCHS="$(lipo -archs "$X64_FILE" 2>/dev/null || true)"
-    if [[ "$ARM_ARCHS" == *arm64* && "$ARM_ARCHS" == *x86_64* ]]; then
-      continue
-    elif [[ "$X64_ARCHS" == *arm64* && "$X64_ARCHS" == *x86_64* ]]; then
-      cp -p "$X64_FILE" "$DEST"
-    elif [[ "$ARM_ARCHS" == *arm64* && "$X64_ARCHS" == *x86_64* ]]; then
-      mkdir -p "$(dirname "$DEST")"
-      lipo -create "$ARM_FILE" "$X64_FILE" -output "$DEST"
+echo "== Merge every native Mach-O file =="
+while IFS= read -r -d '' afile; do
+  rel="${afile#"$ARM64/"}"
+  xfile="$X64/$rel"
+  if /usr/bin/file -b "$afile" | grep -q 'Mach-O'; then
+    if [[ ! -f "$xfile" ]] || ! /usr/bin/file -b "$xfile" | grep -q 'Mach-O'; then
+      echo "ERRO: binário ARM64 sem par Intel: $rel" >&2; exit 1
     fi
+    mkdir -p "$MACOS/$(dirname "$rel")"
+    lipo -create "$xfile" "$afile" -output "$MACOS/$rel.universal"
+    mv "$MACOS/$rel.universal" "$MACOS/$rel"
   fi
 done < <(find "$ARM64" -type f -print0)
 
-# Inclui arquivos exclusivos do publish Intel, sem substituir os equivalentes mesclados.
-while IFS= read -r -d '' X64_FILE; do
-  RELATIVE="${X64_FILE#"$X64/"}"
-  DEST="$UNIVERSAL/$RELATIVE"
-  if [[ ! -e "$DEST" ]]; then
-    mkdir -p "$(dirname "$DEST")"
-    cp -p "$X64_FILE" "$DEST"
+while IFS= read -r -d '' xfile; do
+  rel="${xfile#"$X64/"}"
+  afile="$ARM64/$rel"
+  if /usr/bin/file -b "$xfile" | grep -q 'Mach-O'; then
+    if [[ ! -f "$afile" ]] || ! /usr/bin/file -b "$afile" | grep -q 'Mach-O'; then
+      echo "ERRO: binário Intel sem par ARM64: $rel" >&2; exit 1
+    fi
+  fi
+  dest="$MACOS/$rel"
+  if [[ ! -e "$dest" ]]; then
+    mkdir -p "$(dirname "$dest")"
+    cp -p "$xfile" "$dest"
   fi
 done < <(find "$X64" -type f -print0)
 
-ditto "$UNIVERSAL/." "$APP/Contents/MacOS/"
-chmod +x "$APP/Contents/MacOS/$APP_EXECUTABLE"
+chmod +x "$MACOS/$EXECUTABLE"
+ARCHS="$(lipo -archs "$MACOS/$EXECUTABLE")"
+echo "AppHost: $ARCHS"
+[[ " $ARCHS " == *" arm64 "* && " $ARCHS " == *" x86_64 "* ]] || { echo "AppHost não é universal." >&2; exit 1; }
 
 ICONSET="$RUN_ROOT/AssinaPDF.iconset"
 mkdir -p "$ICONSET"
-SOURCE_LOGO="$ROOT_DIR/src/AssinaPDF.CrossPlatform/logo-future.png"
-if [[ -f "$SOURCE_LOGO" ]]; then
-  sips -z 16 16 "$SOURCE_LOGO" --out "$ICONSET/icon_16x16.png" >/dev/null
-  sips -z 32 32 "$SOURCE_LOGO" --out "$ICONSET/icon_16x16@2x.png" >/dev/null
-  sips -z 32 32 "$SOURCE_LOGO" --out "$ICONSET/icon_32x32.png" >/dev/null
-  sips -z 64 64 "$SOURCE_LOGO" --out "$ICONSET/icon_32x32@2x.png" >/dev/null
-  sips -z 128 128 "$SOURCE_LOGO" --out "$ICONSET/icon_128x128.png" >/dev/null
-  sips -z 256 256 "$SOURCE_LOGO" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
-  sips -z 256 256 "$SOURCE_LOGO" --out "$ICONSET/icon_256x256.png" >/dev/null
-  sips -z 512 512 "$SOURCE_LOGO" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
-  sips -z 512 512 "$SOURCE_LOGO" --out "$ICONSET/icon_512x512.png" >/dev/null
-  sips -z 1024 1024 "$SOURCE_LOGO" --out "$ICONSET/icon_512x512@2x.png" >/dev/null
+LOGO="$ROOT_DIR/src/AssinaPDF.CrossPlatform/logo-future.png"
+if [[ -f "$LOGO" ]]; then
+  sips -z 16 16 "$LOGO" --out "$ICONSET/icon_16x16.png" >/dev/null
+  sips -z 32 32 "$LOGO" --out "$ICONSET/icon_16x16@2x.png" >/dev/null
+  sips -z 32 32 "$LOGO" --out "$ICONSET/icon_32x32.png" >/dev/null
+  sips -z 64 64 "$LOGO" --out "$ICONSET/icon_32x32@2x.png" >/dev/null
+  sips -z 128 128 "$LOGO" --out "$ICONSET/icon_128x128.png" >/dev/null
+  sips -z 256 256 "$LOGO" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
+  sips -z 256 256 "$LOGO" --out "$ICONSET/icon_256x256.png" >/dev/null
+  sips -z 512 512 "$LOGO" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
+  sips -z 512 512 "$LOGO" --out "$ICONSET/icon_512x512.png" >/dev/null
+  sips -z 1024 1024 "$LOGO" --out "$ICONSET/icon_512x512@2x.png" >/dev/null
   iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AssinaPDF.icns"
 fi
 
@@ -91,7 +101,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>AssinaPDF</string>
   <key>CFBundleDisplayName</key><string>AssinaPDF | Future Soluções</string>
   <key>CFBundleIdentifier</key><string>com.futuresolucoes.assinapdf</string>
-  <key>CFBundleExecutable</key><string>$APP_EXECUTABLE</string>
+  <key>CFBundleExecutable</key><string>$EXECUTABLE</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
@@ -102,22 +112,33 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Assinatura ad-hoc para facilitar testes locais. Distribuição pública exige Developer ID + notarização.
+plutil -lint "$APP/Contents/Info.plist"
+# Assinatura ad-hoc para testes. Distribuição pública exige Developer ID e notarização.
 codesign --force --deep --sign - "$APP"
+codesign --verify --deep --strict "$APP"
 
 ditto "$APP" "$STAGING/AssinaPDF.app"
 ln -s /Applications "$STAGING/Applications"
 cat > "$STAGING/LEIA-ME.txt" <<'INFO'
 AssinaPDF | Future Soluções
 
-Arraste AssinaPDF.app para a pasta Applications.
-Na primeira abertura, o macOS pode solicitar confirmação de segurança porque este pacote de teste não está notarizado.
-
-A versão pública deve ser assinada com Developer ID e notarizada pela Apple.
+Arraste AssinaPDF.app para Applications.
+Pacote de teste assinado ad-hoc; a distribuição pública deverá receber assinatura Developer ID e notarização Apple.
 INFO
 
-DMG="$RUN_ROOT/installers/AssinaPDF-macOS-Universal-$VERSION.dmg"
+DMG="$DIST/AssinaPDF-macOS-Universal-$VERSION.dmg"
 hdiutil create -volname "AssinaPDF | Future Soluções" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
 
-echo "Instalador macOS Universal gerado: $DMG"
-shasum -a 256 "$DMG"
+echo "== Auditoria de todos os binários nativos no .app =="
+while IFS= read -r -d '' f; do
+  if /usr/bin/file -b "$f" | grep -q 'Mach-O'; then
+    arches="$(lipo -archs "$f")"
+    echo "$arches  $f"
+    [[ " $arches " == *" arm64 "* && " $arches " == *" x86_64 "* ]] || {
+      echo "ERRO: binário nativo não universal: $f ($arches)" >&2; exit 1;
+    }
+  fi
+done < <(find "$MACOS" -type f -print0)
+
+shasum -a 256 "$DMG" | tee "$DMG.sha256"
+echo "DMG pronto: $DMG"
