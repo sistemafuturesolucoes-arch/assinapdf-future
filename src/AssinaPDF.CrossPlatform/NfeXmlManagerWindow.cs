@@ -860,11 +860,11 @@ public sealed class NfeXmlManagerWindow : Window
 
     private static string ExtractCnpjFromCertificate(X509Certificate2 certificate)
     {
-        string subject = certificate.Subject + "\\n" + certificate.SubjectName.Name;
+        string subject = certificate.Subject + "\n" + certificate.SubjectName.Name;
         var patterns = new[]
         {
-            @"(?:SERIALNUMBER|2\\.5\\.4\\.5)\\s*=\\s*(?:CNPJ[:\\s]*)?([A-Z0-9]{12}[0-9]{2})",
-            @"CNPJ[:\\s]*([A-Z0-9]{12}[0-9]{2})"
+            @"(?:SERIALNUMBER|2\.5\.4\.5)\s*=\s*(?:CNPJ[:\s]*)?([A-Z0-9]{12}[0-9]{2})",
+            @"CNPJ[:\s]*([A-Z0-9]{12}[0-9]{2})"
         };
 
         foreach (string pattern in patterns)
