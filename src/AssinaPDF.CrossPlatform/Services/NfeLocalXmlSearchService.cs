@@ -15,7 +15,7 @@ public static class NfeLocalXmlSearchService
     {
         cnpj = NfeDistributionService.NormalizeCnpj(cnpj);
         if (cnpj.Length != 14)
-            throw new ArgumentException("Informe um CNPJ com 14 dígitos.", nameof(cnpj));
+            throw new ArgumentException("Informe um CNPJ com 14 caracteres.", nameof(cnpj));
         ArgumentNullException.ThrowIfNull(folders);
         if (maximumFiles < 1)
             throw new ArgumentOutOfRangeException(nameof(maximumFiles));
