@@ -847,7 +847,7 @@ public sealed class NfeXmlManagerWindow : Window
 
     private string GetSelectedCertificateCnpj() =>
         _certificatePicker.SelectedItem is CertificateInfo selected
-            ? ExtractCnpjFromCertificate(selected.Certificate)
+            ? CertificateCnpjExtractor.Extract(selected.Certificate)
             : string.Empty;
 
     private void TryFillCnpjFromCertificate()
@@ -856,28 +856,6 @@ public sealed class NfeXmlManagerWindow : Window
         _certificateCnpjStatus.Text = _cnpjInput.Text.Length == 14
             ? $"CNPJ identificado: {_cnpjInput.Text}"
             : "CNPJ não identificado. Selecione um certificado e-CNPJ.";
-    }
-
-    private static string ExtractCnpjFromCertificate(X509Certificate2 certificate)
-    {
-        string subject = certificate.Subject + "\n" + certificate.SubjectName.Name;
-        var patterns = new[]
-        {
-            @"(?:SERIALNUMBER|2\.5\.4\.5)\s*=\s*(?:CNPJ[:\s]*)?([A-Z0-9]{12}[0-9]{2})",
-            @"CNPJ[:\s]*([A-Z0-9]{12}[0-9]{2})"
-        };
-
-        foreach (string pattern in patterns)
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(
-                subject,
-                pattern,
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (match.Success)
-                return match.Groups[1].Value.ToUpperInvariant();
-        }
-
-        return string.Empty;
     }
 
     private sealed record ReceivedDocumentExport(NfeDistributedDocument Document, string SourcePath);
