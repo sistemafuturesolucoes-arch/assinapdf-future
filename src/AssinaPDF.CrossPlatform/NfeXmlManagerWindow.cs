@@ -23,12 +23,14 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly List<NfeDocumentSummary> _issuedDocuments = new();
     private readonly List<NfeDocumentSummary> _allIssuedDocuments = new();
     private readonly List<ReceivedDocumentExport> _receivedDocuments = new();
+    private readonly List<ReceivedDocumentExport> _visibleReceivedDocuments = new();
     private Button? _queryReceivedButton;
 
     private readonly ComboBox _certificatePicker;
     private readonly ComboBox _environmentPicker;
     private readonly TextBox _cnpjInput;
     private readonly CalendarDatePicker _monthPicker;
+    private readonly CalendarDatePicker _receivedMonthPicker;
     private readonly TextBlock _receivedStatus;
     private readonly TextBlock _issuedStatus;
     private readonly ListBox _receivedList;
@@ -81,6 +83,14 @@ public sealed class NfeXmlManagerWindow : Window
             MinWidth = 180,
             PlaceholderText = "Escolher mês/ano"
         };
+        _receivedMonthPicker = new CalendarDatePicker
+        {
+            SelectedDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
+            SelectedDateFormat = CalendarDatePickerFormat.Custom,
+            CustomDateFormatString = "MMMM yyyy",
+            MinWidth = 180,
+            PlaceholderText = "Escolher mês/ano"
+        };
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         TryFillCnpjFromCertificate();
         _receivedStatus = MakeStatus(_certificateLoadError is null
@@ -95,6 +105,7 @@ public sealed class NfeXmlManagerWindow : Window
             SelectionMode = SelectionMode.Multiple
         };
         _monthPicker.SelectedDateChanged += (_, _) => ApplyIssuedMonthFilter();
+        _receivedMonthPicker.SelectedDateChanged += (_, _) => ApplyReceivedMonthFilter();
 
         var root = new StackPanel { Margin = new Thickness(16), Spacing = 10 };
         root.Children.Add(new TextBlock
@@ -216,6 +227,17 @@ public sealed class NfeXmlManagerWindow : Window
         actions.Children.Add(query);
         actions.Children.Add(chooseFolder);
         panel.Children.Add(actions);
+
+        var monthRow = new WrapPanel();
+        monthRow.Children.Add(new TextBlock
+        {
+            Text = "Filtrar mês de emissão:",
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0),
+            Foreground = Brush.Parse("#4B535E")
+        });
+        monthRow.Children.Add(_receivedMonthPicker);
+        panel.Children.Add(monthRow);
 
         var exportActions = new WrapPanel();
         var exportSelectedXml = MakeButton("Exportar XML selecionados", "#6741B8", "#FFFFFF");
@@ -341,6 +363,7 @@ public sealed class NfeXmlManagerWindow : Window
 
         _receivedRows.Clear();
         _receivedDocuments.Clear();
+        _visibleReceivedDocuments.Clear();
         _receivedStatus.Text = "Conectando à SEFAZ com o certificado selecionado...";
         SetReceivedQueryEnabled(false);
 
@@ -385,9 +408,6 @@ public sealed class NfeXmlManagerWindow : Window
                     string path = Path.Combine(outputDirectory, fileName);
                     await File.WriteAllTextAsync(path, document.XmlContent, new UTF8Encoding(false));
                     _receivedDocuments.Add(new ReceivedDocumentExport(document, path));
-                    _receivedRows.Add(
-                        $"NSU {document.Nsu} · {document.DocumentType} · " +
-                        $"{document.InvoiceNumber} · {document.IssuerName}");
                     saved++;
                 }
 
@@ -417,6 +437,7 @@ public sealed class NfeXmlManagerWindow : Window
                 currentNsu = batch.LastNsu;
             }
 
+            ApplyReceivedMonthFilter(updateStatus: false);
             _receivedStatus.Text =
                 $"{saved} documento(s) recebidos e salvos em:\n{outputDirectory}\n" +
                 (reachedEnd
@@ -540,6 +561,36 @@ public sealed class NfeXmlManagerWindow : Window
         }
     }
 
+    private void ApplyReceivedMonthFilter(bool updateStatus = true)
+    {
+        _visibleReceivedDocuments.Clear();
+        _receivedRows.Clear();
+
+        IEnumerable<ReceivedDocumentExport> filtered = _receivedDocuments;
+        if (_receivedMonthPicker.SelectedDate is DateTime selectedDate)
+        {
+            filtered = filtered.Where(item =>
+                DateTimeOffset.TryParse(item.Document.IssueDate, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeLocal, out var issueDate) &&
+                issueDate.Year == selectedDate.Year &&
+                issueDate.Month == selectedDate.Month);
+        }
+
+        _visibleReceivedDocuments.AddRange(filtered);
+        foreach (var item in _visibleReceivedDocuments)
+        {
+            var document = item.Document;
+            _receivedRows.Add(
+                $"NSU {document.Nsu} · {document.DocumentType} · " +
+                $"{document.InvoiceNumber} · {document.IssuerName} · {FormatIssueDate(document.IssueDate)}");
+        }
+
+        if (updateStatus)
+            _receivedStatus.Text =
+                $"{_visibleReceivedDocuments.Count} documento(s) recebidos no mês selecionado " +
+                $"({_receivedMonthPicker.SelectedDate?.ToString("MM/yyyy") ?? "todos os meses"}).";
+    }
+
     private List<ReceivedDocumentExport> GetSelectedReceivedDocuments()
     {
         var selected = new List<ReceivedDocumentExport>();
@@ -548,8 +599,8 @@ public sealed class NfeXmlManagerWindow : Window
             if (item is string row)
             {
                 int index = _receivedRows.IndexOf(row);
-                if (index >= 0 && index < _receivedDocuments.Count)
-                    selected.Add(_receivedDocuments[index]);
+                if (index >= 0 && index < _visibleReceivedDocuments.Count)
+                    selected.Add(_visibleReceivedDocuments[index]);
             }
         }
         return selected;
@@ -558,7 +609,7 @@ public sealed class NfeXmlManagerWindow : Window
     private async Task ExportReceivedDocumentsAsync(bool pdf, bool exportAll)
     {
         List<ReceivedDocumentExport> documents = exportAll
-            ? _receivedDocuments.ToList()
+            ? _visibleReceivedDocuments.ToList()
             : GetSelectedReceivedDocuments();
 
         if (documents.Count == 0)
