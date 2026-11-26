@@ -121,6 +121,47 @@ public static class NfePdfExportService
             return date.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
         return string.IsNullOrWhiteSpace(value) ? "Não informado" : value;
     }
+
+    public static void ExportReceivedDocumentSummary(NfeDistributedDocument distributed, string destinationPath)
+    {
+        ArgumentNullException.ThrowIfNull(distributed);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        EnsureFontResolver();
+
+        using var document = new PdfDocument();
+        document.Info.Title = $"Documento fiscal NSU {distributed.Nsu}";
+        PdfPage page = document.AddPage();
+        page.Size = PdfSharp.PageSize.A4;
+        using XGraphics graphics = XGraphics.FromPdfPage(page);
+        var title = new XFont("Arial", 15, XFontStyleEx.Bold);
+        var bold = new XFont("Arial", 10, XFontStyleEx.Bold);
+        var body = new XFont("Arial", 9, XFontStyleEx.Regular);
+        double y = 36;
+        const double left = 34;
+        double width = page.Width.Point - 68;
+
+        void Line(string text, XFont font, double height = 18)
+        {
+            graphics.DrawString(text, font, XBrushes.Black,
+                new XRect(left, y, width, height), XStringFormats.TopLeft);
+            y += height;
+        }
+
+        Line("DOCUMENTO FISCAL RECEBIDO — SEFAZ", title, 28);
+        Line("Resumo de consulta. Este PDF não substitui o DANFE oficial.", body, 22);
+        Line("DADOS DO DOCUMENTO", bold, 22);
+        Line($"Tipo: {distributed.DocumentType}", body);
+        Line($"NSU: {distributed.Nsu}", body);
+        Line($"Número da NF-e: {distributed.InvoiceNumber}", body);
+        Line($"Emitente: {distributed.IssuerName}", body);
+        Line($"Data de emissão: {FormatDate(distributed.IssueDate)}", body);
+        Line($"Chave de acesso: {distributed.AccessKey}", body, 24);
+        Line($"Layout/schema recebido: {distributed.Schema}", body, 24);
+        Line("O XML original foi preservado separadamente para conferência e uso fiscal.", body, 22);
+        Line("Gerado pelo AssinaPDF | Future Soluções", body);
+        document.Save(destinationPath);
+    }
+
     private static readonly object FontResolverLock = new();
 
     private static void EnsureFontResolver()
