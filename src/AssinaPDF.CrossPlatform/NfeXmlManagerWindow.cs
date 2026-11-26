@@ -27,7 +27,7 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly ComboBox _certificatePicker;
     private readonly ComboBox _environmentPicker;
     private readonly TextBox _cnpjInput;
-    private readonly DatePicker _monthPicker;
+    private readonly CalendarDatePicker _monthPicker;
     private readonly TextBlock _receivedStatus;
     private readonly TextBlock _issuedStatus;
     private readonly ListBox _receivedList;
@@ -72,10 +72,13 @@ public sealed class NfeXmlManagerWindow : Window
             PlaceholderText = "CNPJ da empresa (14 caracteres)",
             MinWidth = 210
         };
-        _monthPicker = new DatePicker
+        _monthPicker = new CalendarDatePicker
         {
-            SelectedDate = new DateTimeOffset(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, TimeSpan.Zero),
-            MinWidth = 150
+            SelectedDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
+            SelectedDateFormat = CalendarDatePickerFormat.Custom,
+            CustomDateFormatString = "MMMM yyyy",
+            MinWidth = 180,
+            PlaceholderText = "Escolher mês/ano"
         };
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         TryFillCnpjFromCertificate();
@@ -90,6 +93,7 @@ public sealed class NfeXmlManagerWindow : Window
             Height = 210,
             SelectionMode = SelectionMode.Multiple
         };
+        _monthPicker.SelectedDateChanged += (_, _) => ApplyIssuedMonthFilter();
 
         var root = new StackPanel { Margin = new Thickness(16), Spacing = 10 };
         root.Children.Add(new TextBlock
@@ -255,9 +259,6 @@ public sealed class NfeXmlManagerWindow : Window
             Foreground = Brush.Parse("#4B535E")
         });
         monthRow.Children.Add(_monthPicker);
-        var applyMonth = MakeButton("Aplicar mês", "#E7E9ED", "#34383E");
-        applyMonth.Click += (_, _) => ApplyIssuedMonthFilter();
-        monthRow.Children.Add(applyMonth);
         panel.Children.Add(monthRow);
 
         var exportActions = new WrapPanel();
@@ -526,7 +527,7 @@ public sealed class NfeXmlManagerWindow : Window
         _issuedDocuments.Clear();
         _issuedRows.Clear();
 
-        if (_monthPicker.SelectedDate is not DateTimeOffset selectedDate)
+        if (_monthPicker.SelectedDate is not DateTime selectedDate)
         {
             _issuedDocuments.AddRange(_allIssuedDocuments);
         }
