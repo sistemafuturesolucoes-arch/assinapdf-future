@@ -16,6 +16,7 @@ public sealed class NfeXmlManagerWindow : Window
 {
     private readonly CertificateStoreService _certificateStore = new();
     private readonly List<CertificateInfo> _certificates;
+    private string? _certificateLoadError;
     private readonly ObservableCollection<string> _receivedRows = new();
     private readonly ObservableCollection<string> _issuedRows = new();
     private readonly List<NfeDocumentSummary> _issuedDocuments = new();
@@ -40,7 +41,15 @@ public sealed class NfeXmlManagerWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush.Parse("#F3F4F6");
 
-        _certificates = _certificateStore.LoadCertificates().ToList();
+        try
+        {
+            _certificates = _certificateStore.LoadCertificates().ToList();
+        }
+        catch (Exception ex)
+        {
+            _certificates = new List<CertificateInfo>();
+            _certificateLoadError = ex.Message;
+        }
         _certificatePicker = new ComboBox
         {
             ItemsSource = _certificates,
@@ -60,7 +69,9 @@ public sealed class NfeXmlManagerWindow : Window
         };
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         TryFillCnpjFromCertificate();
-        _receivedStatus = MakeStatus("Selecione o certificado e informe o CNPJ para consultar a distribuição da SEFAZ.");
+        _receivedStatus = MakeStatus(_certificateLoadError is null
+            ? "Selecione o certificado e informe o CNPJ para consultar a distribuição da SEFAZ."
+            : "Não foi possível carregar o repositório de certificados. A busca local de notas emitidas continua disponível. " + _certificateLoadError);
         _issuedStatus = MakeStatus("Informe o CNPJ para localizar NF-e emitidas que já estejam salvas no computador.");
         _receivedList = new ListBox { ItemsSource = _receivedRows, MinHeight = 250 };
         _issuedList = new ListBox { ItemsSource = _issuedRows, MinHeight = 250 };
