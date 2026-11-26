@@ -242,8 +242,8 @@ public sealed class NfeXmlManagerWindow : Window
         var exportActions = new WrapPanel();
         var exportSelectedXml = MakeButton("Exportar XML selecionados", "#6741B8", "#FFFFFF");
         var exportSelectedPdf = MakeButton("Exportar PDF selecionados", "#6741B8", "#FFFFFF");
-        var exportAllXml = MakeButton("Exportar XML recebidos", "#E7E9ED", "#34383E");
-        var exportAllPdf = MakeButton("Exportar PDF recebidos", "#E7E9ED", "#34383E");
+        var exportAllXml = MakeButton("Exportar XML do mês", "#E7E9ED", "#34383E");
+        var exportAllPdf = MakeButton("Exportar PDF do mês", "#E7E9ED", "#34383E");
         exportSelectedXml.Click += async (_, _) => await ExportReceivedDocumentsAsync(pdf: false, exportAll: false);
         exportSelectedPdf.Click += async (_, _) => await ExportReceivedDocumentsAsync(pdf: true, exportAll: false);
         exportAllXml.Click += async (_, _) => await ExportReceivedDocumentsAsync(pdf: false, exportAll: true);
@@ -446,6 +446,7 @@ public sealed class NfeXmlManagerWindow : Window
         }
         catch (Exception ex)
         {
+            ApplyReceivedMonthFilter(updateStatus: false);
             _receivedStatus.Text =
                 "Não foi possível concluir a consulta à SEFAZ.\n" + ex.Message;
         }
