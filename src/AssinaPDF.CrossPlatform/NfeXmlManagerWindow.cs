@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
@@ -20,11 +21,13 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly ObservableCollection<string> _receivedRows = new();
     private readonly ObservableCollection<string> _issuedRows = new();
     private readonly List<NfeDocumentSummary> _issuedDocuments = new();
+    private readonly List<NfeDocumentSummary> _allIssuedDocuments = new();
     private Button? _queryReceivedButton;
 
     private readonly ComboBox _certificatePicker;
     private readonly ComboBox _environmentPicker;
     private readonly TextBox _cnpjInput;
+    private readonly DatePicker _monthPicker;
     private readonly TextBlock _receivedStatus;
     private readonly TextBlock _issuedStatus;
     private readonly ListBox _receivedList;
@@ -34,10 +37,12 @@ public sealed class NfeXmlManagerWindow : Window
     public NfeXmlManagerWindow()
     {
         Title = "AssinaPDF | Buscar XMLs fiscais";
-        Width = 900;
-        Height = 680;
-        MinWidth = 680;
-        MinHeight = 480;
+        Width = 820;
+        Height = 620;
+        MinWidth = 600;
+        MinHeight = 440;
+        MaxWidth = 1100;
+        MaxHeight = 850;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush.Parse("#F3F4F6");
 
@@ -64,8 +69,13 @@ public sealed class NfeXmlManagerWindow : Window
         };
         _cnpjInput = new TextBox
         {
-            Watermark = "CNPJ da empresa (14 caracteres)",
-            MinWidth = 230
+            PlaceholderText = "CNPJ da empresa (14 caracteres)",
+            MinWidth = 210
+        };
+        _monthPicker = new DatePicker
+        {
+            SelectedDate = new DateTimeOffset(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, TimeSpan.Zero),
+            MinWidth = 150
         };
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         TryFillCnpjFromCertificate();
@@ -73,10 +83,15 @@ public sealed class NfeXmlManagerWindow : Window
             ? "Selecione o certificado e informe o CNPJ para consultar a distribuição da SEFAZ."
             : "Não foi possível carregar o repositório de certificados. A busca local de notas emitidas continua disponível. " + _certificateLoadError);
         _issuedStatus = MakeStatus("Informe o CNPJ para localizar NF-e emitidas que já estejam salvas no computador.");
-        _receivedList = new ListBox { ItemsSource = _receivedRows, MinHeight = 250 };
-        _issuedList = new ListBox { ItemsSource = _issuedRows, MinHeight = 250 };
+        _receivedList = new ListBox { ItemsSource = _receivedRows, Height = 190 };
+        _issuedList = new ListBox
+        {
+            ItemsSource = _issuedRows,
+            Height = 210,
+            SelectionMode = SelectionMode.Multiple
+        };
 
-        var root = new StackPanel { Margin = new Thickness(24), Spacing = 14 };
+        var root = new StackPanel { Margin = new Thickness(16), Spacing = 10 };
         root.Children.Add(new TextBlock
         {
             Text = "Buscar XMLs fiscais",
@@ -92,12 +107,7 @@ public sealed class NfeXmlManagerWindow : Window
             Foreground = Brush.Parse("#68717D")
         });
 
-        var companyRow = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 10,
-            VerticalAlignment = VerticalAlignment.Center
-        };
+        var companyRow = new WrapPanel { Orientation = Orientation.Horizontal };
         companyRow.Children.Add(_cnpjInput);
         companyRow.Children.Add(new TextBlock
         {
@@ -224,23 +234,46 @@ public sealed class NfeXmlManagerWindow : Window
             Foreground = Brush.Parse("#68717D")
         });
 
-        var actions = new WrapPanel();
+        var searchActions = new WrapPanel();
         var commonFolders = MakeButton("Buscar nas pastas comuns", "#6741B8", "#FFFFFF");
         var chooseFolder = MakeButton("Selecionar outra pasta", "#E7E9ED", "#34383E");
         var openFile = MakeButton("Abrir XML selecionado", "#E7E9ED", "#34383E");
-        var exportSelected = MakeButton("Exportar XML selecionado", "#6741B8", "#FFFFFF");
-        var exportAll = MakeButton("Exportar todos", "#E7E9ED", "#34383E");
         commonFolders.Click += async (_, _) => await SearchIssuedAsync(GetCommonFolders());
         chooseFolder.Click += async (_, _) => await ChooseIssuedFolderAsync();
         openFile.Click += (_, _) => OpenSelectedIssuedXml();
-        exportSelected.Click += async (_, _) => await ExportSelectedIssuedXmlAsync();
-        exportAll.Click += async (_, _) => await ExportAllIssuedXmlsAsync();
-        actions.Children.Add(commonFolders);
-        actions.Children.Add(chooseFolder);
-        actions.Children.Add(openFile);
-        actions.Children.Add(exportSelected);
-        actions.Children.Add(exportAll);
-        panel.Children.Add(actions);
+        searchActions.Children.Add(commonFolders);
+        searchActions.Children.Add(chooseFolder);
+        searchActions.Children.Add(openFile);
+        panel.Children.Add(searchActions);
+
+        var monthRow = new WrapPanel();
+        monthRow.Children.Add(new TextBlock
+        {
+            Text = "Filtrar mês de emissão:",
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0),
+            Foreground = Brush.Parse("#4B535E")
+        });
+        monthRow.Children.Add(_monthPicker);
+        var applyMonth = MakeButton("Aplicar mês", "#E7E9ED", "#34383E");
+        applyMonth.Click += (_, _) => ApplyIssuedMonthFilter();
+        monthRow.Children.Add(applyMonth);
+        panel.Children.Add(monthRow);
+
+        var exportActions = new WrapPanel();
+        var exportSelectedXml = MakeButton("Exportar XML selecionados", "#6741B8", "#FFFFFF");
+        var exportSelectedPdf = MakeButton("Exportar PDF selecionados", "#6741B8", "#FFFFFF");
+        var exportMonthXml = MakeButton("Exportar XML do mês", "#E7E9ED", "#34383E");
+        var exportMonthPdf = MakeButton("Exportar PDF do mês", "#E7E9ED", "#34383E");
+        exportSelectedXml.Click += async (_, _) => await ExportIssuedDocumentsAsync(pdf: false, exportAll: false);
+        exportSelectedPdf.Click += async (_, _) => await ExportIssuedDocumentsAsync(pdf: true, exportAll: false);
+        exportMonthXml.Click += async (_, _) => await ExportIssuedDocumentsAsync(pdf: false, exportAll: true);
+        exportMonthPdf.Click += async (_, _) => await ExportIssuedDocumentsAsync(pdf: true, exportAll: true);
+        exportActions.Children.Add(exportSelectedXml);
+        exportActions.Children.Add(exportSelectedPdf);
+        exportActions.Children.Add(exportMonthXml);
+        exportActions.Children.Add(exportMonthPdf);
+        panel.Children.Add(exportActions);
         panel.Children.Add(_issuedStatus);
         panel.Children.Add(_issuedList);
         return panel;
@@ -432,6 +465,7 @@ public sealed class NfeXmlManagerWindow : Window
 
         _issuedRows.Clear();
         _issuedDocuments.Clear();
+        _allIssuedDocuments.Clear();
         _issuedStatus.Text = "Procurando XMLs nas pastas selecionadas...";
 
         try
@@ -440,14 +474,8 @@ public sealed class NfeXmlManagerWindow : Window
             var result = await Task.Run(() =>
                 NfeLocalXmlSearchService.FindIssued(cnpj, selectedFolders, 3000));
 
-            _issuedDocuments.AddRange(result.Documents);
-            foreach (var document in _issuedDocuments)
-            {
-                _issuedRows.Add(
-                    $"NF-e {document.InvoiceNumber} · {document.IssueDate} · " +
-                    $"{document.IssuerName} · R$ {document.InvoiceTotal:N2} · {document.SourcePath}");
-            }
-
+            _allIssuedDocuments.AddRange(result.Documents);
+            ApplyIssuedMonthFilter();
             _issuedStatus.Text =
                 $"{result.Documents.Count} NF-e emitida(s) encontrada(s) em {result.FilesExamined} arquivo(s) analisado(s)." +
                 (result.LimitReached ? " Limite de 3.000 arquivos por pesquisa atingido." : "") +
@@ -493,74 +521,131 @@ public sealed class NfeXmlManagerWindow : Window
         }
     }
 
-    private async Task ExportSelectedIssuedXmlAsync()
+    private void ApplyIssuedMonthFilter()
     {
-        int index = _issuedList.SelectedIndex;
-        if (index < 0 || index >= _issuedDocuments.Count)
+        _issuedDocuments.Clear();
+        _issuedRows.Clear();
+
+        if (_monthPicker.SelectedDate is not DateTimeOffset selectedDate)
         {
-            _issuedStatus.Text = "Selecione uma NF-e na lista antes de exportar.";
-            return;
+            _issuedDocuments.AddRange(_allIssuedDocuments);
+        }
+        else
+        {
+            _issuedDocuments.AddRange(_allIssuedDocuments.Where(document =>
+                DateTimeOffset.TryParse(document.IssueDate, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeLocal, out var issueDate) &&
+                issueDate.Year == selectedDate.Year &&
+                issueDate.Month == selectedDate.Month));
         }
 
-        try
+        foreach (var document in _issuedDocuments)
         {
-            var document = _issuedDocuments[index];
-            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-            {
-                Title = "Exportar XML da NF-e",
-                SuggestedFileName = Path.GetFileName(document.SourcePath),
-                DefaultExtension = "xml",
-                ShowOverwritePrompt = true,
-                FileTypeChoices = new[]
-                {
-                    new FilePickerFileType("Arquivo XML") { Patterns = new[] { "*.xml" } }
-                }
-            });
+            _issuedRows.Add(
+                $"NF-e {document.InvoiceNumber} · {FormatIssueDate(document.IssueDate)} · " +
+                $"{document.IssuerName} · R$ {document.InvoiceTotal:N2} · {document.SourcePath}");
+        }
 
-            if (file is null) return;
-            string destination = file.Path.LocalPath;
-            File.Copy(document.SourcePath, destination, overwrite: true);
-            _issuedStatus.Text = "XML exportado com sucesso para: " + destination;
-        }
-        catch (Exception ex)
-        {
-            _issuedStatus.Text = "Não foi possível exportar o XML selecionado: " + ex.Message;
-        }
+        _issuedStatus.Text =
+            $"{_issuedDocuments.Count} NF-e no mês selecionado ({_monthPicker.SelectedDate?.ToString("MM/yyyy") ?? "todos os meses"}). " +
+            "Selecione uma ou mais notas para exportar.";
     }
 
-    private async Task ExportAllIssuedXmlsAsync()
+    private static string FormatIssueDate(string value) =>
+        DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var date)
+            ? date.ToLocalTime().ToString("dd/MM/yyyy")
+            : value;
+
+    private List<NfeDocumentSummary> GetSelectedIssuedDocuments()
     {
-        if (_issuedDocuments.Count == 0)
+        var selected = new List<NfeDocumentSummary>();
+        foreach (object item in _issuedList.SelectedItems)
         {
-            _issuedStatus.Text = "Faça uma pesquisa e localize as NF-e antes de exportar.";
+            if (item is string row)
+            {
+                int index = _issuedRows.IndexOf(row);
+                if (index >= 0 && index < _issuedDocuments.Count)
+                    selected.Add(_issuedDocuments[index]);
+            }
+        }
+        return selected;
+    }
+
+    private async Task ExportIssuedDocumentsAsync(bool pdf, bool exportAll)
+    {
+        List<NfeDocumentSummary> documents = exportAll
+            ? _issuedDocuments.ToList()
+            : GetSelectedIssuedDocuments();
+
+        if (documents.Count == 0)
+        {
+            _issuedStatus.Text = exportAll
+                ? "Não há NF-e no mês selecionado para exportar."
+                : "Selecione uma ou mais NF-e na lista antes de exportar.";
             return;
         }
 
+        string extension = pdf ? "pdf" : "xml";
+        string formatLabel = pdf ? "PDF" : "XML";
+
         try
         {
+            if (documents.Count == 1)
+            {
+                var document = documents[0];
+                string suggestedName = $"NFe-{SafeFilePart(document.InvoiceNumber)}.{extension}";
+                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = $"Exportar NF-e em {formatLabel}",
+                    SuggestedFileName = suggestedName,
+                    DefaultExtension = extension,
+                    ShowOverwritePrompt = true,
+                    FileTypeChoices = new[]
+                    {
+                        new FilePickerFileType(pdf ? "Documento PDF" : "Arquivo XML")
+                        {
+                            Patterns = new[] { "*." + extension }
+                        }
+                    }
+                });
+                if (file is null) return;
+                ExportOne(document, file.Path.LocalPath, pdf);
+                _issuedStatus.Text = $"{formatLabel} exportado: {file.Path.LocalPath}";
+                return;
+            }
+
             var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Escolher pasta para exportar todas as NF-e encontradas",
+                Title = $"Escolher pasta para exportar {documents.Count} NF-e em {formatLabel}",
                 AllowMultiple = false
             });
             if (folders.Count == 0) return;
 
             string destinationDirectory = folders[0].Path.LocalPath;
             int exported = 0;
-            foreach (var document in _issuedDocuments)
+            foreach (var document in documents)
             {
-                string fileName = Path.GetFileName(document.SourcePath);
+                string fileName = $"NFe-{SafeFilePart(document.InvoiceNumber)}-{SafeFilePart(document.AccessKey)}.{extension}";
                 string destination = Path.Combine(destinationDirectory, fileName);
-                File.Copy(document.SourcePath, destination, overwrite: true);
+                ExportOne(document, destination, pdf);
                 exported++;
             }
 
-            _issuedStatus.Text = $"{exported} XML(s) exportado(s) para: {destinationDirectory}";
+            _issuedStatus.Text =
+                $"{exported} arquivo(s) {formatLabel} exportado(s) para: {destinationDirectory}";
         }
         catch (Exception ex)
         {
-            _issuedStatus.Text = "Não foi possível exportar os XMLs: " + ex.Message;
+            _issuedStatus.Text = $"Não foi possível exportar em {formatLabel}: " + ex.Message;
         }
+    }
+
+    private static void ExportOne(NfeDocumentSummary document, string destination, bool pdf)
+    {
+        if (pdf)
+            NfePdfExportService.ExportInvoiceSummary(document, destination);
+        else
+            File.Copy(document.SourcePath, destination, overwrite: true);
     }
 
     private void SetReceivedQueryEnabled(bool enabled)
