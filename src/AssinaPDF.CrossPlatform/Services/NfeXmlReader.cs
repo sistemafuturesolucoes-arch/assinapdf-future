@@ -237,6 +237,15 @@ public static class NfeXmlReader
             throw new InvalidDataException("O dígito verificador da chave de acesso da NF-e é inválido.");
     }
 
+    public static bool IsValidCnpj(string? value)
+    {
+        string normalized = NormalizeDocument(value);
+        return normalized.Length == 14 &&
+            normalized.Take(12).All(IsAsciiUpperAlphaNumeric) &&
+            normalized.Skip(12).All(char.IsAsciiDigit) &&
+            HasValidCnpjCheckDigits(normalized);
+    }
+
     private static void ValidateDocument(string document, string role)
     {
         string normalized = NormalizeDocument(document);
