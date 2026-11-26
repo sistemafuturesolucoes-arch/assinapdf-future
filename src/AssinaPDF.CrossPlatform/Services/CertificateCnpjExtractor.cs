@@ -7,11 +7,11 @@ public static class CertificateCnpjExtractor
 {
     private static readonly Regex[] ExplicitPatterns =
     {
-        new(@"(?:SERIALNUMBER|2\\.5\\.4\\.5)\\s*=\\s*(?:CNPJ[:\\s]*)?([A-Z0-9]{12}[0-9]{2})",
+        new(@"(?:SERIALNUMBER|2\.5\.4\.5)\s*=\s*(?:CNPJ[:\s]*)?([A-Z0-9]{12}[0-9]{2})",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
-        new(@"CNPJ[:\\s]*([A-Z0-9]{12}[0-9]{2})",
+        new(@"CNPJ[:\s]*([A-Z0-9]{12}[0-9]{2})",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
-        new(@"CN\\s*=\\s*[^,\\r\\n]*:\\s*([A-Z0-9]{12}[0-9]{2})(?![A-Z0-9])",
+        new(@"CN\s*=\s*[^,\r\n]*:\s*([A-Z0-9]{12}[0-9]{2})(?![A-Z0-9])",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
     };
 
