@@ -18,7 +18,6 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly List<CertificateInfo> _certificates;
     private readonly ObservableCollection<string> _receivedRows = new();
     private readonly ObservableCollection<string> _issuedRows = new();
-    private readonly List<string> _receivedPaths = new();
     private readonly List<NfeDocumentSummary> _issuedDocuments = new();
     private Button? _queryReceivedButton;
 
@@ -30,7 +29,6 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly ListBox _receivedList;
     private readonly ListBox _issuedList;
     private string? _receivedBaseDirectory;
-    private string? _lastIssuedFolder;
 
     public NfeXmlManagerWindow()
     {
@@ -270,7 +268,6 @@ public sealed class NfeXmlManagerWindow : Window
         }
 
         _receivedRows.Clear();
-        _receivedPaths.Clear();
         _receivedStatus.Text = "Conectando à SEFAZ com o certificado selecionado...";
         SetReceivedQueryEnabled(false);
 
@@ -298,6 +295,8 @@ public sealed class NfeXmlManagerWindow : Window
                 {
                     if (batch.StatusCode == "656")
                     {
+                        if (!string.IsNullOrWhiteSpace(batch.LastNsu))
+                            state.LastNsu = batch.LastNsu;
                         state.NextAllowedUtc = DateTimeOffset.UtcNow.AddHours(1);
                         await SaveStateAsync(cnpj, production, state);
                     }
@@ -312,7 +311,6 @@ public sealed class NfeXmlManagerWindow : Window
                     string fileName = $"{document.Nsu}-{namePart}.xml";
                     string path = Path.Combine(outputDirectory, fileName);
                     await File.WriteAllTextAsync(path, document.XmlContent, new UTF8Encoding(false));
-                    _receivedPaths.Add(path);
                     _receivedRows.Add(
                         $"NSU {document.Nsu} · {document.DocumentType} · " +
                         $"{document.InvoiceNumber} · {document.IssuerName} · {path}");
@@ -393,8 +391,7 @@ public sealed class NfeXmlManagerWindow : Window
                     AllowMultiple = false
                 });
             if (folders.Count == 0) return;
-            _lastIssuedFolder = folders[0].Path.LocalPath;
-            await SearchIssuedAsync(new[] { _lastIssuedFolder });
+            await SearchIssuedAsync(new[] { folders[0].Path.LocalPath });
         }
         catch (Exception ex)
         {
