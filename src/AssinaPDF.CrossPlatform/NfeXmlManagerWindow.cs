@@ -477,7 +477,7 @@ public sealed class NfeXmlManagerWindow : Window
             _allIssuedDocuments.AddRange(result.Documents);
             ApplyIssuedMonthFilter();
             _issuedStatus.Text =
-                $"{result.Documents.Count} NF-e emitida(s) encontrada(s) em {result.FilesExamined} arquivo(s) analisado(s)." +
+                $"{_issuedDocuments.Count} NF-e exibida(s) no mês selecionado, de {result.Documents.Count} encontrada(s) em {result.FilesExamined} arquivo(s) analisado(s)." +
                 (result.LimitReached ? " Limite de 3.000 arquivos por pesquisa atingido." : "") +
                 (result.InvalidFiles > 0 ? $" {result.InvalidFiles} arquivo(s) não eram NF-e processadas compatíveis ou não puderam ser lidos." : "");
         }
@@ -543,7 +543,7 @@ public sealed class NfeXmlManagerWindow : Window
         {
             _issuedRows.Add(
                 $"NF-e {document.InvoiceNumber} · {FormatIssueDate(document.IssueDate)} · " +
-                $"{document.IssuerName} · R$ {document.InvoiceTotal:N2} · {document.SourcePath}");
+                $"{document.IssuerName} · R$ {document.InvoiceTotal:N2}");
         }
 
         _issuedStatus.Text =
