@@ -36,4 +36,25 @@ public sealed class NfeXmlReaderAlphanumericCnpjTests
             "12ABC34501DE35",
             NfeDistributionService.NormalizeCnpj("12.ABC.345/01DE-35"));
     }
+
+    [Fact]
+    public void Parse_NfeWithInvalidAlphanumericCnpjCheckDigits_IsRejected()
+    {
+        string fixture = Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "NfeAuthorized.Synthetic.xml");
+        string xml = File.ReadAllText(fixture)
+            .Replace(
+                "42261011222333000181550010000000041123456787",
+                "42261012ABC34501DE35550010000000041123456788",
+                StringComparison.Ordinal)
+            .Replace(
+                "<CNPJ>11222333000181</CNPJ>",
+                "<CNPJ>12ABC34501DE34</CNPJ>",
+                StringComparison.Ordinal);
+
+        var exception = Assert.Throws<InvalidDataException>(() => NfeXmlReader.Parse(xml));
+        Assert.Contains("CNPJ", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
