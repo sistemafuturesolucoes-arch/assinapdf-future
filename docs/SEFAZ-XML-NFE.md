@@ -10,7 +10,7 @@ A central é exclusiva do projeto `src/AssinaPDF.CrossPlatform` e apresenta duas
 ## Notas recebidas pela SEFAZ
 
 - Ambientes disponíveis: produção e homologação.
-- O CNPJ informado deve ter 14 dígitos e pertencer à mesma base de CNPJ do certificado.
+- O CNPJ informado deve ter 14 caracteres (os dois últimos são dígitos verificadores) e pertencer à mesma base do certificado. O módulo aceita CNPJ numérico e alfanumérico conforme a NT 2014.002 v1.40.
 - A comunicação HTTPS usa autenticação mútua com o certificado selecionado no repositório pessoal do usuário.
 - O AssinaPDF envia consultas `distNSU`, descompacta os `docZip` GZip e salva os documentos localmente.
 - O NSU é persistido por CNPJ e ambiente em `%LOCALAPPDATA%/FutureSolucoes/AssinaPDF/Sefaz` (Windows) ou no diretório equivalente de dados locais do usuário.
@@ -29,7 +29,7 @@ O serviço de distribuição não disponibiliza ao emitente a própria NF-e. Por
 - Pesquisa recursivamente nas pastas Documentos, Área de Trabalho e Downloads.
 - Permite selecionar uma pasta adicional.
 - Limite de 3.000 arquivos XML por pesquisa e profundidade máxima de 10 níveis.
-- Considera NF-e processada modelo 55, versão 4.00, autorizada e compatível com o leitor fiscal existente.
+- Considera NF-e processada modelo 55, versão 4.00, autorizada e compatível com o leitor fiscal existente, incluindo CNPJ alfanumérico e validação dos dígitos verificadores.
 - O CNPJ do emitente do XML precisa corresponder ao CNPJ informado.
 
 ## Privacidade
