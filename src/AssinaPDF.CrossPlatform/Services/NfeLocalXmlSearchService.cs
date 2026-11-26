@@ -54,8 +54,7 @@ public static class NfeLocalXmlSearchService
                     files = Directory.EnumerateFiles(folder, pattern, options);
                 }
                 catch (Exception ex) when (
-                    ex is IOException or UnauthorizedAccessException or
-                    DirectoryNotFoundException or ArgumentException)
+                    ex is IOException or UnauthorizedAccessException or ArgumentException)
                 {
                     invalid++;
                     continue;
