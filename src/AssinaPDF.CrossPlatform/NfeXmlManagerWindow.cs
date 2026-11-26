@@ -57,7 +57,7 @@ public sealed class NfeXmlManagerWindow : Window
         };
         _cnpjInput = new TextBox
         {
-            Watermark = "CNPJ da empresa (14 dígitos)",
+            Watermark = "CNPJ da empresa (14 caracteres)",
             MinWidth = 230
         };
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
@@ -231,7 +231,7 @@ public sealed class NfeXmlManagerWindow : Window
         string cnpj = NfeDistributionService.NormalizeCnpj(_cnpjInput.Text ?? "");
         if (cnpj.Length != 14)
         {
-            _receivedStatus.Text = "Informe um CNPJ válido com 14 dígitos.";
+            _receivedStatus.Text = "Informe um CNPJ válido com 14 caracteres.";
             return;
         }
 
