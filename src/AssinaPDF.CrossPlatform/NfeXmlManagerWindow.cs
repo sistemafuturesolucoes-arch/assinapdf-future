@@ -20,6 +20,7 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly ObservableCollection<string> _issuedRows = new();
     private readonly List<string> _receivedPaths = new();
     private readonly List<NfeDocumentSummary> _issuedDocuments = new();
+    private Button? _queryReceivedButton;
 
     private readonly ComboBox _certificatePicker;
     private readonly ComboBox _environmentPicker;
@@ -48,6 +49,7 @@ public sealed class NfeXmlManagerWindow : Window
             SelectedIndex = _certificates.Count > 0 ? 0 : -1,
             MinWidth = 300
         };
+        _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         _environmentPicker = new ComboBox
         {
             ItemsSource = new[] { "Produção", "Homologação" },
@@ -177,6 +179,7 @@ public sealed class NfeXmlManagerWindow : Window
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var query = MakeButton("Consultar SEFAZ e baixar XMLs", "#6741B8", "#FFFFFF");
+        _queryReceivedButton = query;
         var chooseFolder = MakeButton("Escolher pasta de destino", "#E7E9ED", "#34383E");
         query.Click += async (_, _) => await QueryReceivedAsync();
         chooseFolder.Click += async (_, _) => await ChooseReceivedFolderAsync();
@@ -495,9 +498,23 @@ public sealed class NfeXmlManagerWindow : Window
 
     private void SetReceivedQueryEnabled(bool enabled)
     {
-        // O botão de consulta é o primeiro botão do painel; a interface continua responsiva
-        // e a prevenção de chamadas duplicadas é feita pelo estado da operação.
+        if (_queryReceivedButton is not null)
+            _queryReceivedButton.IsEnabled = enabled;
         _receivedList.IsEnabled = enabled;
+    }
+
+    private void TryFillCnpjFromCertificate()
+    {
+        if (_certificatePicker.SelectedItem is not CertificateInfo selected ||
+            !string.IsNullOrWhiteSpace(_cnpjInput.Text))
+            return;
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            selected.Certificate.Subject,
+            @"(?:SERIALNUMBER|2\\.5\\.4\\.5)\\s*=\\s*(\\d{14})",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (match.Success)
+            _cnpjInput.Text = match.Groups[1].Value;
     }
 
     private sealed class DistributionState
@@ -521,8 +538,9 @@ public sealed class NfeXmlManagerWindow : Window
         if (!File.Exists(path)) return new DistributionState();
         try
         {
-            return await JsonSerializer.DeserializeAsync<DistributionState>(
-                File.OpenRead(path)) ?? new DistributionState();
+            await using var stream = File.OpenRead(path);
+            return await JsonSerializer.DeserializeAsync<DistributionState>(stream)
+                ?? new DistributionState();
         }
         catch
         {
