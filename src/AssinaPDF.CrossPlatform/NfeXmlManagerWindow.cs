@@ -93,11 +93,13 @@ public sealed class NfeXmlManagerWindow : Window
         };
         _receivedMonthPicker = new CalendarDatePicker
         {
-            SelectedDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
+            // Começa sem filtro para que documentos de qualquer mês (inclusive
+            // resumos sem data de emissão) apareçam imediatamente após a consulta.
+            SelectedDate = null,
             SelectedDateFormat = CalendarDatePickerFormat.Custom,
             CustomDateFormatString = "MMMM yyyy",
             MinWidth = 180,
-            PlaceholderText = "Escolher mês/ano"
+            PlaceholderText = "Todos os meses (filtrar...)"
         };
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         TryFillCnpjFromCertificate();
@@ -597,13 +599,14 @@ public sealed class NfeXmlManagerWindow : Window
             var document = item.Document;
             _receivedRows.Add(
                 $"NSU {document.Nsu} · {document.DocumentType} · " +
-                $"{document.InvoiceNumber} · {document.IssuerName} · {FormatIssueDate(document.IssueDate)}");
+                $"{document.InvoiceNumber} · {document.IssuerName} · {FormatIssueDate(document.IssueDate)}\n" +
+                Path.GetFileName(item.SourcePath));
         }
 
         if (updateStatus)
-            _receivedStatus.Text =
-                $"{_visibleReceivedDocuments.Count} documento(s) recebidos no mês selecionado " +
-                $"({_receivedMonthPicker.SelectedDate?.ToString("MM/yyyy") ?? "todos os meses"}).";
+            _receivedStatus.Text = _receivedMonthPicker.SelectedDate is DateTime selected
+                ? $"{_visibleReceivedDocuments.Count} documento(s) exibido(s) em {selected:MM/yyyy}."
+                : $"{_visibleReceivedDocuments.Count} documento(s) exibido(s) — todos os meses.";
     }
 
     private List<ReceivedDocumentExport> GetSelectedReceivedDocuments()
