@@ -228,7 +228,7 @@ public sealed class NfeXmlManagerWindow : Window
 
     private async Task QueryReceivedAsync()
     {
-        string cnpj = NfeDistributionService.NormalizeDigits(_cnpjInput.Text ?? "");
+        string cnpj = NfeDistributionService.NormalizeCnpj(_cnpjInput.Text ?? "");
         if (cnpj.Length != 14)
         {
             _receivedStatus.Text = "Informe um CNPJ válido com 14 dígitos.";
@@ -307,7 +307,7 @@ public sealed class NfeXmlManagerWindow : Window
 
                 foreach (var document in batch.Documents)
                 {
-                    string key = NfeDistributionService.NormalizeDigits(document.AccessKey);
+                    string key = document.AccessKey.Trim();
                     string namePart = key.Length == 44 ? key : SafeFilePart(document.Schema);
                     string fileName = $"{document.Nsu}-{namePart}.xml";
                     string path = Path.Combine(outputDirectory, fileName);
@@ -489,7 +489,7 @@ public sealed class NfeXmlManagerWindow : Window
 
         var match = System.Text.RegularExpressions.Regex.Match(
             selected.Certificate.Subject,
-            @"(?:SERIALNUMBER|2\.5\.4\.5)\s*=\s*(\d{14})",
+            @"(?:SERIALNUMBER|2\.5\.4\.5)\s*=\s*([A-Z0-9]{12}[0-9]{2})",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (match.Success)
             _cnpjInput.Text = match.Groups[1].Value;
