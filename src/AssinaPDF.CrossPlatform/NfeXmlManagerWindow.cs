@@ -34,10 +34,10 @@ public sealed class NfeXmlManagerWindow : Window
     public NfeXmlManagerWindow()
     {
         Title = "AssinaPDF | Buscar XMLs fiscais";
-        Width = 1040;
-        Height = 760;
-        MinWidth = 820;
-        MinHeight = 620;
+        Width = 900;
+        Height = 680;
+        MinWidth = 680;
+        MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush.Parse("#F3F4F6");
 
@@ -159,7 +159,12 @@ public sealed class NfeXmlManagerWindow : Window
             Background = Brushes.White,
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(2),
-            Child = root
+            Child = new ScrollViewer
+            {
+                Content = root,
+                VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            }
         };
 
         Closed += (_, _) =>
@@ -219,16 +224,22 @@ public sealed class NfeXmlManagerWindow : Window
             Foreground = Brush.Parse("#68717D")
         });
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var actions = new WrapPanel();
         var commonFolders = MakeButton("Buscar nas pastas comuns", "#6741B8", "#FFFFFF");
         var chooseFolder = MakeButton("Selecionar outra pasta", "#E7E9ED", "#34383E");
         var openFile = MakeButton("Abrir XML selecionado", "#E7E9ED", "#34383E");
+        var exportSelected = MakeButton("Exportar XML selecionado", "#6741B8", "#FFFFFF");
+        var exportAll = MakeButton("Exportar todos", "#E7E9ED", "#34383E");
         commonFolders.Click += async (_, _) => await SearchIssuedAsync(GetCommonFolders());
         chooseFolder.Click += async (_, _) => await ChooseIssuedFolderAsync();
         openFile.Click += (_, _) => OpenSelectedIssuedXml();
+        exportSelected.Click += async (_, _) => await ExportSelectedIssuedXmlAsync();
+        exportAll.Click += async (_, _) => await ExportAllIssuedXmlsAsync();
         actions.Children.Add(commonFolders);
         actions.Children.Add(chooseFolder);
         actions.Children.Add(openFile);
+        actions.Children.Add(exportSelected);
+        actions.Children.Add(exportAll);
         panel.Children.Add(actions);
         panel.Children.Add(_issuedStatus);
         panel.Children.Add(_issuedList);
@@ -479,6 +490,76 @@ public sealed class NfeXmlManagerWindow : Window
         catch (Exception ex)
         {
             _issuedStatus.Text = "Não foi possível abrir o XML: " + ex.Message;
+        }
+    }
+
+    private async Task ExportSelectedIssuedXmlAsync()
+    {
+        int index = _issuedList.SelectedIndex;
+        if (index < 0 || index >= _issuedDocuments.Count)
+        {
+            _issuedStatus.Text = "Selecione uma NF-e na lista antes de exportar.";
+            return;
+        }
+
+        try
+        {
+            var document = _issuedDocuments[index];
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Exportar XML da NF-e",
+                SuggestedFileName = Path.GetFileName(document.SourcePath),
+                DefaultExtension = "xml",
+                ShowOverwritePrompt = true,
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Arquivo XML") { Patterns = new[] { "*.xml" } }
+                }
+            });
+
+            if (file is null) return;
+            string destination = file.Path.LocalPath;
+            File.Copy(document.SourcePath, destination, overwrite: true);
+            _issuedStatus.Text = "XML exportado com sucesso para: " + destination;
+        }
+        catch (Exception ex)
+        {
+            _issuedStatus.Text = "Não foi possível exportar o XML selecionado: " + ex.Message;
+        }
+    }
+
+    private async Task ExportAllIssuedXmlsAsync()
+    {
+        if (_issuedDocuments.Count == 0)
+        {
+            _issuedStatus.Text = "Faça uma pesquisa e localize as NF-e antes de exportar.";
+            return;
+        }
+
+        try
+        {
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Escolher pasta para exportar todas as NF-e encontradas",
+                AllowMultiple = false
+            });
+            if (folders.Count == 0) return;
+
+            string destinationDirectory = folders[0].Path.LocalPath;
+            int exported = 0;
+            foreach (var document in _issuedDocuments)
+            {
+                string fileName = Path.GetFileName(document.SourcePath);
+                string destination = Path.Combine(destinationDirectory, fileName);
+                File.Copy(document.SourcePath, destination, overwrite: true);
+                exported++;
+            }
+
+            _issuedStatus.Text = $"{exported} XML(s) exportado(s) para: {destinationDirectory}";
+        }
+        catch (Exception ex)
+        {
+            _issuedStatus.Text = "Não foi possível exportar os XMLs: " + ex.Message;
         }
     }
 
