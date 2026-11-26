@@ -49,7 +49,6 @@ public sealed class NfeXmlManagerWindow : Window
             SelectedIndex = _certificates.Count > 0 ? 0 : -1,
             MinWidth = 300
         };
-        _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         _environmentPicker = new ComboBox
         {
             ItemsSource = new[] { "Produção", "Homologação" },
@@ -61,6 +60,7 @@ public sealed class NfeXmlManagerWindow : Window
             Watermark = "CNPJ da empresa (14 dígitos)",
             MinWidth = 230
         };
+        _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         _receivedStatus = MakeStatus("Selecione o certificado e informe o CNPJ para consultar a distribuição da SEFAZ.");
         _issuedStatus = MakeStatus("Informe o CNPJ para localizar NF-e emitidas que já estejam salvas no computador.");
         _receivedList = new ListBox { ItemsSource = _receivedRows, MinHeight = 250 };
@@ -511,7 +511,7 @@ public sealed class NfeXmlManagerWindow : Window
 
         var match = System.Text.RegularExpressions.Regex.Match(
             selected.Certificate.Subject,
-            @"(?:SERIALNUMBER|2\\.5\\.4\\.5)\\s*=\\s*(\\d{14})",
+            @"(?:SERIALNUMBER|2\.5\.4\.5)\s*=\s*(\d{14})",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (match.Success)
             _cnpjInput.Text = match.Groups[1].Value;
