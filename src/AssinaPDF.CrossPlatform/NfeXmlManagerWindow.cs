@@ -29,6 +29,7 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly ComboBox _certificatePicker;
     private readonly ComboBox _environmentPicker;
     private readonly TextBox _cnpjInput;
+    private readonly TextBlock _certificateCnpjStatus;
     private readonly CalendarDatePicker _monthPicker;
     private readonly CalendarDatePicker _receivedMonthPicker;
     private readonly TextBlock _receivedStatus;
@@ -72,8 +73,15 @@ public sealed class NfeXmlManagerWindow : Window
         };
         _cnpjInput = new TextBox
         {
-            PlaceholderText = "CNPJ da empresa (14 caracteres)",
+            IsVisible = false,
+            PlaceholderText = "CNPJ identificado no certificado",
             MinWidth = 210
+        };
+        _certificateCnpjStatus = new TextBlock
+        {
+            Text = "CNPJ será identificado pelo certificado selecionado.",
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Brush.Parse("#4B535E")
         };
         _monthPicker = new CalendarDatePicker
         {
@@ -94,9 +102,9 @@ public sealed class NfeXmlManagerWindow : Window
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
         TryFillCnpjFromCertificate();
         _receivedStatus = MakeStatus(_certificateLoadError is null
-            ? "Selecione o certificado e informe o CNPJ para consultar a distribuição da SEFAZ."
+            ? "Selecione um certificado e o AssinaPDF identificará automaticamente o CNPJ para consultar a SEFAZ."
             : "Não foi possível carregar o repositório de certificados. A busca local de notas emitidas continua disponível. " + _certificateLoadError);
-        _issuedStatus = MakeStatus("Informe o CNPJ para localizar NF-e emitidas que já estejam salvas no computador.");
+        _issuedStatus = MakeStatus("A SEFAZ não disponibiliza à própria empresa o XML das NF-e que ela emitiu por esta consulta. Aqui você pode importar e organizar XMLs emitidos que já foram salvos pelo emissor fiscal.");
         _receivedList = new ListBox { ItemsSource = _receivedRows, Height = 170, SelectionMode = SelectionMode.Multiple };
         _issuedList = new ListBox
         {
@@ -117,14 +125,20 @@ public sealed class NfeXmlManagerWindow : Window
         });
         root.Children.Add(new TextBlock
         {
-            Text = "Consulte NF-e recebidas na SEFAZ e organize XMLs de notas emitidas que já estão no computador.",
+            Text = "O certificado identifica automaticamente a empresa. Consulte documentos recebidos na SEFAZ e importe XMLs emitidos pelo seu emissor fiscal.",
             FontSize = 13,
             TextWrapping = TextWrapping.Wrap,
             Foreground = Brush.Parse("#68717D")
         });
 
         var companyRow = new WrapPanel { Orientation = Orientation.Horizontal };
-        companyRow.Children.Add(_cnpjInput);
+        companyRow.Children.Add(new TextBlock
+        {
+            Text = "Empresa:",
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Brush.Parse("#4B535E")
+        });
+        companyRow.Children.Add(_certificateCnpjStatus);
         companyRow.Children.Add(new TextBlock
         {
             Text = "Certificado:",
@@ -137,7 +151,7 @@ public sealed class NfeXmlManagerWindow : Window
 
         var tabs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var receivedTab = MakeButton("Notas recebidas · SEFAZ", "#6741B8", "White");
-        var issuedTab = MakeButton("Notas emitidas · arquivos locais", "#E7E9ED", "#34383E");
+        var issuedTab = MakeButton("Notas emitidas · XMLs importados", "#E7E9ED", "#34383E");
         tabs.Children.Add(receivedTab);
         tabs.Children.Add(issuedTab);
         root.Children.Add(tabs);
@@ -320,10 +334,10 @@ public sealed class NfeXmlManagerWindow : Window
 
     private async Task QueryReceivedAsync()
     {
-        string cnpj = NfeDistributionService.NormalizeCnpj(_cnpjInput.Text ?? "");
+        string cnpj = GetSelectedCertificateCnpj();
         if (cnpj.Length != 14)
         {
-            _receivedStatus.Text = "Informe um CNPJ válido com 14 caracteres.";
+            _receivedStatus.Text = "Não foi possível identificar um CNPJ válido no certificado selecionado. Selecione um certificado e-CNPJ válido.";
             return;
         }
 
@@ -497,10 +511,10 @@ public sealed class NfeXmlManagerWindow : Window
 
     private async Task SearchIssuedAsync(IEnumerable<string> folders)
     {
-        string cnpj = NfeDistributionService.NormalizeDigits(_cnpjInput.Text ?? "");
+        string cnpj = GetSelectedCertificateCnpj();
         if (cnpj.Length != 14)
         {
-            _issuedStatus.Text = "Informe o CNPJ emitente com 14 dígitos antes de pesquisar.";
+            _issuedStatus.Text = "Selecione um certificado e-CNPJ para identificar a empresa e filtrar os XMLs emitidos.";
             return;
         }
 
@@ -831,18 +845,39 @@ public sealed class NfeXmlManagerWindow : Window
         _receivedList.IsEnabled = enabled;
     }
 
+    private string GetSelectedCertificateCnpj() =>
+        _certificatePicker.SelectedItem is CertificateInfo selected
+            ? ExtractCnpjFromCertificate(selected.Certificate)
+            : string.Empty;
+
     private void TryFillCnpjFromCertificate()
     {
-        if (_certificatePicker.SelectedItem is not CertificateInfo selected ||
-            !string.IsNullOrWhiteSpace(_cnpjInput.Text))
-            return;
+        _cnpjInput.Text = GetSelectedCertificateCnpj();
+        _certificateCnpjStatus.Text = _cnpjInput.Text.Length == 14
+            ? $"CNPJ identificado: {_cnpjInput.Text}"
+            : "CNPJ não identificado. Selecione um certificado e-CNPJ.";
+    }
 
-        var match = System.Text.RegularExpressions.Regex.Match(
-            selected.Certificate.Subject,
-            @"(?:SERIALNUMBER|2\.5\.4\.5)\s*=\s*([A-Z0-9]{12}[0-9]{2})",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (match.Success)
-            _cnpjInput.Text = match.Groups[1].Value;
+    private static string ExtractCnpjFromCertificate(X509Certificate2 certificate)
+    {
+        string subject = certificate.Subject + "\\n" + certificate.SubjectName.Name;
+        var patterns = new[]
+        {
+            @"(?:SERIALNUMBER|2\\.5\\.4\\.5)\\s*=\\s*(?:CNPJ[:\\s]*)?([A-Z0-9]{12}[0-9]{2})",
+            @"CNPJ[:\\s]*([A-Z0-9]{12}[0-9]{2})"
+        };
+
+        foreach (string pattern in patterns)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(
+                subject,
+                pattern,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success)
+                return match.Groups[1].Value.ToUpperInvariant();
+        }
+
+        return string.Empty;
     }
 
     private sealed record ReceivedDocumentExport(NfeDistributedDocument Document, string SourcePath);
