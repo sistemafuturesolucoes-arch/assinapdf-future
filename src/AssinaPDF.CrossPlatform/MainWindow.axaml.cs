@@ -548,6 +548,22 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OpenNfeXmlManager_Click(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var manager = new NfeXmlManagerWindow();
+            await manager.ShowDialog(this);
+            DashboardStatusText.Text = "Central de XMLs fiscais fechada.";
+        }
+        catch (Exception ex)
+        {
+            DashboardStatusText.Text = $"Não foi possível abrir a central de XMLs fiscais: {ex.Message}";
+        }
+    }
+
     private static WriteableBitmap CreateBitmap(RenderedPdfPage page)
     {
         var bitmap = new WriteableBitmap(
