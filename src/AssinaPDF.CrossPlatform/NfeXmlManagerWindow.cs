@@ -414,64 +414,30 @@ public sealed class NfeXmlManagerWindow : Window
         _issuedRows.Clear();
         _issuedDocuments.Clear();
         _issuedStatus.Text = "Procurando XMLs nas pastas selecionadas...";
-        var seen = new HashSet<string>(
-            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        int examined = 0;
-        int failures = 0;
 
-        await Task.Run(() =>
+        try
         {
-            foreach (string folder in folders.Where(Directory.Exists))
+            string[] selectedFolders = folders.ToArray();
+            var result = await Task.Run(() =>
+                NfeLocalXmlSearchService.FindIssued(cnpj, selectedFolders, 3000));
+
+            _issuedDocuments.AddRange(result.Documents);
+            foreach (var document in _issuedDocuments)
             {
-                IEnumerable<string> files;
-                try
-                {
-                    files = Directory.EnumerateFiles(folder, "*.xml", new EnumerationOptions
-                    {
-                        RecurseSubdirectories = true,
-                        IgnoreInaccessible = true,
-                        AttributesToSkip = FileAttributes.ReparsePoint,
-                        MaxRecursionDepth = 10
-                    });
-                }
-                catch
-                {
-                    continue;
-                }
-
-                foreach (string file in files)
-                {
-                    if (!seen.Add(file)) continue;
-                    if (++examined > 3000) return;
-                    try
-                    {
-                        var summary = NfeXmlReader.ReadFile(file);
-                        if (NfeDistributionService.NormalizeDigits(summary.IssuerDocument) == cnpj)
-                        {
-                            lock (_issuedDocuments)
-                                _issuedDocuments.Add(summary);
-                        }
-                    }
-                    catch
-                    {
-                        failures++;
-                    }
-                }
+                _issuedRows.Add(
+                    $"NF-e {document.InvoiceNumber} · {document.IssueDate} · " +
+                    $"{document.IssuerName} · R$ {document.InvoiceTotal:N2} · {document.SourcePath}");
             }
-        });
 
-        foreach (var document in _issuedDocuments
-            .OrderByDescending(x => x.IssueDate, StringComparer.Ordinal))
-        {
-            _issuedRows.Add(
-                $"NF-e {document.InvoiceNumber} · {document.IssueDate} · " +
-                $"{document.IssuerName} · R$ {document.InvoiceTotal:N2} · {document.SourcePath}");
+            _issuedStatus.Text =
+                $"{result.Documents.Count} NF-e emitida(s) encontrada(s) em {result.FilesExamined} arquivo(s) analisado(s)." +
+                (result.LimitReached ? " Limite de 3.000 arquivos por pesquisa atingido." : "") +
+                (result.InvalidFiles > 0 ? $" {result.InvalidFiles} arquivo(s) não eram NF-e processadas compatíveis ou não puderam ser lidos." : "");
         }
-
-        _issuedStatus.Text =
-            $"{_issuedDocuments.Count} NF-e emitida(s) encontrada(s) em {examined} arquivo(s) analisado(s)." +
-            (examined > 3000 ? " Limite de 3.000 arquivos por pesquisa atingido." : "") +
-            (failures > 0 ? $" {failures} arquivo(s) não eram NF-e processadas compatíveis." : "");
+        catch (Exception ex)
+        {
+            _issuedStatus.Text = "Não foi possível pesquisar os XMLs locais: " + ex.Message;
+        }
     }
 
     private IEnumerable<string> GetCommonFolders()
