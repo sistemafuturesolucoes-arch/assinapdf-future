@@ -709,9 +709,17 @@ public sealed class NfeXmlManagerWindow : Window
         }
 
         if (completeInvoice is not null)
-            NfePdfExportService.ExportInvoiceSummary(completeInvoice, destination);
+        {
+            // Use o gerador de DANFE modelo 55, não o espelho simplificado.
+            NfeDanfeGenerator.Generate(completeInvoice, destination);
+        }
         else
-            NfePdfExportService.ExportReceivedDocumentSummary(item.Document, destination);
+        {
+            throw new InvalidOperationException(
+                "A SEFAZ disponibilizou apenas um resumo/evento, não o XML autorizado completo. " +
+                "Não é possível gerar o DANFE oficial a partir desse conteúdo. " +
+                "Baixe o XML completo após a manifestação aplicável ou importe o XML autorizado do emissor.");
+        }
     }
 
     private void ApplyIssuedMonthFilter()
@@ -836,7 +844,7 @@ public sealed class NfeXmlManagerWindow : Window
     private static void ExportOne(NfeDocumentSummary document, string destination, bool pdf)
     {
         if (pdf)
-            NfePdfExportService.ExportInvoiceSummary(document, destination);
+            NfeDanfeGenerator.Generate(document, destination);
         else
             File.Copy(document.SourcePath, destination, overwrite: true);
     }
