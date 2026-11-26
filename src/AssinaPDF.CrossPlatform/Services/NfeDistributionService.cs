@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Net.Http.Headers;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -87,6 +88,9 @@ public static class NfeDistributionService
             envelope.ToString(SaveOptions.DisableFormatting),
             Encoding.UTF8,
             "application/soap+xml");
+        content.Headers.ContentType!.Parameters.Add(new NameValueHeaderValue(
+            "action",
+            "\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse\""));
         using var response = await client.PostAsync(
             production ? ProductionUrl : HomologationUrl,
             content,
