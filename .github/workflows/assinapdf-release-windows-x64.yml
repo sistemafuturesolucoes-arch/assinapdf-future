@@ -1,0 +1,103 @@
+name: AssinaPDF CrossPlatform - Windows x64 Update Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/nfe-xml-sefaz-2026-11-26
+    paths:
+      - 'src/AssinaPDF.CrossPlatform/**'
+      - 'tests/AssinaPDF.CrossPlatform.Tests/**'
+      - 'installer-crossplatform/**'
+      - '.github/workflows/assinapdf-release-windows-x64.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-test-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore and run all CrossPlatform tests
+        shell: pwsh
+        run: |
+          dotnet restore tests/AssinaPDF.CrossPlatform.Tests/AssinaPDF.CrossPlatform.Tests.csproj
+          if ($LASTEXITCODE -ne 0) { throw "Falha no restore dos testes." }
+
+          dotnet test tests/AssinaPDF.CrossPlatform.Tests/AssinaPDF.CrossPlatform.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=AssinaPDF-CrossPlatform.trx"
+          if ($LASTEXITCODE -ne 0) { throw "Os testes do AssinaPDF falharam. O pacote não será publicado." }
+
+      - name: Publish Windows x64 self-contained
+        shell: pwsh
+        run: |
+          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts/publish/win-x64"
+          New-Item -ItemType Directory -Force $publish | Out-Null
+
+          dotnet publish src/AssinaPDF.CrossPlatform/AssinaPDF.MacPrototype.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:Version=0.4.4 `
+            -p:AssemblyVersion=0.4.4.0 `
+            -p:FileVersion=0.4.4.0 `
+            -p:InformationalVersion=0.4.4 `
+            -o $publish
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar o aplicativo Windows x64." }
+
+          $exe = Join-Path $publish "AssinaPDF.MacPrototype.exe"
+          if (!(Test-Path $exe) -or (Get-Item $exe).Length -eq 0) {
+            throw "Executável principal não foi gerado."
+          }
+
+      - name: Build MSI upgrade package
+        shell: pwsh
+        run: |
+          $publish = (Join-Path $env:GITHUB_WORKSPACE "artifacts/publish/win-x64").TrimEnd('\') + '\'
+          $output = Join-Path $env:GITHUB_WORKSPACE "artifacts/installer"
+          New-Item -ItemType Directory -Force $output | Out-Null
+          $outputArg = $output.TrimEnd('\') + '\'
+
+          dotnet build installer-crossplatform/AssinaPDF.CrossPlatform.wixproj `
+            --configuration Release `
+            "-p:PublishDir=$publish" `
+            "-p:ProductVersion=0.4.4" `
+            "-p:OutputPath=$outputArg"
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar o MSI." }
+
+          $msi = Join-Path $output "AssinaPDF-CrossPlatform-Setup-x64.msi"
+          if (!(Test-Path $msi) -or (Get-Item $msi).Length -lt 1MB) {
+            throw "MSI ausente ou menor que o tamanho mínimo esperado."
+          }
+          Get-FileHash $msi -Algorithm SHA256 | Format-List
+
+      - name: Upload MSI build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AssinaPDF-0.4.4-Windows-x64
+          path: artifacts/installer/AssinaPDF-CrossPlatform-Setup-x64.msi
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub prerelease for controlled updater test
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.4.4
+          name: AssinaPDF Future 0.4.4 - Windows x64 (teste do atualizador)
+          prerelease: true
+          make_latest: false
+          generate_release_notes: true
+          files: artifacts/installer/AssinaPDF-CrossPlatform-Setup-x64.msi
