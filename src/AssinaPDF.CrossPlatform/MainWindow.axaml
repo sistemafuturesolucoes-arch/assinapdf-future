@@ -144,6 +144,19 @@
               </StackPanel>
             </Button>
 
+            <Button Grid.Row="2" Grid.Column="0" Click="OpenNfeXmlManager_Click"
+                    Background="White" BorderBrush="#E0E3E8" BorderThickness="1"
+                    CornerRadius="10" Padding="20" HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
+              <StackPanel VerticalAlignment="Center" Spacing="10">
+                <TextBlock Text="⇩" FontSize="29" Foreground="#27865A"/>
+                <TextBlock Text="Buscar XMLs fiscais" FontSize="18" FontWeight="SemiBold" Foreground="#292D36"/>
+                <TextBlock Text="Consulte NF-e recebidas na SEFAZ e localize notas emitidas no computador."
+                           FontSize="12" Foreground="#737B87" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Button>
+
           </Grid>
 
           <Border Background="#ECEEF2" CornerRadius="8" Padding="16,12">
