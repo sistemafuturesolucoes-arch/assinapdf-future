@@ -1,6 +1,8 @@
 using System.Globalization;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
+using PdfSharp.Fonts;
+using System.Reflection;
 using AssinaPDF.MacPrototype.Services;
 
 namespace AssinaPDF.MacPrototype;
@@ -12,6 +14,7 @@ public static class NfePdfExportService
         ArgumentNullException.ThrowIfNull(invoice);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
+        EnsureFontResolver();
         using var document = new PdfDocument();
         document.Info.Title = $"Espelho NF-e {invoice.InvoiceNumber}";
         document.Info.Subject = $"Chave de acesso {invoice.AccessKey}";
@@ -118,4 +121,44 @@ public static class NfePdfExportService
             return date.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
         return string.IsNullOrWhiteSpace(value) ? "Não informado" : value;
     }
+    private static readonly object FontResolverLock = new();
+
+    private static void EnsureFontResolver()
+    {
+        lock (FontResolverLock)
+        {
+            if (GlobalFontSettings.FontResolver is null)
+                GlobalFontSettings.FontResolver = new InterFontResolver();
+        }
+    }
+
+    private sealed class InterFontResolver : IFontResolver
+    {
+        private const string RegularFace = "FutureInter-Regular";
+        private const string BoldFace = "FutureInter-Bold";
+
+        public FontResolverInfo ResolveTypeface(string familyName, bool isBold, bool isItalic)
+        {
+            string face = isBold ? BoldFace : RegularFace;
+            return new FontResolverInfo(face, false, isItalic);
+        }
+
+        public byte[]? GetFont(string faceName)
+        {
+            string suffix = faceName == BoldFace ? "Inter-Bold.ttf" :
+                faceName == RegularFace ? "Inter-Regular.ttf" :
+                throw new ArgumentException("Fonte PDF não reconhecida.", nameof(faceName));
+
+            Assembly assembly = typeof(NfePdfExportService).Assembly;
+            string resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(name => name.EndsWith("Assets.Fonts." + suffix, StringComparison.Ordinal))
+                ?? throw new InvalidOperationException("A fonte Inter necessária para gerar o PDF não foi encontrada.");
+            using Stream stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("Não foi possível carregar a fonte Inter incorporada.");
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            return memory.ToArray();
+        }
+    }
+
 }
