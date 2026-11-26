@@ -22,6 +22,7 @@ public sealed class NfeXmlManagerWindow : Window
     private readonly ObservableCollection<string> _issuedRows = new();
     private readonly List<NfeDocumentSummary> _issuedDocuments = new();
     private readonly List<NfeDocumentSummary> _allIssuedDocuments = new();
+    private readonly List<ReceivedDocumentExport> _receivedDocuments = new();
     private Button? _queryReceivedButton;
 
     private readonly ComboBox _certificatePicker;
@@ -86,7 +87,7 @@ public sealed class NfeXmlManagerWindow : Window
             ? "Selecione o certificado e informe o CNPJ para consultar a distribuição da SEFAZ."
             : "Não foi possível carregar o repositório de certificados. A busca local de notas emitidas continua disponível. " + _certificateLoadError);
         _issuedStatus = MakeStatus("Informe o CNPJ para localizar NF-e emitidas que já estejam salvas no computador.");
-        _receivedList = new ListBox { ItemsSource = _receivedRows, Height = 190 };
+        _receivedList = new ListBox { ItemsSource = _receivedRows, Height = 170, SelectionMode = SelectionMode.Multiple };
         _issuedList = new ListBox
         {
             ItemsSource = _issuedRows,
@@ -206,7 +207,7 @@ public sealed class NfeXmlManagerWindow : Window
             Foreground = Brush.Parse("#68717D")
         });
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var actions = new WrapPanel();
         var query = MakeButton("Consultar SEFAZ e baixar XMLs", "#6741B8", "#FFFFFF");
         _queryReceivedButton = query;
         var chooseFolder = MakeButton("Escolher pasta de destino", "#E7E9ED", "#34383E");
@@ -215,6 +216,21 @@ public sealed class NfeXmlManagerWindow : Window
         actions.Children.Add(query);
         actions.Children.Add(chooseFolder);
         panel.Children.Add(actions);
+
+        var exportActions = new WrapPanel();
+        var exportSelectedXml = MakeButton("Exportar XML selecionados", "#6741B8", "#FFFFFF");
+        var exportSelectedPdf = MakeButton("Exportar PDF selecionados", "#6741B8", "#FFFFFF");
+        var exportAllXml = MakeButton("Exportar XML recebidos", "#E7E9ED", "#34383E");
+        var exportAllPdf = MakeButton("Exportar PDF recebidos", "#E7E9ED", "#34383E");
+        exportSelectedXml.Click += async (_, _) => await ExportReceivedDocumentsAsync(pdf: false, exportAll: false);
+        exportSelectedPdf.Click += async (_, _) => await ExportReceivedDocumentsAsync(pdf: true, exportAll: false);
+        exportAllXml.Click += async (_, _) => await ExportReceivedDocumentsAsync(pdf: false, exportAll: true);
+        exportAllPdf.Click += async (_, _) => await ExportReceivedDocumentsAsync(pdf: true, exportAll: true);
+        exportActions.Children.Add(exportSelectedXml);
+        exportActions.Children.Add(exportSelectedPdf);
+        exportActions.Children.Add(exportAllXml);
+        exportActions.Children.Add(exportAllPdf);
+        panel.Children.Add(exportActions);
         panel.Children.Add(_receivedStatus);
         panel.Children.Add(_receivedList);
         return panel;
@@ -324,6 +340,7 @@ public sealed class NfeXmlManagerWindow : Window
         }
 
         _receivedRows.Clear();
+        _receivedDocuments.Clear();
         _receivedStatus.Text = "Conectando à SEFAZ com o certificado selecionado...";
         SetReceivedQueryEnabled(false);
 
@@ -367,9 +384,10 @@ public sealed class NfeXmlManagerWindow : Window
                     string fileName = $"{document.Nsu}-{namePart}.xml";
                     string path = Path.Combine(outputDirectory, fileName);
                     await File.WriteAllTextAsync(path, document.XmlContent, new UTF8Encoding(false));
+                    _receivedDocuments.Add(new ReceivedDocumentExport(document, path));
                     _receivedRows.Add(
                         $"NSU {document.Nsu} · {document.DocumentType} · " +
-                        $"{document.InvoiceNumber} · {document.IssuerName} · {path}");
+                        $"{document.InvoiceNumber} · {document.IssuerName}");
                     saved++;
                 }
 
@@ -522,6 +540,111 @@ public sealed class NfeXmlManagerWindow : Window
         }
     }
 
+    private List<ReceivedDocumentExport> GetSelectedReceivedDocuments()
+    {
+        var selected = new List<ReceivedDocumentExport>();
+        foreach (object item in _receivedList.SelectedItems)
+        {
+            if (item is string row)
+            {
+                int index = _receivedRows.IndexOf(row);
+                if (index >= 0 && index < _receivedDocuments.Count)
+                    selected.Add(_receivedDocuments[index]);
+            }
+        }
+        return selected;
+    }
+
+    private async Task ExportReceivedDocumentsAsync(bool pdf, bool exportAll)
+    {
+        List<ReceivedDocumentExport> documents = exportAll
+            ? _receivedDocuments.ToList()
+            : GetSelectedReceivedDocuments();
+
+        if (documents.Count == 0)
+        {
+            _receivedStatus.Text = exportAll
+                ? "Não há documentos recebidos nesta consulta para exportar."
+                : "Selecione um ou mais documentos recebidos antes de exportar.";
+            return;
+        }
+
+        string extension = pdf ? "pdf" : "xml";
+        string formatLabel = pdf ? "PDF" : "XML";
+        try
+        {
+            if (documents.Count == 1)
+            {
+                var item = documents[0];
+                string suggestedName = $"NSU-{SafeFilePart(item.Document.Nsu)}.{extension}";
+                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = $"Exportar documento recebido em {formatLabel}",
+                    SuggestedFileName = suggestedName,
+                    DefaultExtension = extension,
+                    ShowOverwritePrompt = true,
+                    FileTypeChoices = new[]
+                    {
+                        new FilePickerFileType(pdf ? "Documento PDF" : "Arquivo XML")
+                        {
+                            Patterns = new[] { "*." + extension }
+                        }
+                    }
+                });
+                if (file is null) return;
+                ExportReceivedOne(item, file.Path.LocalPath, pdf);
+                _receivedStatus.Text = $"{formatLabel} exportado: {file.Path.LocalPath}";
+                return;
+            }
+
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = $"Escolher pasta para exportar {documents.Count} documentos em {formatLabel}",
+                AllowMultiple = false
+            });
+            if (folders.Count == 0) return;
+
+            string directory = folders[0].Path.LocalPath;
+            int exported = 0;
+            foreach (var item in documents)
+            {
+                string key = SafeFilePart(item.Document.AccessKey);
+                string name = $"NSU-{SafeFilePart(item.Document.Nsu)}-{key}.{extension}";
+                ExportReceivedOne(item, Path.Combine(directory, name), pdf);
+                exported++;
+            }
+            _receivedStatus.Text = $"{exported} arquivo(s) {formatLabel} exportado(s) para: {directory}";
+        }
+        catch (Exception ex)
+        {
+            _receivedStatus.Text = $"Não foi possível exportar os documentos em {formatLabel}: " + ex.Message;
+        }
+    }
+
+    private static void ExportReceivedOne(ReceivedDocumentExport item, string destination, bool pdf)
+    {
+        if (!pdf)
+        {
+            File.Copy(item.SourcePath, destination, overwrite: true);
+            return;
+        }
+
+        NfeDocumentSummary? completeInvoice = null;
+        try
+        {
+            completeInvoice = NfeXmlReader.Parse(item.Document.XmlContent, item.SourcePath);
+        }
+        catch
+        {
+            // A SEFAZ pode entregar apenas o resumo; nesse caso, o PDF identifica claramente o tipo recebido.
+        }
+
+        if (completeInvoice is not null)
+            NfePdfExportService.ExportInvoiceSummary(completeInvoice, destination);
+        else
+            NfePdfExportService.ExportReceivedDocumentSummary(item.Document, destination);
+    }
+
     private void ApplyIssuedMonthFilter()
     {
         _issuedDocuments.Clear();
@@ -669,6 +792,8 @@ public sealed class NfeXmlManagerWindow : Window
         if (match.Success)
             _cnpjInput.Text = match.Groups[1].Value;
     }
+
+    private sealed record ReceivedDocumentExport(NfeDistributedDocument Document, string SourcePath);
 
     private sealed class DistributionState
     {
