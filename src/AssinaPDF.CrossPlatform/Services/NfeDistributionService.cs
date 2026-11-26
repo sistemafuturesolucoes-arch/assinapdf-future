@@ -156,7 +156,7 @@ public static class NfeDistributionService
             using (var output = new MemoryStream())
             {
                 await gzip.CopyToAsync(output, cancellationToken);
-                xml = Encoding.UTF8.GetString(output.ToArray());
+                xml = Encoding.UTF8.GetString(output.ToArray()).TrimStart('\uFEFF');
             }
 
             documents.Add(ParseDistributedDocument(nsu, schema, xml));
