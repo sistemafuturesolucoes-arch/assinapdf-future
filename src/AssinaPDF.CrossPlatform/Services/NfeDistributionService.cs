@@ -48,9 +48,11 @@ public static class NfeDistributionService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(certificate);
-        cnpj = NormalizeDigits(cnpj);
-        if (cnpj.Length != 14)
-            throw new ArgumentException("Informe um CNPJ com 14 dígitos.", nameof(cnpj));
+        cnpj = NormalizeCnpj(cnpj);
+        if (cnpj.Length != 14 ||
+            cnpj.Take(12).Any(c => !IsAsciiUpperAlphaNumeric(c)) ||
+            cnpj.Skip(12).Any(c => !char.IsAsciiDigit(c)))
+            throw new ArgumentException("Informe um CNPJ válido com 14 caracteres (os dois últimos devem ser numéricos).", nameof(cnpj));
         if (!certificate.HasPrivateKey)
             throw new InvalidOperationException(
                 "O certificado selecionado não possui chave privada acessível.");
@@ -251,6 +253,13 @@ public static class NfeDistributionService
     private static string AttributeValue(XElement? element, string name) =>
         (string?)element?.Attribute(name) ?? "";
 
+    public static string NormalizeCnpj(string value) =>
+        new(value.Where(char.IsAsciiLetterOrDigit)
+            .Select(char.ToUpperInvariant).ToArray());
+
+    private static bool IsAsciiUpperAlphaNumeric(char value) =>
+        value is >= '0' and <= '9' or >= 'A' and <= 'Z';
+
     public static string NormalizeDigits(string value) =>
-        new(value.Where(char.IsDigit).ToArray());
+        new(value.Where(char.IsAsciiDigit).ToArray());
 }
