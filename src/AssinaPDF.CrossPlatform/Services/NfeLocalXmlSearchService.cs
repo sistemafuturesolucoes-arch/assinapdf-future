@@ -13,7 +13,7 @@ public static class NfeLocalXmlSearchService
         IEnumerable<string> folders,
         int maximumFiles = 3000)
     {
-        cnpj = NfeDistributionService.NormalizeDigits(cnpj);
+        cnpj = NfeDistributionService.NormalizeCnpj(cnpj);
         if (cnpj.Length != 14)
             throw new ArgumentException("Informe um CNPJ com 14 dígitos.", nameof(cnpj));
         ArgumentNullException.ThrowIfNull(folders);
@@ -77,7 +77,7 @@ public static class NfeLocalXmlSearchService
                         try
                         {
                             var summary = NfeXmlReader.ReadFile(file);
-                            if (NfeDistributionService.NormalizeDigits(summary.IssuerDocument) == cnpj)
+                            if (NfeDistributionService.NormalizeCnpj(summary.IssuerDocument) == cnpj)
                                 documents.Add(summary);
                         }
                         catch
@@ -87,8 +87,7 @@ public static class NfeLocalXmlSearchService
                     }
                 }
                 catch (Exception ex) when (
-                    ex is IOException or UnauthorizedAccessException or
-                    DirectoryNotFoundException)
+                    ex is IOException or UnauthorizedAccessException)
                 {
                     invalid++;
                 }
