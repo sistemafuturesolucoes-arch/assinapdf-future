@@ -61,6 +61,7 @@ public sealed class NfeXmlManagerWindow : Window
             MinWidth = 230
         };
         _certificatePicker.SelectionChanged += (_, _) => TryFillCnpjFromCertificate();
+        TryFillCnpjFromCertificate();
         _receivedStatus = MakeStatus("Selecione o certificado e informe o CNPJ para consultar a distribuição da SEFAZ.");
         _issuedStatus = MakeStatus("Informe o CNPJ para localizar NF-e emitidas que já estejam salvas no computador.");
         _receivedList = new ListBox { ItemsSource = _receivedRows, MinHeight = 250 };
@@ -246,9 +247,20 @@ public sealed class NfeXmlManagerWindow : Window
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                 "AssinaPDF", "XML", "Recebidas");
         string outputDirectory = Path.Combine(baseDirectory, cnpj);
-        Directory.CreateDirectory(outputDirectory);
 
-        var state = await LoadStateAsync(cnpj, production);
+        DistributionState state;
+        try
+        {
+            state = await LoadStateAsync(cnpj, production);
+            Directory.CreateDirectory(outputDirectory);
+        }
+        catch (Exception ex)
+        {
+            _receivedStatus.Text =
+                "Não foi possível acessar o histórico de NSU ou a pasta de destino. " + ex.Message;
+            return;
+        }
+
         if (state.NextAllowedUtc is DateTimeOffset allowed && allowed > DateTimeOffset.UtcNow)
         {
             _receivedStatus.Text =
@@ -536,16 +548,9 @@ public sealed class NfeXmlManagerWindow : Window
     {
         string path = StatePath(cnpj, production);
         if (!File.Exists(path)) return new DistributionState();
-        try
-        {
-            await using var stream = File.OpenRead(path);
-            return await JsonSerializer.DeserializeAsync<DistributionState>(stream)
-                ?? new DistributionState();
-        }
-        catch
-        {
-            return new DistributionState();
-        }
+        await using var stream = File.OpenRead(path);
+        return await JsonSerializer.DeserializeAsync<DistributionState>(stream)
+            ?? new DistributionState();
     }
 
     private static async Task SaveStateAsync(
