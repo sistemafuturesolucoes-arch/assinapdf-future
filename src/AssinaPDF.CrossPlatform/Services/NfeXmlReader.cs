@@ -243,7 +243,8 @@ public static class NfeXmlReader
         bool validCpf = normalized.Length == 11 && normalized.All(char.IsAsciiDigit);
         bool validCnpj = normalized.Length == 14 &&
             normalized.Take(12).All(IsAsciiUpperAlphaNumeric) &&
-            normalized.Skip(12).All(char.IsAsciiDigit);
+            normalized.Skip(12).All(char.IsAsciiDigit) &&
+            HasValidCnpjCheckDigits(normalized);
         if (!validCpf && !validCnpj)
             throw new InvalidDataException(
                 $"O CPF/CNPJ do {role} deve conter 11 dígitos ou 14 caracteres no padrão CNPJ vigente.");
@@ -331,6 +332,30 @@ public static class NfeXmlReader
 
     private static bool IsAsciiUpperAlphaNumeric(char value) =>
         value is >= '0' and <= '9' or >= 'A' and <= 'Z';
+
+    private static bool HasValidCnpjCheckDigits(string cnpj)
+    {
+        if (cnpj.Length != 14)
+            return false;
+
+        int firstDigit = CalculateCnpjDigit(cnpj[..12]);
+        int secondDigit = CalculateCnpjDigit(cnpj[..12] + firstDigit.ToString(CultureInfo.InvariantCulture));
+        return cnpj[12] - '0' == firstDigit && cnpj[13] - '0' == secondDigit;
+    }
+
+    private static int CalculateCnpjDigit(string value)
+    {
+        int sum = 0;
+        int weight = 2;
+        for (int index = value.Length - 1; index >= 0; index--)
+        {
+            sum += (value[index] - 48) * weight;
+            weight = weight == 9 ? 2 : weight + 1;
+        }
+
+        int remainder = sum % 11;
+        return remainder is 0 or 1 ? 0 : 11 - remainder;
+    }
 
     private static string FormatAddress(XElement? address)
     {
