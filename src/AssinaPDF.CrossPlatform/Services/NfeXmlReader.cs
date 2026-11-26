@@ -210,14 +210,23 @@ public static class NfeXmlReader
 
     private static void ValidateAccessKey(string accessKey)
     {
-        if (accessKey.Length != 44 || accessKey.Any(c => c is < '0' or > '9'))
-            throw new InvalidDataException("A chave de acesso da NF-e não possui 44 dígitos numéricos.");
+        if (accessKey.Length != 44 ||
+            accessKey.Take(6).Any(c => !char.IsAsciiDigit(c)) ||
+            accessKey.Skip(6).Take(12).Any(c => !IsAsciiUpperAlphaNumeric(c)) ||
+            accessKey.Skip(18).Any(c => !char.IsAsciiDigit(c)))
+        {
+            throw new InvalidDataException(
+                "A chave de acesso da NF-e deve conter 44 caracteres no padrão numérico/alfanumérico vigente.");
+        }
 
         int sum = 0;
         int weight = 2;
         for (int index = 42; index >= 0; index--)
         {
-            sum += (accessKey[index] - '0') * weight;
+            int characterValue = char.IsAsciiDigit(accessKey[index])
+                ? accessKey[index] - '0'
+                : accessKey[index] - 48;
+            sum += characterValue * weight;
             weight = weight == 9 ? 2 : weight + 1;
         }
 
@@ -230,9 +239,14 @@ public static class NfeXmlReader
 
     private static void ValidateDocument(string document, string role)
     {
-        string digits = DigitsOnly(document);
-        if (digits.Length is not (11 or 14))
-            throw new InvalidDataException($"O CPF/CNPJ do {role} deve conter 11 ou 14 dígitos.");
+        string normalized = NormalizeDocument(document);
+        bool validCpf = normalized.Length == 11 && normalized.All(char.IsAsciiDigit);
+        bool validCnpj = normalized.Length == 14 &&
+            normalized.Take(12).All(IsAsciiUpperAlphaNumeric) &&
+            normalized.Skip(12).All(char.IsAsciiDigit);
+        if (!validCpf && !validCnpj)
+            throw new InvalidDataException(
+                $"O CPF/CNPJ do {role} deve conter 11 dígitos ou 14 caracteres no padrão CNPJ vigente.");
     }
 
     private static void ValidateKeyMatchesInvoice(
@@ -243,9 +257,9 @@ public static class NfeXmlReader
         int series)
     {
         string keyIssuer = accessKey.Substring(6, 14);
-        string issuerDigits = DigitsOnly(issuerDocument);
-        if (issuerDigits.Length == 14 &&
-            !string.Equals(keyIssuer, issuerDigits, StringComparison.Ordinal))
+        string issuerNormalized = NormalizeDocument(issuerDocument);
+        if (issuerNormalized.Length == 14 &&
+            !string.Equals(keyIssuer, issuerNormalized, StringComparison.Ordinal))
             throw new InvalidDataException("O CNPJ do emitente não corresponde ao CNPJ da chave de acesso.");
 
         string keyYearMonth = accessKey.Substring(2, 4);
@@ -311,8 +325,12 @@ public static class NfeXmlReader
         return result;
     }
 
-    private static string DigitsOnly(string? value) =>
-        new((value ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+    private static string NormalizeDocument(string? value) =>
+        new((value ?? string.Empty).Where(char.IsAsciiLetterOrDigit)
+            .Select(char.ToUpperInvariant).ToArray());
+
+    private static bool IsAsciiUpperAlphaNumeric(char value) =>
+        value is >= '0' and <= '9' or >= 'A' and <= 'Z';
 
     private static string FormatAddress(XElement? address)
     {
