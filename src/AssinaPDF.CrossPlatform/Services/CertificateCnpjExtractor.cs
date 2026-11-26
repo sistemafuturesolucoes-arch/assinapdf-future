@@ -22,7 +22,7 @@ public static class CertificateCnpjExtractor
     public static string Extract(X509Certificate2 certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate);
-        return Extract(certificate.Subject + "\\n" + certificate.SubjectName.Name);
+        return Extract(certificate.Subject + "\n" + certificate.SubjectName.Name);
     }
 
     public static string Extract(string? subject)
